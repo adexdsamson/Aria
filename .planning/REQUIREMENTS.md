@@ -142,3 +142,17 @@ Per PROJECT.md - explicitly not building:
 ## Traceability
 
 (Populated by ROADMAP.md - each requirement mapped to exactly one phase.)
+
+## Phase Mapping (filled by ROADMAP.md)
+
+| Phase | Requirements |
+|---|---|
+| Phase 1 Foundation | FOUND-01..07, LLM-01, LLM-03..05 |
+| Phase 2 Gmail + Briefing MVP | EMAIL-01, EMAIL-07, CAL-01, BRIEF-01, BRIEF-03, BRIEF-06, XCUT-01, XCUT-06, XCUT-07 |
+| Phase 3 Approval + Router + Email | APPR-01, APPR-03..07, LLM-02, EMAIL-03..06 |
+| Phase 4 Calendar Smart-Scheduling | CAL-04..07, APPR-02 |
+| Phase 5 Outlook Parity | EMAIL-02, CAL-02, CAL-03, CAL-08 |
+| Phase 6 Meeting Capture + Todoist | MEET-01..06, TASK-01, TASK-02 |
+| Phase 7 RAG Q&A | RAG-01..05 |
+| Phase 8 Insights / Recap / Learning / Release | INSIGHT-01..03, RECAP-01..04, LEARN-01..03, BRIEF-02, BRIEF-04, BRIEF-05, XCUT-02, XCUT-04, XCUT-05 |
+| Cross-cutting (every phase) | XCUT-03 (log redaction discipline) |
