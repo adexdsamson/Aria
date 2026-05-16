@@ -1,3 +1,91 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * D-13 design tokens surfaced as CSS variables.
+ * Values mirror src/renderer/app/theme/tokens.ts; keep them in sync.
+ */
+
+:root {
+  --aria-bg: #ffffff;
+  --aria-fg: #18181b;
+  --aria-muted-fg: #52525b;
+  --aria-border: #e4e4e7;
+  --aria-accent: #5b8def;
+  --aria-accent-fg: #ffffff;
+
+  --aria-gray-50: #fafafa;
+  --aria-gray-100: #f4f4f5;
+  --aria-gray-200: #e4e4e7;
+  --aria-gray-300: #d4d4d8;
+  --aria-gray-400: #a1a1aa;
+  --aria-gray-500: #71717a;
+  --aria-gray-600: #52525b;
+  --aria-gray-700: #3f3f46;
+  --aria-gray-800: #27272a;
+  --aria-gray-900: #18181b;
+  --aria-gray-950: #09090b;
+
+  --aria-type-xs: 12px;
+  --aria-type-sm: 14px;
+  --aria-type-base: 16px;
+  --aria-type-lg: 18px;
+  --aria-type-xl: 20px;
+  --aria-type-2xl: 24px;
+  --aria-type-3xl: 30px;
+
+  --aria-radius-sm: 4px;
+  --aria-radius-md: 6px;
+  --aria-radius-lg: 8px;
+  --aria-radius-xl: 12px;
+
+  --aria-space-xs: 4px;
+  --aria-space-sm: 8px;
+  --aria-space-md: 16px;
+  --aria-space-lg: 24px;
+  --aria-space-xl: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aria-bg: #0b0b0d;
+    --aria-fg: #f4f4f5;
+    --aria-muted-fg: #a1a1aa;
+    --aria-border: #27272a;
+    --aria-accent: #7aa2f7;
+    --aria-accent-fg: #0b1220;
+
+    --aria-gray-50: #09090b;
+    --aria-gray-100: #18181b;
+    --aria-gray-200: #27272a;
+    --aria-gray-300: #3f3f46;
+    --aria-gray-400: #52525b;
+    --aria-gray-500: #71717a;
+    --aria-gray-600: #a1a1aa;
+    --aria-gray-700: #d4d4d8;
+    --aria-gray-800: #e4e4e7;
+    --aria-gray-900: #f4f4f5;
+    --aria-gray-950: #fafafa;
+  }
+}
+
+:root[data-theme='dark'] {
+  --aria-bg: #0b0b0d;
+  --aria-fg: #f4f4f5;
+  --aria-muted-fg: #a1a1aa;
+  --aria-border: #27272a;
+  --aria-accent: #7aa2f7;
+  --aria-accent-fg: #0b1220;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background-color: var(--aria-bg);
+  color: var(--aria-fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: var(--aria-type-base);
+}

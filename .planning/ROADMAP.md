@@ -8,7 +8,7 @@
 
 | # | Phase | Goal | Plans (est) |
 |---|---|---|---|
-| 1 | Foundation | Desktop app shell with encrypted local store, LLM router skeleton, and "hello briefing" stub end-to-end | 4 |
+| 1 | 1/5 | In Progress|  |
 | 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 3 |
 | 3 | Approval Queue + Sensitivity Router + Email Triage/Drafting/Send | Aria writes its first email under user approval, with hybrid LLM routing live | 4 |
 | 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3 |
@@ -25,7 +25,7 @@
 **Goal:** Desktop app shell with encrypted local store, LLM router skeleton, and a hello-briefing stub working end-to-end
 **Mode:** mvp
 **Requirements:** FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05, FOUND-06, FOUND-07, LLM-01, LLM-03, LLM-04, LLM-05
-**Plans:** 4 plans
+**Plans:** 1/5 plans executed
 Plans:
 - [ ] 01-01-scaffold-PLAN.md — Electron 42 + electron-vite + React + TS + Tailwind + shadcn scaffold; secure preload bridge; pino redacted log sink; vitest + playwright _electron smoke (wave 1)
 - [ ] 01-02-db-passphrase-PLAN.md — BIP39 mnemonic + scrypt vault + SQLCipher chacha20 DB + migration runner + VACUUM-INTO backup/restore + onboarding wizard (wave 2)
