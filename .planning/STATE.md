@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 1 complete
-last_updated: "2026-05-16T14:36:17.384Z"
+status: Phase 2 in progress
+last_updated: "2026-05-16T22:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_plans: 9
+  completed_plans: 6
+  percent: 67
 ---
 
 # State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Phase
 
-**Phase 1: Foundation** - not yet started.
+**Phase 2: Gmail + Daily Briefing MVP** — Wave 1 (02-01) complete; Wave 2 (02-02 Calendar) up next.
 
 ## Phase Status
 
-- [ ] Phase 1: Foundation
+- [x] Phase 1: Foundation
 - [ ] Phase 2: Gmail + Daily Briefing MVP
 - [ ] Phase 3: Approval Queue + Sensitivity Router + Email Triage/Drafting/Send
 - [ ] Phase 4: Calendar Smart-Scheduling (Google)
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Next Action
 
-Run `/gsd-discuss-phase 1` to gather context and clarify the approach for the Foundation phase, then `/gsd-plan-phase 1` to produce PLAN.md.
+Run `/gsd-execute-phase 2 --wave 2` to execute the Calendar ingest plan (02-02).
 
 ## Workflow Config
 

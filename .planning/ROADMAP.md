@@ -52,7 +52,7 @@ Cross-cutting in Phase 1: kick off Google CASA security review (multi-week lead 
 **Requirements:** EMAIL-01, EMAIL-07, CAL-01 (read portion), BRIEF-01, BRIEF-03, BRIEF-06, XCUT-01, XCUT-06, XCUT-07
 **Plans:** 4 plans
 Plans:
-- [ ] 02-01-gmail-ingest-PLAN.md — Gmail OAuth (loopback IP + PKCE) + read-only ingest with historyId + 7-day backfill + 5-min cron + EMAIL-07 banner + StatusPanel row + invalid_grant detection (wave 1, autonomous: false — GCP setup checkpoint)
+- [x] 02-01-gmail-ingest-PLAN.md — Gmail OAuth (loopback IP + PKCE) + read-only ingest with historyId + 7-day backfill + 5-min cron + EMAIL-07 banner + StatusPanel row + invalid_grant detection (wave 1, autonomous: false — GCP setup checkpoint)
 - [ ] 02-02-calendar-ingest-PLAN.md — Google Calendar OAuth (reuses connectGoogle) + read-only ingest via syncToken + 410 fallback + all-day/timed event normalization (XCUT-07) + 15-min cron + Calendar row + StatusPanel row (wave 2, depends on 02-01)
 - [ ] 02-03-briefing-news-PLAN.md — News sources (HN + RSS + NG country bundle) with URL resolution + CountrySectorPicker onboarding step + NewsSourcesSection Settings + migration 004 news_source table (wave 3, depends on 02-02)
 - [ ] 02-04-briefing-engine-PLAN.md — Briefing engine: Promise.allSettled gather + M1 PII redaction + generateObject(BriefingSchema) via Phase 1 router + B4 SC2 fallback for no-IMPORTANT accounts + scheduler with lastFiredDate + powerMonitor coalescing + BriefingScreen UI + BriefingSettingsSection + Playwright e2e + migration 005 briefing/dismissed tables (wave 4, depends on 02-03)
