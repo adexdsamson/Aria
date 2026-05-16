@@ -18,6 +18,8 @@ import { redactObject } from './log/redact';
 import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
+import { registerOnboardingHandlers, createDbHolder } from './ipc/onboarding';
+import { CHANNELS } from '../shared/ipc-contract';
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -101,7 +103,22 @@ async function bootstrap(): Promise<void> {
   applyCsp();
   registerPowerHooks(logger);
   registerScheduler(logger);
-  registerHandlers(ipcMain, { logger });
+  // Plan 02: register onboarding + backup IPC first, then stub-register the
+  // remaining channels via registerHandlers (skipping the ones we just took).
+  // Plan 03 (wave 4) will replace the remaining stubs.
+  const dbHolder = createDbHolder();
+  registerOnboardingHandlers(ipcMain, { logger, dataDir, dbHolder });
+  registerHandlers(ipcMain, { logger }, {
+    skipChannels: [
+      CHANNELS.ONBOARDING_GEN_MNEMONIC,
+      CHANNELS.ONBOARDING_CONFIRM,
+      CHANNELS.ONBOARDING_SEAL,
+      CHANNELS.ONBOARDING_UNLOCK,
+      CHANNELS.ONBOARDING_STATUS,
+    ],
+  });
+  // Backup/restore handlers wired in Task 3b.
+  void dbHolder;
 
   createMainWindow();
 

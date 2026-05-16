@@ -13,11 +13,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { getLogger } from '../../log/pino';
+import { EMBEDDED_MIGRATIONS } from './embedded';
 
 type Db = Database.Database;
 
-/** Default location of bundled migration files. */
-export const MIGRATIONS_DIR = path.join(__dirname);
+/** Default location of bundled migration files (used by source-tree tests). */
+export const MIGRATIONS_DIR = __dirname;
 
 export interface RunMigrationsOptions {
   /** Override migrations directory (used by tests). */
@@ -36,18 +37,24 @@ interface Migration {
  * Parse `<NNN>_<slug>.sql` filenames into ordered migrations. Files whose
  * names do not match the pattern are ignored with a warning.
  */
-function loadMigrations(dir: string): Migration[] {
-  const entries = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.sql'));
-  entries.sort();
-  const out: Migration[] = [];
-  for (const file of entries) {
-    const m = /^(\d+)_/.exec(file);
-    if (!m) continue;
-    const version = Number.parseInt(m[1]!, 10);
-    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
-    out.push({ version, file, sql });
+function loadMigrations(dir: string | undefined): Migration[] {
+  // When an explicit dir is supplied (unit tests), read .sql files from disk.
+  // Otherwise use the EMBEDDED_MIGRATIONS string constants, which survive the
+  // electron-vite bundle into out/main/index.js.
+  if (dir && fs.existsSync(dir)) {
+    const entries = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.sql'));
+    entries.sort();
+    const out: Migration[] = [];
+    for (const file of entries) {
+      const m = /^(\d+)_/.exec(file);
+      if (!m) continue;
+      const version = Number.parseInt(m[1]!, 10);
+      const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+      out.push({ version, file, sql });
+    }
+    return out;
   }
-  return out;
+  return EMBEDDED_MIGRATIONS.map((m) => ({ version: m.version, file: m.file, sql: m.sql }));
 }
 
 /**
@@ -56,7 +63,7 @@ function loadMigrations(dir: string): Migration[] {
  * Returns the list of versions actually applied (empty when already current).
  */
 export function runMigrations(db: Db, opts: RunMigrationsOptions = {}): number[] {
-  const dir = opts.dir ?? MIGRATIONS_DIR;
+  const dir = opts.dir;
   const logger = opts.logger ?? safeLogger();
   const migrations = loadMigrations(dir);
   const current = db.pragma('user_version', { simple: true }) as number;
