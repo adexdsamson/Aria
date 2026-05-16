@@ -46,28 +46,31 @@ Cross-cutting in Phase 1: kick off Google CASA security review (multi-week lead 
 **Plans (estimated):**
 1. Gmail OAuth (loopback IP flow); read-only ingest with historyId change tokens; rate-limited backfill; reconciliation pass
 2. Google Calendar OAuth + read-only ingest with delta tokens (write capability deferred to Phase 4)
-3. Briefing agent v1: today calendar preview + unread priority email + external news placeholder; daily cron with sleep/wake coalescing; UI surface
+3. Briefing agent v1: today calendar preview + unread priority email + external news section (curated source list, per-item guardrails: no opinion/no auto-action, dismissible); every surfaced briefing item carries a one-line "why this mattered" rationale; daily cron with sleep/wake coalescing; UI surface
 **Success Criteria:**
 1. User connects Gmail; new mail appears in Aria within 5 minutes
-2. User wakes machine at 7am; sees a briefing covering today calendar and top unread mail
+2. User wakes machine at 7am; sees a briefing covering today calendar, top unread mail, and external news; every item shows a "why this mattered" rationale
 3. Expired Gmail token surfaces a re-auth banner; other features unaffected
 4. Sleep/wake does not produce a cron storm
+5. External news section honors guardrails: bounded source list, no auto-action, user can dismiss/disable
 
 ### Phase 3: Approval Queue + Sensitivity Router + Email Triage/Drafting/Send
 **Goal:** Aria writes its first email under user approval, with hybrid LLM routing live and defended
 **Mode:** mvp
 **Requirements:** APPR-01, APPR-03, APPR-04, APPR-05, APPR-06, APPR-07, LLM-02, EMAIL-03, EMAIL-04, EMAIL-05, EMAIL-06
 **Plans (estimated):**
-1. Approval Queue persisted entity and state machine (pending/generating/ready/approved/sent); UI surface; tier configuration
+1. Approval Queue persisted entity and state machine (pending/generating/ready/approved/sent); UI surface; tier configuration infra in place (always-confirm vs per-recipient allowlist) but v1 ships with always-confirm default only — allowlist UI deferred to v1.x
 2. Sensitivity classifier upgrade (local LLM via generateObject + Zod); redaction layer with re-hydration; PII regression eval; routing-log audit UI
-3. Email triage agent (priority + rationale); thread summarization on demand
-4. Email drafting agent (voice-match few-shot from sent mail) -> Approval Queue; Gmail send scope OAuth using CASA-approved credentials; send + audit log
+3. Email triage agent (priority + first-class "why this mattered" rationale on every triage decision, surfaced inline in the queue); thread summarization on demand
+4. Voice-match spike: few-shot from sent mail vs local fine-tune — pick approach against held-out eval before building. Then Email drafting agent on chosen path -> Approval Queue; Gmail send scope OAuth using CASA-approved credentials; send + audit log
 **Success Criteria:**
 1. User cannot send any email without an explicit approval action (verified by attempted bypass)
 2. PII-like content classifies as sensitive and routes LOCAL; routing log shows decision + reason
 3. User approves a draft; email sends via Gmail; appears in Sent folder
 4. Approval queue items survive an app crash mid-generation; never transition to sent without explicit user action
 5. Draft voice match passes a held-out eval vs prior sent emails
+6. Every triage decision carries a user-visible "why this mattered" rationale; rationale is structured and auditable
+7. Tier config schema exists and is enforced by the gate even though only the always-confirm tier is user-selectable in v1
 
 Pre-Phase-3 gate: recruit at least one real SMB-exec design partner per PROJECT.md key decision.
 
@@ -133,11 +136,11 @@ Pre-Phase-3 gate: recruit at least one real SMB-exec design partner per PROJECT.
 **Requirements:** INSIGHT-01, INSIGHT-02, INSIGHT-03, RECAP-01, RECAP-02, RECAP-03, RECAP-04, LEARN-01, LEARN-02, LEARN-03, BRIEF-02, BRIEF-04, BRIEF-05, XCUT-02, XCUT-04, XCUT-05
 **Plans (estimated):**
 1. Insights computation over user history (calendar-load delta, response-time trends, recurring themes); briefing integration; routed prose generation
-2. Weekly recap agent with audit log of Aria actions; editable preview; PDF/DOCX export via docx + @react-pdf/renderer
+2. Weekly recap agent: meetings/actions/wins/upcoming PLUS an explicit "What Aria did this week" section stitched from the action audit log (drafts sent, meetings moved, tasks pushed, approvals declined); editable preview; PDF/DOCX export via docx + @react-pdf/renderer
 3. Preference learning loop wired to approval feedback (edits, rejects); local-only; user-inspectable preferences with reset
 4. Release prep: macOS notarization, Windows OV signing, electron-updater feed, pre-migration DB backup, antivirus runbook, final integration testing
 **Success Criteria:**
-1. User receives a weekly recap covering meetings, actions, wins, and what is coming, plus an audit log of Aria actions; editable and exportable
+1. User receives a weekly recap covering meetings, actions, wins, and what is coming, with an explicit "What Aria did this week" section sourced from the action audit log; editable and exportable
 2. After two weeks of use, briefing includes at least one insight derived from the user own data
 3. Drafts after week two are observably closer to the user voice than week one (manual eval)
 4. Auto-updater installs a new version, runs schema migration, and restores from backup if migration fails (verified in test)
