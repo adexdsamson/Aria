@@ -9,7 +9,7 @@
 | # | Phase | Goal | Plans (est) |
 |---|---|---|---|
 | 1 | 5/5 | Complete   | 2026-05-16 |
-| 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 3 |
+| 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 4 |
 | 3 | Approval Queue + Sensitivity Router + Email Triage/Drafting/Send | Aria writes its first email under user approval, with hybrid LLM routing live | 4 |
 | 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3 |
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
@@ -50,15 +50,18 @@ Cross-cutting in Phase 1: kick off Google CASA security review (multi-week lead 
 **Goal:** First useful slice - Gmail inbound, today calendar, briefing generated and displayed
 **Mode:** mvp
 **Requirements:** EMAIL-01, EMAIL-07, CAL-01 (read portion), BRIEF-01, BRIEF-03, BRIEF-06, XCUT-01, XCUT-06, XCUT-07
-**Plans (estimated):**
-1. Gmail OAuth (loopback IP flow); read-only ingest with historyId change tokens; rate-limited backfill; reconciliation pass
-2. Google Calendar OAuth + read-only ingest with delta tokens (write capability deferred to Phase 4)
-3. Briefing agent v1: today calendar preview + unread priority email + external news section (curated source list, per-item guardrails: no opinion/no auto-action, dismissible); every surfaced briefing item carries a one-line "why this mattered" rationale; daily cron with sleep/wake coalescing; UI surface
+**Plans:** 4 plans
+Plans:
+- [ ] 02-01-gmail-ingest-PLAN.md — Gmail OAuth (loopback IP + PKCE) + read-only ingest with historyId + 7-day backfill + 5-min cron + EMAIL-07 banner + StatusPanel row + invalid_grant detection (wave 1, autonomous: false — GCP setup checkpoint)
+- [ ] 02-02-calendar-ingest-PLAN.md — Google Calendar OAuth (reuses connectGoogle) + read-only ingest via syncToken + 410 fallback + all-day/timed event normalization (XCUT-07) + 15-min cron + Calendar row + StatusPanel row (wave 2, depends on 02-01)
+- [ ] 02-03-briefing-news-PLAN.md — News sources (HN + RSS + NG country bundle) with URL resolution + CountrySectorPicker onboarding step + NewsSourcesSection Settings + migration 004 news_source table (wave 3, depends on 02-02)
+- [ ] 02-04-briefing-engine-PLAN.md — Briefing engine: Promise.allSettled gather + M1 PII redaction + generateObject(BriefingSchema) via Phase 1 router + B4 SC2 fallback for no-IMPORTANT accounts + scheduler with lastFiredDate + powerMonitor coalescing + BriefingScreen UI + BriefingSettingsSection + Playwright e2e + migration 005 briefing/dismissed tables (wave 4, depends on 02-03)
+
 **Success Criteria:**
 1. User connects Gmail; new mail appears in Aria within 5 minutes
-2. User wakes machine at 7am; sees a briefing covering today calendar, top unread mail, and external news; every item shows a "why this mattered" rationale
+2. User wakes machine at 7am; sees a briefing covering today calendar, top unread mail, and external news; every item shows a "why this mattered" rationale (B4 fallback: when account has unread mail but no IMPORTANT labels, the email section displays a documented Phase-2-limitation placeholder pointing to Phase 3's classifier)
 3. Expired Gmail token surfaces a re-auth banner; other features unaffected
-4. Sleep/wake does not produce a cron storm
+4. Sleep/wake does not produce a cron storm (cronRegistry size invariant: 3 across suspend/resume)
 5. External news section honors guardrails: bounded source list, no auto-action, user can dismiss/disable
 
 ### Phase 3: Approval Queue + Sensitivity Router + Email Triage/Drafting/Send
