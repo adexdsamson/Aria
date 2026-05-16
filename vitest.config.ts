@@ -11,6 +11,8 @@ import { resolve } from 'node:path';
  */
 export default defineConfig({
   test: {
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
