@@ -23,6 +23,11 @@ export const CHANNELS = {
   DIAGNOSTICS_STATUS: 'aria:diagnostics:status',
   BACKUP_CREATE: 'aria:backup:create',
   BACKUP_RESTORE: 'aria:backup:restore',
+  // Plan 02-01 Gmail integration
+  GMAIL_CONNECT: 'aria:gmail:connect',
+  GMAIL_STATUS: 'aria:gmail:status',
+  GMAIL_DISCONNECT: 'aria:gmail:disconnect',
+  GMAIL_FORCE_SYNC: 'aria:gmail:force-sync',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -89,6 +94,30 @@ export interface OnboardingStatus {
   unlocked: boolean;
 }
 
+/**
+ * Plan 02-01 — Gmail integration status payload returned by GMAIL_STATUS.
+ *
+ * `tokenStatus` drives the IntegrationsSection UI:
+ *   - `missing`  — no row in gmail_account; render "Connect Gmail" button
+ *   - `ok`       — connected, last_error is empty
+ *   - `expired`  — last_error starts with `token-expired`; EMAIL-07 banner
+ *                  (`Aria's access to Gmail has expired. Re-connect to resume
+ *                   syncing. Calendar and other integrations are unaffected.`)
+ *   - `revoked`  — last_error starts with `token-revoked`; EMAIL-07 banner
+ *                  with the revoked variant copy
+ *
+ * `queueDepth` = scheduler.queue.size + scheduler.queue.pending — surfaced by
+ * StatusPanel's IntegrationStatusRow.
+ */
+export interface GmailIntegrationStatus {
+  connected: boolean;
+  email?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
+  queueDepth: number;
+}
+
 /** Standardized error envelope returned by stub handlers in Plan 01b. */
 export interface IpcError {
   error: string;
@@ -120,6 +149,11 @@ export interface AriaApi {
 
   backupCreate(req?: { destination?: string }): Promise<{ path: string } | IpcError>;
   backupRestore(req: { source: string; passphrase: string }): Promise<{ ok: boolean } | IpcError>;
+
+  gmailConnect(): Promise<{ ok: true; email: string } | { ok: false; error: string } | IpcError>;
+  gmailStatus(): Promise<GmailIntegrationStatus | IpcError>;
+  gmailDisconnect(): Promise<{ ok: boolean } | IpcError>;
+  gmailForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
 }
 
 /**
@@ -144,4 +178,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   DIAGNOSTICS_STATUS: 'diagnosticsStatus',
   BACKUP_CREATE: 'backupCreate',
   BACKUP_RESTORE: 'backupRestore',
+  GMAIL_CONNECT: 'gmailConnect',
+  GMAIL_STATUS: 'gmailStatus',
+  GMAIL_DISCONNECT: 'gmailDisconnect',
+  GMAIL_FORCE_SYNC: 'gmailForceSync',
 } as const;

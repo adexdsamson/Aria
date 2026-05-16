@@ -40,10 +40,25 @@ export class SafeStorageUnavailableError extends Error {
   }
 }
 
+/**
+ * Plan 02-01: Google OAuth refresh tokens live in a separate `googleTokens`
+ * subtree on the SAME secrets.json file. Refresh token is encrypted via
+ * safeStorage.encryptString and base64-encoded — exactly the same discipline
+ * as `providers`. The plaintext refresh token NEVER hits disk and NEVER
+ * appears in SQLCipher rows (T-02-01-01).
+ */
+export type GoogleTokenKind = 'gmail' | 'calendar';
+
+interface GoogleTokenEntry {
+  refreshTokenEnc: string;
+  email: string;
+}
+
 interface SecretsFile {
   v: 1;
   providers: Partial<Record<ProviderId, string>>;
   activeProvider: ProviderId | null;
+  googleTokens?: Partial<Record<GoogleTokenKind, GoogleTokenEntry>>;
 }
 
 const SECRETS_FILE = 'secrets.json';
@@ -156,5 +171,71 @@ export async function setActiveProvider(
     throw new Error('no-key-for-provider');
   }
   data.activeProvider = provider;
+  writeFileAtomic(data);
+}
+
+// ============================================================================
+// Plan 02-01: Google OAuth refresh-token storage (googleTokens subtree)
+// ============================================================================
+
+export interface SetGoogleTokensInput {
+  kind: GoogleTokenKind;
+  refreshToken: string;
+  email: string;
+}
+
+/**
+ * Persist a Google OAuth refresh token + the user's email for the given kind
+ * ('gmail' | 'calendar'). The refresh token is encrypted via safeStorage and
+ * base64-encoded before write. Phase-1 fields (`providers`, `activeProvider`)
+ * are preserved untouched (T-01-03 isolation discipline).
+ */
+export function setGoogleTokens(input: SetGoogleTokensInput): void {
+  assertSafeStorageReady();
+  const { kind, refreshToken, email } = input;
+  if (!refreshToken) {
+    throw new Error('setGoogleTokens: refreshToken is empty');
+  }
+  const encrypted = safeStorage.encryptString(refreshToken).toString('base64');
+  const data = readFile();
+  if (!data.googleTokens) data.googleTokens = {};
+  data.googleTokens[kind] = { refreshTokenEnc: encrypted, email };
+  writeFileAtomic(data);
+}
+
+export interface GoogleTokens {
+  refreshToken: string;
+  email: string;
+}
+
+/**
+ * Read + decrypt the persisted refresh token for the given kind. Returns null
+ * when no entry exists. Throws SafeStorageUnavailableError(decrypt-failed) on
+ * corrupted ciphertext or when the OS keychain rejects the decrypt.
+ */
+export function getGoogleTokens(kind: GoogleTokenKind): GoogleTokens | null {
+  assertSafeStorageReady();
+  const data = readFile();
+  const entry = data.googleTokens?.[kind];
+  if (!entry) return null;
+  try {
+    const buf = Buffer.from(entry.refreshTokenEnc, 'base64');
+    const refreshToken = safeStorage.decryptString(buf);
+    return { refreshToken, email: entry.email };
+  } catch {
+    throw new SafeStorageUnavailableError('decrypt-failed');
+  }
+}
+
+/**
+ * Remove the persisted Google tokens for the given kind. Leaves OTHER kinds
+ * (e.g. calendar when clearing gmail) and Phase-1 `providers` / `activeProvider`
+ * untouched.
+ */
+export function clearGoogleTokens(kind: GoogleTokenKind): void {
+  const data = readFile();
+  if (data.googleTokens && data.googleTokens[kind]) {
+    delete data.googleTokens[kind];
+  }
   writeFileAtomic(data);
 }

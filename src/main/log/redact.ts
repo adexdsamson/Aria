@@ -19,6 +19,11 @@ export const DEFAULT_PII_PATTERNS: RegExp[] = [
   /(?:(?:\+?\d{1,3}[-.\s])?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4})/g,
   // Currency amounts: $1, $1.50, $1,234.56
   /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?|\$\d+(?:\.\d+)?/g,
+  // Plan 02-01 (T-02-01-02): OAuth bearer access tokens. Conservative; this
+  // covers Google's URL-safe base64 access_token format including '.' / '-' / '_' / '+' / '/' / '~' / '=' padding.
+  /Bearer\s+[A-Za-z0-9._\-~+/]+=*/g,
+  // Plan 02-01 (T-02-01-02): OAuth authorization code (loopback redirect query).
+  /code=[A-Za-z0-9._\-/]+/g,
 ];
 
 /**

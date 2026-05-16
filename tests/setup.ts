@@ -24,6 +24,37 @@ export function createTempUserDataDir(prefix = 'aria-test'): string {
 // Default userData dir for the suite; tests can replace via app.getPath override.
 const DEFAULT_USER_DATA = createTempUserDataDir('aria-default');
 
+/**
+ * Plan 02-01: GmailClient fixture factory. Sync-gmail tests inject a fake
+ * with these four methods (`listHistory`, `listMessages`, `getMessageMetadata`,
+ * `getProfile`); per-case override behavior via `mockReturnValue` / `mockImplementation`.
+ *
+ * Calendar half is a no-op placeholder; Plan 02-02 will flesh it out.
+ */
+export interface GmailClientFake {
+  listHistory: ReturnType<typeof vi.fn>;
+  listMessages: ReturnType<typeof vi.fn>;
+  getMessageMetadata: ReturnType<typeof vi.fn>;
+  getProfile: ReturnType<typeof vi.fn>;
+}
+
+export interface CalendarClientFake {
+  // Filled in by Plan 02-02.
+  noop: ReturnType<typeof vi.fn>;
+}
+
+export function mockGoogleapis(): { gmail: GmailClientFake; calendar: CalendarClientFake } {
+  return {
+    gmail: {
+      listHistory: vi.fn().mockResolvedValue({ history: [], historyId: '0' }),
+      listMessages: vi.fn().mockResolvedValue({ messages: [], historyId: '0' }),
+      getMessageMetadata: vi.fn().mockResolvedValue(null),
+      getProfile: vi.fn().mockResolvedValue({ emailAddress: 'test@example.com', historyId: '0' }),
+    },
+    calendar: { noop: vi.fn() },
+  };
+}
+
 vi.mock('electron', () => {
   return {
     safeStorage: {
