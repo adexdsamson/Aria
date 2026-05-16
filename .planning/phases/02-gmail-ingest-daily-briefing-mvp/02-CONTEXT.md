@@ -222,3 +222,21 @@ None — no pre-existing todos matched Phase 2.
 
 *Phase: 02-gmail-ingest-daily-briefing-mvp*
 *Context gathered: 2026-05-16 via /gsd-discuss-phase*
+
+---
+
+## Resolutions to RESEARCH open questions (2026-05-16)
+
+- **GCP project + OAuth Client ID:** Wave-0 prerequisite task in Plan 2-1. User
+  creates a GCP project + Desktop OAuth client; dev builds read `client_id` from
+  `.env.local`; release builds embed production `client_id` at build time. This is
+  the same TODO listed as CASA-INTAKE §1.
+- **Briefing missed-on-sleep policy:** Honor CONTEXT.md "don't back-fire on wake",
+  BUT the Briefing screen renders a "Generate today's briefing now?" affordance when
+  no briefing row exists for today's local date. User-initiated, not auto-fire.
+- **News candidate-pool budget:** Top 50 total, capped per source — ~20 HN front
+  page + ~15 RSS most-recent + ~15 NG bundle most-recent, deduplicated by URL hash.
+  Keeps the ranking prompt under ~8k input tokens; ~$0.10/day cost ceiling.
+- **Gmail OAuth scope:** `gmail.readonly` (NOT `gmail.metadata`). Maintains a
+  monotonic consent ladder with Phase 3's `gmail.send`. CASA Tier 2 review (already
+  in flight per `01-03-CASA-INTAKE.md`) covers both.
