@@ -29,11 +29,14 @@ import { registerSecretsHandlers } from './secrets';
 import { registerOllamaHandlers } from './ollama';
 import { registerAskHandlers } from './ask';
 import { registerDiagnosticsHandlers } from './diagnostics';
+import { registerGmailHandlers } from './gmail';
+import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
   logger: Logger;
   dataDir: string;
   dbHolder?: DbHolder;
+  scheduler?: SchedulerHandle;
   secrets?: unknown;
   router?: unknown;
   ollama?: unknown;
@@ -102,6 +105,18 @@ export function registerHandlers(
   if (!skip.has(CHANNELS.DIAGNOSTICS_ROUTING_LOG)) {
     registerDiagnosticsHandlers(ipcMain, { logger, dbHolder });
     skip.add(CHANNELS.DIAGNOSTICS_ROUTING_LOG);
+  }
+
+  const gmailChannels = [
+    CHANNELS.GMAIL_CONNECT,
+    CHANNELS.GMAIL_STATUS,
+    CHANNELS.GMAIL_DISCONNECT,
+    CHANNELS.GMAIL_FORCE_SYNC,
+  ];
+  if (!gmailChannels.every((c) => skip.has(c))) {
+    const scheduler = deps.scheduler ?? registerScheduler(logger);
+    registerGmailHandlers(ipcMain, { logger, dbHolder, scheduler });
+    gmailChannels.forEach((c) => skip.add(c));
   }
 }
 

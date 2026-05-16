@@ -7,10 +7,63 @@
  * exact D-10 phrasing (`Frontier disabled — add an API key in Settings.`).
  */
 import { useEffect, useState } from 'react';
-import type { DiagnosticsStatus } from '../../../shared/ipc-contract';
+import type { DiagnosticsStatus, GmailIntegrationStatus, IpcError } from '../../../shared/ipc-contract';
 
 const POLL_MS = 10_000;
 const LOCAL_ONLY_BANNER = 'Frontier disabled — add an API key in Settings.';
+
+function isErr(v: unknown): v is IpcError {
+  return !!v && typeof v === 'object' && 'error' in (v as object);
+}
+
+function relativeTime(iso?: string): string {
+  if (!iso) return 'never';
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return 'never';
+  const deltaSec = Math.round((then - Date.now()) / 1000);
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  const abs = Math.abs(deltaSec);
+  if (abs < 60) return rtf.format(deltaSec, 'second');
+  if (abs < 3600) return rtf.format(Math.round(deltaSec / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(deltaSec / 3600), 'hour');
+  return rtf.format(Math.round(deltaSec / 86400), 'day');
+}
+
+export function IntegrationStatusRow({ kind }: { kind: 'gmail' }): JSX.Element {
+  const [status, setStatus] = useState<GmailIntegrationStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function tick(): Promise<void> {
+      if (kind !== 'gmail') return;
+      const next = await window.aria.gmailStatus();
+      if (!cancelled && !isErr(next)) setStatus(next);
+    }
+    void tick();
+    const id = setInterval(() => void tick(), POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [kind]);
+
+  if (!status) return <span data-testid={`integration-row-${kind}`}>loading…</span>;
+  const badge =
+    status.tokenStatus === 'expired' || status.tokenStatus === 'revoked'
+      ? 'error'
+      : !status.connected
+        ? 'idle'
+        : status.queueDepth > 0
+          ? 'syncing'
+          : 'idle';
+  const lastErr = (status.lastError ?? '').slice(0, 80);
+  return (
+    <span data-testid={`integration-row-${kind}`}>
+      [{badge}] {status.email ?? '(disconnected)'} · synced {relativeTime(status.lastSyncedAt)} · queued: {status.queueDepth}
+      {lastErr ? ` · err: ${lastErr}` : ''}
+    </span>
+  );
+}
 
 export function StatusPanel(): JSX.Element {
   const [status, setStatus] = useState<DiagnosticsStatus | null>(null);
@@ -56,6 +109,10 @@ export function StatusPanel(): JSX.Element {
           <dt>Data directory</dt>
           <dd>
             <code>{status.dataDir}</code>
+          </dd>
+          <dt>Gmail</dt>
+          <dd>
+            <IntegrationStatusRow kind="gmail" />
           </dd>
         </dl>
       )}
