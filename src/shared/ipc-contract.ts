@@ -28,6 +28,11 @@ export const CHANNELS = {
   GMAIL_STATUS: 'aria:gmail:status',
   GMAIL_DISCONNECT: 'aria:gmail:disconnect',
   GMAIL_FORCE_SYNC: 'aria:gmail:force-sync',
+  // Plan 02-02 Calendar integration
+  CALENDAR_CONNECT: 'aria:calendar:connect',
+  CALENDAR_STATUS: 'aria:calendar:status',
+  CALENDAR_DISCONNECT: 'aria:calendar:disconnect',
+  CALENDAR_FORCE_SYNC: 'aria:calendar:force-sync',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -118,6 +123,42 @@ export interface GmailIntegrationStatus {
   queueDepth: number;
 }
 
+/**
+ * Plan 02-02 — Calendar integration status payload. Mirrors GmailIntegrationStatus
+ * field-for-field so the renderer can share the row component shape.
+ */
+export interface CalendarIntegrationStatus {
+  connected: boolean;
+  email?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
+  queueDepth: number;
+}
+
+/**
+ * Plan 02-02 — calendar_event row shape consumed by Plan 02-04's briefing
+ * reader. Mirrors the migration 003 columns. EITHER `start_at_utc` (timed
+ * events) OR `start_date` (YYYY-MM-DD all-day events) is set, never both;
+ * the SQLite CHECK constraint enforces this server-side.
+ */
+export interface CalendarEventRow {
+  id: string;
+  calendar_id: string;
+  summary: string;
+  location: string | null;
+  start_at_utc: string | null;
+  end_at_utc: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  start_timezone: string | null;
+  attendees: string;
+  status: string;
+  recurring_id: string | null;
+  updated_at: string;
+  fetched_at: string;
+}
+
 /** Standardized error envelope returned by stub handlers in Plan 01b. */
 export interface IpcError {
   error: string;
@@ -154,6 +195,11 @@ export interface AriaApi {
   gmailStatus(): Promise<GmailIntegrationStatus | IpcError>;
   gmailDisconnect(): Promise<{ ok: boolean } | IpcError>;
   gmailForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
+
+  calendarConnect(): Promise<{ ok: true; email: string } | { ok: false; error: string } | IpcError>;
+  calendarStatus(): Promise<CalendarIntegrationStatus | IpcError>;
+  calendarDisconnect(): Promise<{ ok: boolean } | IpcError>;
+  calendarForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
 }
 
 /**
@@ -182,4 +228,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   GMAIL_STATUS: 'gmailStatus',
   GMAIL_DISCONNECT: 'gmailDisconnect',
   GMAIL_FORCE_SYNC: 'gmailForceSync',
+  CALENDAR_CONNECT: 'calendarConnect',
+  CALENDAR_STATUS: 'calendarStatus',
+  CALENDAR_DISCONNECT: 'calendarDisconnect',
+  CALENDAR_FORCE_SYNC: 'calendarForceSync',
 } as const;

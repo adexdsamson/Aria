@@ -39,8 +39,9 @@ export interface GmailClientFake {
 }
 
 export interface CalendarClientFake {
-  // Filled in by Plan 02-02.
-  noop: ReturnType<typeof vi.fn>;
+  listEvents: ReturnType<typeof vi.fn>;
+  listEventsWindow: ReturnType<typeof vi.fn>;
+  getCalendarMetadata: ReturnType<typeof vi.fn>;
 }
 
 export function mockGoogleapis(): { gmail: GmailClientFake; calendar: CalendarClientFake } {
@@ -51,7 +52,11 @@ export function mockGoogleapis(): { gmail: GmailClientFake; calendar: CalendarCl
       getMessageMetadata: vi.fn().mockResolvedValue(null),
       getProfile: vi.fn().mockResolvedValue({ emailAddress: 'test@example.com', historyId: '0' }),
     },
-    calendar: { noop: vi.fn() },
+    calendar: {
+      listEvents: vi.fn().mockResolvedValue({ items: [], nextSyncToken: 'st-0' }),
+      listEventsWindow: vi.fn().mockResolvedValue({ items: [] }),
+      getCalendarMetadata: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
+    },
   };
 }
 

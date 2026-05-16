@@ -72,4 +72,38 @@ CREATE INDEX idx_gmail_message_recv ON gmail_message(received_at DESC);
 CREATE INDEX idx_gmail_message_priority ON gmail_message(is_unread, is_important, received_at DESC);
 `,
   },
+  {
+    version: 3,
+    file: '003_calendar.sql',
+    sql: `
+CREATE TABLE calendar_account (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  email TEXT NOT NULL,
+  calendar_id TEXT NOT NULL DEFAULT 'primary',
+  sync_token TEXT,
+  last_synced_at TEXT,
+  last_error TEXT,
+  connected_at TEXT NOT NULL
+);
+CREATE TABLE calendar_event (
+  id TEXT PRIMARY KEY,
+  calendar_id TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  location TEXT,
+  start_at_utc TEXT,
+  end_at_utc TEXT,
+  start_date TEXT,
+  end_date TEXT,
+  start_timezone TEXT,
+  attendees TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'confirmed',
+  recurring_id TEXT,
+  updated_at TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  CHECK ((start_at_utc IS NOT NULL) OR (start_date IS NOT NULL))
+);
+CREATE INDEX idx_calendar_event_start ON calendar_event(start_at_utc);
+CREATE INDEX idx_calendar_event_start_date ON calendar_event(start_date);
+`,
+  },
 ];
