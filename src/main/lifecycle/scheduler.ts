@@ -3,12 +3,17 @@
  * cleanly inside Electron's main process. Phase 2 wires daily-briefing cron
  * jobs through this surface.
  */
-import PQueue from 'p-queue';
+import PQueueImport from 'p-queue';
 import type { Logger } from 'pino';
 import type { ScheduledTask } from 'node-cron';
 
+// p-queue v9 is ESM-only; when bundled to CJS by electron-vite, the default
+// export lands on `.default`. Normalize at module load.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PQueue: typeof PQueueImport = ((PQueueImport as any).default ?? PQueueImport) as typeof PQueueImport;
+
 export interface SchedulerHandle {
-  queue: PQueue;
+  queue: InstanceType<typeof PQueueImport>;
   cronRegistry: Map<string, ScheduledTask>;
 }
 
