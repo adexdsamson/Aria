@@ -19,6 +19,7 @@ import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
 import { registerOnboardingHandlers, createDbHolder } from './ipc/onboarding';
+import { registerBackupHandlers } from './ipc/backup';
 import { CHANNELS } from '../shared/ipc-contract';
 
 /**
@@ -108,6 +109,7 @@ async function bootstrap(): Promise<void> {
   // Plan 03 (wave 4) will replace the remaining stubs.
   const dbHolder = createDbHolder();
   registerOnboardingHandlers(ipcMain, { logger, dataDir, dbHolder });
+  registerBackupHandlers(ipcMain, { logger, dataDir, dbHolder });
   registerHandlers(ipcMain, { logger }, {
     skipChannels: [
       CHANNELS.ONBOARDING_GEN_MNEMONIC,
@@ -115,10 +117,10 @@ async function bootstrap(): Promise<void> {
       CHANNELS.ONBOARDING_SEAL,
       CHANNELS.ONBOARDING_UNLOCK,
       CHANNELS.ONBOARDING_STATUS,
+      CHANNELS.BACKUP_CREATE,
+      CHANNELS.BACKUP_RESTORE,
     ],
   });
-  // Backup/restore handlers wired in Task 3b.
-  void dbHolder;
 
   createMainWindow();
 

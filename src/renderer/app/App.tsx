@@ -1,10 +1,11 @@
 import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { SideNav } from '../components/SideNav';
 import { AppRoutes } from './routes';
 import { OnboardingWizard } from '../features/onboarding/OnboardingWizard';
 import { UnlockScreen } from '../features/onboarding/UnlockScreen';
+import { RestoreScreen } from '../features/onboarding/RestoreScreen';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -67,7 +68,7 @@ function AppShell(): JSX.Element {
     return (
       <div data-testid="gate-locked" style={shellStyle()}>
         <Routes>
-          <Route path="/restore" element={<RestoreRouteFallback />} />
+          <Route path="/restore" element={<RestoreScreen />} />
           <Route path="*" element={<UnlockScreen onUnlocked={() => void refresh()} />} />
         </Routes>
       </div>
@@ -94,18 +95,3 @@ function shellStyle(): React.CSSProperties {
   };
 }
 
-/**
- * Placeholder route mounted in the locked gate. Task 3b replaces the body
- * with the real RestoreScreen component. We keep the route registered here
- * so the "Forgot password?" link is never broken.
- */
-function RestoreRouteFallback(): JSX.Element {
-  const navigate = useNavigate();
-  return (
-    <section data-testid="restore-screen-placeholder" style={{ padding: 24 }}>
-      <h1>Restore from backup</h1>
-      <p>Restore UI is not available yet.</p>
-      <button onClick={() => navigate('/')}>Back</button>
-    </section>
-  );
-}
