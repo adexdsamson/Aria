@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 2 in progress
-last_updated: "2026-05-16T22:00:00.000Z"
+last_updated: "2026-05-16T23:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 7
+  percent: 78
 ---
 
 # State
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Phase
 
-**Phase 2: Gmail + Daily Briefing MVP** — Wave 1 (02-01) complete; Wave 2 (02-02 Calendar) up next.
+**Phase 2: Gmail + Daily Briefing MVP** — Waves 1 + 2 complete (02-01 Gmail, 02-02 Calendar); Wave 3 (02-03 News sources) up next.
 
 ## Phase Status
 
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Next Action
 
-Run `/gsd-execute-phase 2 --wave 2` to execute the Calendar ingest plan (02-02).
+Run `/gsd-execute-phase 2 --wave 3` to execute the News sources plan (02-03).
 
 ## Workflow Config
 
