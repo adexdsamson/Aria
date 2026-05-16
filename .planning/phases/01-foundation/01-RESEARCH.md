@@ -773,28 +773,39 @@ Directives extracted from `CLAUDE.md`. All plans MUST comply:
 
 **If this table is empty:** Not empty — items A1–A9 are surfaced for plan-checker / discuss-phase visibility.
 
-## Open Questions
+## Open Questions (RESOLVED)
+1. **RESOLVED:** Pass the raw 32-byte key (do scrypt KDF ourselves) and store salt + params in `app_meta`. Plans 02 Task 1 (`derive.ts`) and Plan 02 Task 2 (`connect.ts`) implement this.
 
-1. **SQLCipher key delivery: raw 32-byte hex vs SQLCipher passphrase mode**
+   **SQLCipher key delivery: raw 32-byte hex vs SQLCipher passphrase mode**
    - What we know: SQLCipher accepts either a passphrase (then internal PBKDF2) or a raw key. better-sqlite3-multiple-ciphers supports both.
    - What's unclear: Whether bypassing SQLCipher's internal PBKDF2 by passing a raw key (and doing scrypt ourselves) is preferred for memory-hardness, or whether the team would rather use SQLCipher's tuned PBKDF2 iterations (≥256k).
    - Recommendation: Pass the raw key (do KDF ourselves with scrypt); document the salt and parameters in `app_meta`. Revisit if onboarding QA finds it sluggish.
 
-2. **Should the active LLM provider be per-call configurable or app-global?**
+2. **RESOLVED:** App-global active provider only in Phase 1; per-call override deferred. Plan 03 Task 1 (`setActiveProvider`) and Plan 04 router implement this.
+
+   **Should the active LLM provider be per-call configurable or app-global?**
    - What we know: D-09 says one frontier provider active at a time.
    - What's unclear: Whether Diagnostics offers a "force provider" switch.
    - Recommendation: Phase 1 = global only; deferred toggle.
 
-3. **`vault.json` cipher: AES-256-GCM via Node `crypto` vs `safeStorage` (rejected for mnemonic per Pitfall 5)**
+3. **RESOLVED:** AES-256-GCM via Node `crypto` (scrypt KDF over daily-unlock password, 16-byte salt + 12-byte nonce + tag in JSON). Plan 02 Task 1 (`vault/unlock.ts`) implements this.
+
+   **`vault.json` cipher: AES-256-GCM via Node `crypto` vs `safeStorage` (rejected for mnemonic per Pitfall 5)**
    - Recommendation: `crypto.scrypt` (KDF from unlock password) + `crypto.createCipheriv('aes-256-gcm', …)`. Store salt + nonce + ciphertext + tag in JSON.
 
-4. **node-cron 4 vs 3:** CLAUDE.md says 3.x; current is 4.x with breaking changes.
+4. **RESOLVED:** Use node-cron 4.x (pinned in Plan 01-01a tooling task); document deviation from CLAUDE.md 3.x.
+
+   **node-cron 4 vs 3:** CLAUDE.md says 3.x; current is 4.x with breaking changes.
    - Recommendation: Use 4.x; document the migration if anyone references 3.x docs.
 
-5. **Tailwind 3.4 vs Tailwind 4:** Tailwind 4 (zero-config Lightning CSS) is out; CLAUDE.md pins 3.4.
+5. **RESOLVED:** Stay on Tailwind 3.4 in Phase 1 (CLAUDE.md lock). Plan 01-01a pins `tailwindcss@^3`.
+
+   **Tailwind 3.4 vs Tailwind 4:** Tailwind 4 (zero-config Lightning CSS) is out; CLAUDE.md pins 3.4.
    - Recommendation: Stay on 3.4 in Phase 1 to honor the lock; revisit at a phase boundary.
 
-6. **Whether to enable Electron Fuses in Phase 1** (e.g., disable `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`).
+6. **RESOLVED:** Enable the standard Electron hardening Fuses (disable `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`) in Plan 01-01b main process bootstrap.
+
+   **Whether to enable Electron Fuses in Phase 1** (e.g., disable `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`).
    - Recommendation: YES — flip the standard hardening fuses now; trivial cost and a meaningful posture win.
 
 ## Sources

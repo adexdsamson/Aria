@@ -29,6 +29,20 @@ A user launches Aria on Windows 11, completes BIP39 mnemonic onboarding with a d
 | Test runners | Vitest 4 (unit/integration) + Playwright 1.60 `_electron` (E2E smoke) | Wave 0 of VALIDATION.md |
 | Package manager | npm (per RESEARCH install command); Aria is a single-package repo (no pnpm workspace) | RESEARCH §Installation |
 
+
+## Wave Map (post-revision iteration 1)
+
+| Wave | Plan | depends_on | autonomous | Files modified (count) | Purpose |
+|------|------|------------|------------|------------------------|---------|
+| 1 | 01-01a-tooling | [] | true | 13 | npm init + pin deps + electron-vite + tailwind + vitest + playwright configs + tests/setup.ts + tokens stub |
+| 2 | 01-01b-shell | [01a] | true | 20 | Main process + preload + IPC contract + pino redact + renderer shell (BriefingScreen + ApprovalsPlaceholder) + smoke e2e |
+| 3 | 01-02-db-passphrase | [01b] | true | 24 | Vault primitives (vault.json with appSalt LOCKED in Task 1) + SQLCipher + migrations + backup/restore + onboarding wizard + unlock + BackupRestoreSection component + onboarded fixture |
+| 4 | 01-03-secrets-settings | [01b, 02] | false (CASA checkpoint) | 14 | safeStorage secrets + Ollama probe + Settings composite (mounts Plan 02's BackupRestoreSection + FrontierKey + Ollama + StatusPanel) + registerHandlers wiring of 4 handler-registration fns + CASA intake |
+| 5 | 01-04-llm-router | [01a, 01b, 02, 03] | true | 17 | Classifier + router + providers + routingLog + ASK_ARIA / DIAGNOSTICS_ROUTING_LOG handlers + Diagnostics UI + hello-Aria e2e + Ollama-free ASK_ARIA integration test |
+
+**Parallelism note:** Plan 02 and Plan 03 are sequential (wave 3 â†’ wave 4), NOT parallel â€” Plan 03 wires Plan 02's handlers and mounts Plan 02's BackupRestoreSection inside SettingsScreen. This serialization closes Warning A from checker iteration 1 (the original wave-2 file-overlap between Plan 02 and Plan 03 on src/main/ipc/index.ts and SettingsScreen.tsx).
+
+**Same-wave files_modified overlap audit:** Every wave contains exactly one plan, so file-overlap is structurally impossible within a wave.
 ## Stack Touched in Phase 1
 
 - [x] Project scaffold — electron-vite + React + TS + Tailwind + shadcn (Plan 01)
