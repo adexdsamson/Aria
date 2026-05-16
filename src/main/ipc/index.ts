@@ -27,9 +27,15 @@ const NOT_IMPLEMENTED = Object.freeze({ error: 'NOT_IMPLEMENTED' as const });
  * Object.keys(CHANNELS).length handlers are registered. Each handler logs
  * `ipc.enter` and `ipc.exit` with the redacted payload + latency.
  */
-export function registerHandlers(ipcMain: IpcMain, deps: IpcDeps): void {
+export function registerHandlers(
+  ipcMain: IpcMain,
+  deps: IpcDeps,
+  options: { skipChannels?: ReadonlyArray<string> } = {},
+): void {
   const { logger } = deps;
+  const skip = new Set(options.skipChannels ?? []);
   for (const channel of Object.values(CHANNELS)) {
+    if (skip.has(channel)) continue;
     ipcMain.handle(channel, async (_event: unknown, payload: unknown) => {
       const started = Date.now();
       const safePayload = redactObject(payload);

@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`vault/derive > deriveDbKey locks a known hex for the BIP39 test-vector mnemonic + fixed salt > abandon-x11-about + fixed-salt scrypt 2^15 1`] = `"8e7af308ebc09180632e01a13f3826cdf0621c494cac3bbfd35077f3eafad06c"`;
