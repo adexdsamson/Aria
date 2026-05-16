@@ -112,13 +112,15 @@ None. The Gmail row is fully wired (status, force-sync, disconnect, reconnect). 
 
 ## Deferred Items (out of scope for 02-01)
 
-Pre-existing test failures observed on master (NOT introduced by this plan; verified by stashing the working tree):
+~~Pre-existing test failures observed on master~~ **RESOLVED 2026-05-16 by `fix(test-abi)` commit** — see `.planning/debug/resolved/vitest-better-sqlite3-abi.md`.
 
-- `tests/unit/main/db/backup-restore.spec.ts` — 3 failures (`closeDb` reading `.open` on an undefined value, indicating an electron-mock contract drift inside that file's local `vi.mock`).
-- `tests/unit/main/db/migrations.spec.ts` — 4 failures (same `closeDb`-on-undefined symptom).
-- `tests/unit/main/llm/routingLog.spec.ts` — 3 failures (same symptom).
+The real root cause was NOT an electron-mock contract drift but a native-module ABI mismatch: `better-sqlite3-multiple-ciphers` was rebuilt by postinstall for Electron 41 (ABI 145), but vitest runs under system Node 25 (ABI 141). The "TypeError: Cannot read properties of undefined (reading 'open')" was a secondary symptom — `openDb` threw on `new Database(dbPath)` due to the binding load failure, leaving `db` undefined for the `closeDb` call in test teardown.
 
-These look like a Phase-1 regression from the move to `pool=threads` plus a `tests/setup.ts` electron mock change; they reproduce on `git stash` with no Phase 2 files present. Filing under `.planning/phases/02-gmail-ingest-daily-briefing-mvp/deferred-items.md` would be appropriate before Plan 02-02 starts, but is out of scope for 02-01. The 02-01 surface (`tests/unit/main/integrations/google/**`, `tests/unit/renderer/features/settings/IntegrationsSection.spec.tsx`, `tests/unit/main/ipc/index.spec.ts`) is 100% green.
+**Fix:** Dual-build pipeline — `scripts/build-native-dual.mjs` produces both ABI variants and stashes them under `node_modules/better-sqlite3-multiple-ciphers/aria-abi/`. Vitest `globalSetup` (`tests/setup-native-abi.ts`) swaps the Node-ABI binary in for tests, restores the Electron-ABI one on teardown. Approach 3 (pin Node) was ruled out because Electron applies its own ABI bump (Node 24 = 137, Electron 41 = 145) — no Node version matches.
+
+Resolved files added: `scripts/build-native-dual.mjs`, `tests/setup-native-abi.ts`. Updated: `scripts/postinstall.mjs`, `vitest.config.ts`, `package.json` scripts, `tests/unit/main/db/migrations.spec.ts` (assert `[1, 2]` post-Plan-02-01).
+
+Result: 105/105 unit tests pass (was 95/105). The 02-01 surface (32/32) remains green.
 
 ## Authentication Gates
 
@@ -149,5 +151,5 @@ The runtime `invalid_grant` test-mode (7-day refresh-token expiry) UX is impleme
 
 - **02-02 (Calendar):** reuse `connectGoogle('calendar')` — the SCOPES constant already includes calendar.readonly. Reuse `IntegrationStatusRow` with a `kind='calendar'` branch (currently only `'gmail'` is implemented). Reuse `registerLifecycleCallbacks` for the 15-min calendar cron.
 - **02-04 (Briefing):** consume `gmail_message` rows directly; the priority filter `is_unread=1 AND is_important=1 AND received_at >= now-24h` will produce zero rows for accounts that don't apply the IMPORTANT label — Plan 02-04 owns the B4 SC2 fallback copy.
-- **Deferred Phase-1 test regression:** the 10 pre-existing failures noted above need investigation before Phase 2 verification — likely a `tests/setup.ts` electron-mock drift introduced by a Phase 1 cleanup commit.
+- ~~**Deferred Phase-1 test regression**~~ — resolved 2026-05-16 (dual-build); see Deferred Items above.
 - **CASA gmail.send dependency:** Phase 3 still needs the multi-week CASA security review kicked off; not blocking 02-01 (read-only scope) but the timer is ticking.

@@ -1,0 +1,88 @@
+/**
+ * Vitest globalSetup — swap the Node-ABI better-sqlite3 binary in for tests,
+ * then restore the Electron-ABI binary on teardown.
+ *
+ * See .planning/debug/vitest-better-sqlite3-abi.md and
+ * scripts/build-native-dual.mjs for the full rationale.
+ *
+ * Default state in build/Release/:
+ *   better_sqlite3.node         — active binary, normally the Electron-ABI build
+ *   better_sqlite3.electron.node — ABI 145 (Electron 41)
+ *   better_sqlite3.node-node    — ABI 141 (system Node 25.x)
+ *
+ * setup():    overwrite active with .node-node
+ * teardown(): restore active from .electron.node
+ *
+ * If the .node-node variant is missing (e.g., fresh clone without postinstall,
+ * or someone ran `pnpm rebuild` and clobbered state), fail loudly with the
+ * exact command to recover.
+ */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+const PKG_DIR = path.resolve(
+  __dirname,
+  '..',
+  'node_modules',
+  'better-sqlite3-multiple-ciphers',
+);
+const RELEASE = path.join(PKG_DIR, 'build', 'Release');
+const STASH = path.join(PKG_DIR, 'aria-abi');
+const ACTIVE = path.join(RELEASE, 'better_sqlite3.node');
+const ELECTRON_VARIANT = path.join(STASH, 'better_sqlite3.electron.node');
+const NODE_VARIANT = path.join(STASH, 'better_sqlite3.node-node');
+
+function ensureNodeVariant(): void {
+  if (fs.existsSync(NODE_VARIANT)) return;
+  if (!fs.existsSync(ELECTRON_VARIANT)) {
+    throw new Error(
+      '[setup-native-abi] No ABI variants present. Run: pnpm install (or `node scripts/build-native-dual.mjs`).',
+    );
+  }
+  console.log(
+    '[setup-native-abi] Node-ABI variant missing — running node-only dual-build…',
+  );
+  const result = spawnSync(
+    'node',
+    [path.resolve(__dirname, '..', 'scripts', 'build-native-dual.mjs'), '--node-only'],
+    { stdio: 'inherit', shell: true },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `[setup-native-abi] dual-build --node-only failed (exit ${String(result.status)}). Run \`pnpm install\` to fully rebuild.`,
+    );
+  }
+}
+
+export async function setup(): Promise<void> {
+  ensureNodeVariant();
+  fs.copyFileSync(NODE_VARIANT, ACTIVE);
+  console.log('[setup-native-abi] swapped Node-ABI binary into build/Release/better_sqlite3.node');
+}
+
+export async function teardown(): Promise<void> {
+  // Best-effort restore. On Windows the .node file is often still mapped into
+  // the test process by the OS loader at teardown time (EBUSY on copyfile).
+  // That's fine: scripts/build-native-dual.mjs always ends with the Electron
+  // variant as the active binary, and a subsequent `pnpm dev` invocation will
+  // load the correct binary because postinstall already left ACTIVE = Electron.
+  // The next `pnpm test` run will simply re-swap. Log + swallow.
+  if (!fs.existsSync(ELECTRON_VARIANT)) return;
+  try {
+    fs.copyFileSync(ELECTRON_VARIANT, ACTIVE);
+    console.log(
+      '[setup-native-abi] restored Electron-ABI binary in build/Release/better_sqlite3.node',
+    );
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code;
+    if (code === 'EBUSY' || code === 'EPERM') {
+      console.warn(
+        `[setup-native-abi] could not restore Electron binary at teardown (${code}). ` +
+          `Run \`pnpm rebuild:native:electron\` before \`pnpm dev\` if Electron fails to load native.`,
+      );
+      return;
+    }
+    throw err;
+  }
+}

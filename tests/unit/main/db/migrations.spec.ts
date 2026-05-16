@@ -19,7 +19,9 @@ describe('db/migrations', () => {
   it('runMigrations creates app_meta, settings, routing_log and sets user_version=1', () => {
     const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: false });
     const applied = runMigrations(db, { dir: MIGRATIONS_DIR });
-    expect(applied).toEqual([1]);
+    // Plan 01-02 added migration 001; Plan 02-01 added 002 (Gmail tables).
+    // Assert both ran on first open, in order.
+    expect(applied).toEqual([1, 2]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -30,7 +32,7 @@ describe('db/migrations', () => {
     expect(tables).toContain('routing_log');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(1);
+    expect(version).toBe(2);
 
     closeDb(db);
   });

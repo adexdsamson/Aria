@@ -8,11 +8,13 @@
  *      blocker (see .planning/debug/sqlcipher-electron-42-abi.md). Drift here
  *      MUST surface loudly — silent rejection would resurrect the original
  *      runtime load failure.
- *   2. `electron-rebuild -f -w better-sqlite3-multiple-ciphers` — build the
- *      native module against Electron's V8 headers. FAIL HARD: from Plan 02
- *      onward SQLCipher is required at runtime, so a failed rebuild must block
- *      `npm install` (no more "accept LOW" Plan 01a wrapper — that
- *      justification no longer holds).
+ *   2. `scripts/build-native-dual.mjs` — full dual-ABI build for
+ *      better-sqlite3-multiple-ciphers. Produces two .node binaries side by
+ *      side: ABI 145 (Electron 41 runtime) and ABI 141 (system Node 25, for
+ *      vitest). See .planning/debug/vitest-better-sqlite3-abi.md for the
+ *      rationale (no Node version produces Electron's ABI; pinning Node is
+ *      infeasible). FAIL HARD: from Plan 02 onward SQLCipher is required at
+ *      runtime and at test time, so either build failing must block install.
  *
  * Sunset condition (drop `patches/` + `patch-package` when):
  *   `better-sqlite3-multiple-ciphers` publishes a version whose
@@ -35,10 +37,8 @@ function run(label, cmd, args) {
 }
 
 run('patch-package', 'patch-package', []);
-run('electron-rebuild', 'electron-rebuild', [
-  '-f',
-  '-w',
-  'better-sqlite3-multiple-ciphers',
+run('dual-build (Electron + Node ABI)', 'node', [
+  'scripts/build-native-dual.mjs',
 ]);
 
 console.log('[aria postinstall] all steps OK');

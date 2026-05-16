@@ -13,7 +13,9 @@
     "test": "npm run test:unit && npm run test:e2e",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "postinstall": "node scripts/postinstall.mjs",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3-multiple-ciphers"
+    "rebuild:native": "node scripts/build-native-dual.mjs",
+    "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3-multiple-ciphers",
+    "rebuild:native:node": "node scripts/build-native-dual.mjs --node-only"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",

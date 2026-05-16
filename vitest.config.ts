@@ -13,6 +13,10 @@ export default defineConfig({
   test: {
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // globalSetup runs ONCE before all tests; swaps the Node-ABI
+    // better-sqlite3 binary in and restores the Electron-ABI one on teardown.
+    // See tests/setup-native-abi.ts + scripts/build-native-dual.mjs.
+    globalSetup: ['tests/setup-native-abi.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
