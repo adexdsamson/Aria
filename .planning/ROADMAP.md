@@ -25,6 +25,13 @@
 **Goal:** Desktop app shell with encrypted local store, LLM router skeleton, and a hello-briefing stub working end-to-end
 **Mode:** mvp
 **Requirements:** FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05, FOUND-06, FOUND-07, LLM-01, LLM-03, LLM-04, LLM-05
+**Plans:** 4 plans
+Plans:
+- [ ] 01-01-scaffold-PLAN.md — Electron 42 + electron-vite + React + TS + Tailwind + shadcn scaffold; secure preload bridge; pino redacted log sink; vitest + playwright _electron smoke (wave 1)
+- [ ] 01-02-db-passphrase-PLAN.md — BIP39 mnemonic + scrypt vault + SQLCipher chacha20 DB + migration runner + VACUUM-INTO backup/restore + onboarding wizard (wave 2)
+- [ ] 01-03-secrets-settings-PLAN.md — Electron safeStorage frontier-key layer (Linux basic_text refusal) + Ollama probe + Settings UI sections + Google CASA intake D-15 (wave 2)
+- [ ] 01-04-llm-router-PLAN.md — Hard-rules classifier + LLM router over AI SDK 6 (Anthropic/OpenAI/Google/Ollama via ollama-ai-provider-v2) + routing_log + Settings → Diagnostics Ask-Aria + hello-Aria e2e (wave 3)
+
 **Plans (estimated):**
 1. Electron 33 + Vite + React + TS scaffold via electron-vite; dev build runs on macOS and Windows
 2. SQLite + better-sqlite3 + SQLCipher schema and migrations; recovery passphrase onboarding; encrypted backup/restore
