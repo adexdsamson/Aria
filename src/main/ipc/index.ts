@@ -1,17 +1,17 @@
 /**
- * IPC handler registry (Plan 03 wave 4).
+ * IPC handler registry (Plan 04 wave 5).
  *
  * `registerHandlers` wires every Phase-1 handler-registration function in
  * order:
- *   1. registerOnboardingHandlers (Plan 02)
- *   2. registerBackupHandlers    (Plan 02)
- *   3. registerSecretsHandlers   (Plan 03)
- *   4. registerOllamaHandlers    (Plan 03)
+ *   1. registerOnboardingHandlers   (Plan 02)
+ *   2. registerBackupHandlers       (Plan 02)
+ *   3. registerSecretsHandlers      (Plan 03)
+ *   4. registerOllamaHandlers       (Plan 03)
+ *   5. registerAskHandlers          (Plan 04)
+ *   6. registerDiagnosticsHandlers  (Plan 04)
  *
- * For channels not yet owned by real handlers (`ASK_ARIA`,
- * `DIAGNOSTICS_ROUTING_LOG`), a no-op stub is registered that returns
- * `{ error: 'NOT_IMPLEMENTED' }`. Plan 04 (wave 5) replaces those two stubs
- * with `registerAskHandlers` + `registerDiagnosticsHandlers`.
+ * All six handler-registration functions now own their channels. No no-op
+ * stubs remain.
  *
  * Every handler logs entry + exit with `latency_ms`, redacting the payload via
  * `redactObject` BEFORE it touches pino (defense-in-depth — pino redacts too).
@@ -19,7 +19,6 @@
 import type { IpcMain } from 'electron';
 import type { Logger } from 'pino';
 import { CHANNELS } from '../../shared/ipc-contract';
-import { redactObject } from '../log/redact';
 import {
   registerOnboardingHandlers,
   createDbHolder,
@@ -28,37 +27,26 @@ import {
 import { registerBackupHandlers } from './backup';
 import { registerSecretsHandlers } from './secrets';
 import { registerOllamaHandlers } from './ollama';
+import { registerAskHandlers } from './ask';
+import { registerDiagnosticsHandlers } from './diagnostics';
 
 export interface IpcDeps {
   logger: Logger;
   dataDir: string;
   dbHolder?: DbHolder;
-  // Reserved for plans 04+; ignored by the real handlers below.
   secrets?: unknown;
   router?: unknown;
   ollama?: unknown;
   vault?: unknown;
-  // Legacy compatibility: tests may construct deps without dataDir/dbHolder.
   db?: unknown;
 }
 
 const NOT_IMPLEMENTED = Object.freeze({ error: 'NOT_IMPLEMENTED' as const });
 
 /**
- * Channels that still ship as no-op stubs in this plan.  Plan 04 (wave 5) will
- * remove them from this list as `registerAskHandlers` and
- * `registerDiagnosticsHandlers` take ownership.
- */
-const STUB_CHANNELS: ReadonlyArray<string> = [
-  CHANNELS.ASK_ARIA,
-  CHANNELS.DIAGNOSTICS_ROUTING_LOG,
-] as const;
-
-/**
- * Wire every Phase-1 handler-registration function and stub the remaining
- * channels. `options.skipChannels` lets callers (e.g. tests, main/index.ts
- * during transition) suppress specific registrations — wave 4 callers can
- * still pass the legacy skip-list and get the same behavior.
+ * Wire every Phase-1 handler-registration function. `options.skipChannels`
+ * lets callers (e.g. tests, main/index.ts during transition) suppress
+ * specific registrations.
  */
 export function registerHandlers(
   ipcMain: IpcMain,
@@ -70,9 +58,6 @@ export function registerHandlers(
   const dbHolder = deps.dbHolder ?? createDbHolder();
   const skip = new Set(options.skipChannels ?? []);
 
-  // 1–4: real handler-registration functions. Each is guarded by skipChannels
-  // so callers can opt out of any one (used by the transitional wiring in
-  // main/index.ts and by tests that only want the stub registry).
   const onboardingChannels = [
     CHANNELS.ONBOARDING_GEN_MNEMONIC,
     CHANNELS.ONBOARDING_CONFIRM,
@@ -109,31 +94,19 @@ export function registerHandlers(
     ollamaChannels.forEach((c) => skip.add(c));
   }
 
-  // Remaining channels → no-op stub. Limited to ASK_ARIA +
-  // DIAGNOSTICS_ROUTING_LOG (Plan 04 territory) plus anything still in skip.
-  for (const channel of Object.values(CHANNELS)) {
-    if (skip.has(channel)) continue;
-    if (!STUB_CHANNELS.includes(channel)) {
-      // Defensive: every non-stub channel should have been covered above.
-      // Skip silently rather than register a duplicate handler that would
-      // throw on Electron's strict invoke-handler registry.
-      continue;
-    }
-    ipcMain.handle(channel, async (_event: unknown, payload: unknown) => {
-      const started = Date.now();
-      const safePayload = redactObject(payload);
-      logger.info({ scope: 'ipc', channel, payload: safePayload }, 'ipc.enter');
-      try {
-        return NOT_IMPLEMENTED;
-      } finally {
-        logger.info(
-          { scope: 'ipc', channel, latency_ms: Date.now() - started },
-          'ipc.exit',
-        );
-      }
-    });
+  if (!skip.has(CHANNELS.ASK_ARIA)) {
+    registerAskHandlers(ipcMain, { logger, dbHolder });
+    skip.add(CHANNELS.ASK_ARIA);
+  }
+
+  if (!skip.has(CHANNELS.DIAGNOSTICS_ROUTING_LOG)) {
+    registerDiagnosticsHandlers(ipcMain, { logger, dbHolder });
+    skip.add(CHANNELS.DIAGNOSTICS_ROUTING_LOG);
   }
 }
 
-/** Exported for tests that need to assert the stub return shape. */
+/**
+ * Legacy stub-shape export kept for back-compat with the Plan 03 wave-4
+ * tests. Plan 04 has no remaining stubs; this is only the legacy literal.
+ */
 export const STUB_RESPONSE = NOT_IMPLEMENTED;

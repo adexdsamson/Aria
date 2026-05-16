@@ -15,6 +15,7 @@
 import type * as React from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { BackupRestoreSection } from '../onboarding/BackupRestoreSection';
+import { DiagnosticsSection } from './DiagnosticsSection';
 import { FrontierKeySection } from './FrontierKeySection';
 import { OllamaSection } from './OllamaSection';
 import { StatusPanel } from './StatusPanel';
@@ -26,17 +27,6 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'onboarding', label: 'Backup & restore' },
   { to: 'diagnostics', label: 'Diagnostics' },
 ];
-
-function DiagnosticsPlaceholder(): JSX.Element {
-  return (
-    <section data-testid="settings-diagnostics" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Diagnostics</h2>
-      <p style={{ color: 'var(--aria-fg-muted)' }}>
-        Routing log + sensitivity classifier diagnostics — mounted by Plan 04.
-      </p>
-    </section>
-  );
-}
 
 export function SettingsScreen(): JSX.Element {
   return (
@@ -72,7 +62,7 @@ export function SettingsScreen(): JSX.Element {
           <Route path="frontier-key" element={<FrontierKeySection />} />
           <Route path="ollama" element={<OllamaSection />} />
           <Route path="onboarding" element={<BackupRestoreSection />} />
-          <Route path="diagnostics" element={<DiagnosticsPlaceholder />} />
+          <Route path="diagnostics" element={<DiagnosticsSection />} />
           <Route path="*" element={<Navigate to="status" replace />} />
         </Routes>
       </div>

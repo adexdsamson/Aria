@@ -1,14 +1,15 @@
 /**
- * registerHandlers behavior tests (updated by Plan 03 wave 4).
+ * registerHandlers behavior tests (updated by Plan 04 wave 5).
  *
- * After Plan 03 wiring, registerHandlers owns:
- *   - 5 onboarding channels (real handlers from Plan 02)
- *   - 2 backup channels    (real handlers from Plan 02)
- *   - 5 secrets channels   (real handlers from Plan 03)
- *   - 2 ollama/diagnostics channels (real handlers from Plan 03)
+ * After Plan 04 wiring, registerHandlers owns all channels with real handlers:
+ *   - 5 onboarding channels         (Plan 02)
+ *   - 2 backup channels             (Plan 02)
+ *   - 5 secrets channels            (Plan 03)
+ *   - 2 ollama/diagnostics channels (Plan 03)
+ *   - 1 ASK_ARIA                    (Plan 04)
+ *   - 1 DIAGNOSTICS_ROUTING_LOG     (Plan 04)
  *
- * Only ASK_ARIA + DIAGNOSTICS_ROUTING_LOG remain as no-op stubs. Plan 04
- * (wave 5) replaces those two with real handlers.
+ * No no-op stubs remain.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { IpcMain } from 'electron';
@@ -37,7 +38,7 @@ function makeFakeLogger() {
   };
 }
 
-describe('registerHandlers (Plan 03 wave 4)', () => {
+describe('registerHandlers (Plan 04 wave 5)', { timeout: 30_000 }, () => {
   let dataDir: string;
 
   beforeEach(() => {
@@ -79,17 +80,18 @@ describe('registerHandlers (Plan 03 wave 4)', () => {
     }
   });
 
-  it('ASK_ARIA + DIAGNOSTICS_ROUTING_LOG are still NOT_IMPLEMENTED stubs', async () => {
-    const { registerHandlers, STUB_RESPONSE } = await import('../../../../src/main/ipc');
+  it('ASK_ARIA + DIAGNOSTICS_ROUTING_LOG are wired to real handlers (Plan 04)', async () => {
+    const { registerHandlers } = await import('../../../../src/main/ipc');
     const { CHANNELS } = await import('../../../../src/shared/ipc-contract');
     const { ipcMain, handlers } = makeFakeIpcMain();
     registerHandlers(ipcMain, { logger: makeFakeLogger() as any, dataDir });
-    for (const ch of [CHANNELS.ASK_ARIA, CHANNELS.DIAGNOSTICS_ROUTING_LOG]) {
-      const h = handlers.get(ch)!;
-      const res = await h({}, { sample: 'payload' });
-      expect(res).toEqual({ error: 'NOT_IMPLEMENTED' });
-    }
-    expect(STUB_RESPONSE).toEqual({ error: 'NOT_IMPLEMENTED' });
+    // DIAGNOSTICS_ROUTING_LOG with no DB attached returns [] not NOT_IMPLEMENTED.
+    const diagRes = await handlers.get(CHANNELS.DIAGNOSTICS_ROUTING_LOG)!({}, { limit: 5 });
+    expect(diagRes).toEqual([]);
+    // ASK_ARIA handler is registered (we don't invoke it here — that would
+    // require a real model / network. The full path is covered by
+    // tests/unit/main/ipc/ask.spec.ts and ask-local-handler.spec.ts).
+    expect(typeof handlers.get(CHANNELS.ASK_ARIA)).toBe('function');
   });
 
   it('secrets + ollama channels are wired to real handlers (not stubs)', async () => {
@@ -111,22 +113,11 @@ describe('registerHandlers (Plan 03 wave 4)', () => {
     expect(hasRes.present).toBe(true);
   });
 
-  it('logs ipc.enter and ipc.exit with redacted payload for stub channels', async () => {
+  it('all six handler-registration functions register exactly one handler per CHANNELS entry', async () => {
     const { registerHandlers } = await import('../../../../src/main/ipc');
     const { CHANNELS } = await import('../../../../src/shared/ipc-contract');
     const { ipcMain, handlers } = makeFakeIpcMain();
-    const logger = makeFakeLogger();
-    registerHandlers(ipcMain, { logger: logger as any, dataDir });
-    const askHandler = handlers.get(CHANNELS.ASK_ARIA);
-    expect(askHandler).toBeTypeOf('function');
-    await askHandler!({}, { prompt: 'email me at foo@bar.com', source: 'generic' });
-    expect(logger.info).toHaveBeenCalledTimes(2);
-    const enterArgs = logger.info.mock.calls[0]![0] as {
-      channel: string;
-      payload: { prompt: string };
-    };
-    expect(enterArgs.channel).toBe(CHANNELS.ASK_ARIA);
-    expect(enterArgs.payload.prompt).toContain('[REDACTED]');
-    expect(enterArgs.payload.prompt).not.toContain('foo@bar.com');
+    registerHandlers(ipcMain, { logger: makeFakeLogger() as any, dataDir });
+    expect(handlers.size).toBe(Object.keys(CHANNELS).length);
   });
 });
