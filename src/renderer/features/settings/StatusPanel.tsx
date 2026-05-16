@@ -7,7 +7,12 @@
  * exact D-10 phrasing (`Frontier disabled — add an API key in Settings.`).
  */
 import { useEffect, useState } from 'react';
-import type { DiagnosticsStatus, GmailIntegrationStatus, IpcError } from '../../../shared/ipc-contract';
+import type {
+  CalendarIntegrationStatus,
+  DiagnosticsStatus,
+  GmailIntegrationStatus,
+  IpcError,
+} from '../../../shared/ipc-contract';
 
 const POLL_MS = 10_000;
 const LOCAL_ONLY_BANNER = 'Frontier disabled — add an API key in Settings.';
@@ -29,14 +34,18 @@ function relativeTime(iso?: string): string {
   return rtf.format(Math.round(deltaSec / 86400), 'day');
 }
 
-export function IntegrationStatusRow({ kind }: { kind: 'gmail' }): JSX.Element {
-  const [status, setStatus] = useState<GmailIntegrationStatus | null>(null);
+export function IntegrationStatusRow({ kind }: { kind: 'gmail' | 'calendar' }): JSX.Element {
+  const [status, setStatus] = useState<GmailIntegrationStatus | CalendarIntegrationStatus | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
     async function tick(): Promise<void> {
-      if (kind !== 'gmail') return;
-      const next = await window.aria.gmailStatus();
+      const next =
+        kind === 'gmail'
+          ? await window.aria.gmailStatus()
+          : await window.aria.calendarStatus();
       if (!cancelled && !isErr(next)) setStatus(next);
     }
     void tick();
@@ -113,6 +122,10 @@ export function StatusPanel(): JSX.Element {
           <dt>Gmail</dt>
           <dd>
             <IntegrationStatusRow kind="gmail" />
+          </dd>
+          <dt>Calendar</dt>
+          <dd>
+            <IntegrationStatusRow kind="calendar" />
           </dd>
         </dl>
       )}

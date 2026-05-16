@@ -30,6 +30,7 @@ import { registerOllamaHandlers } from './ollama';
 import { registerAskHandlers } from './ask';
 import { registerDiagnosticsHandlers } from './diagnostics';
 import { registerGmailHandlers } from './gmail';
+import { registerCalendarHandlers } from './calendar';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -107,6 +108,16 @@ export function registerHandlers(
     skip.add(CHANNELS.DIAGNOSTICS_ROUTING_LOG);
   }
 
+  // Shared scheduler for both Gmail (5-min cron) and Calendar (15-min cron).
+  // Constructed lazily so callers that omit `deps.scheduler` still get a
+  // single SchedulerHandle wired into both registrations (the queue's
+  // concurrency=1 invariant requires one queue per process).
+  let sharedScheduler: SchedulerHandle | undefined = deps.scheduler;
+  function getScheduler(): SchedulerHandle {
+    if (!sharedScheduler) sharedScheduler = registerScheduler(logger);
+    return sharedScheduler;
+  }
+
   const gmailChannels = [
     CHANNELS.GMAIL_CONNECT,
     CHANNELS.GMAIL_STATUS,
@@ -114,9 +125,19 @@ export function registerHandlers(
     CHANNELS.GMAIL_FORCE_SYNC,
   ];
   if (!gmailChannels.every((c) => skip.has(c))) {
-    const scheduler = deps.scheduler ?? registerScheduler(logger);
-    registerGmailHandlers(ipcMain, { logger, dbHolder, scheduler });
+    registerGmailHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
     gmailChannels.forEach((c) => skip.add(c));
+  }
+
+  const calendarChannels = [
+    CHANNELS.CALENDAR_CONNECT,
+    CHANNELS.CALENDAR_STATUS,
+    CHANNELS.CALENDAR_DISCONNECT,
+    CHANNELS.CALENDAR_FORCE_SYNC,
+  ];
+  if (!calendarChannels.every((c) => skip.has(c))) {
+    registerCalendarHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
+    calendarChannels.forEach((c) => skip.add(c));
   }
 }
 

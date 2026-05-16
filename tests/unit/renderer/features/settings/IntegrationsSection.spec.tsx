@@ -21,6 +21,10 @@ interface AriaStub {
   gmailConnect: ReturnType<typeof vi.fn>;
   gmailDisconnect: ReturnType<typeof vi.fn>;
   gmailForceSync: ReturnType<typeof vi.fn>;
+  calendarStatus: ReturnType<typeof vi.fn>;
+  calendarConnect: ReturnType<typeof vi.fn>;
+  calendarDisconnect: ReturnType<typeof vi.fn>;
+  calendarForceSync: ReturnType<typeof vi.fn>;
 }
 
 function installAria(initial: GmailIntegrationStatus): AriaStub {
@@ -29,6 +33,14 @@ function installAria(initial: GmailIntegrationStatus): AriaStub {
     gmailConnect: vi.fn().mockResolvedValue({ ok: true, email: initial.email ?? 'foo@bar.com' }),
     gmailDisconnect: vi.fn().mockResolvedValue({ ok: true }),
     gmailForceSync: vi.fn().mockResolvedValue({ ok: true }),
+    // Plan 02-02: the Calendar row also polls; default to disconnected so the
+    // Gmail-focused cases here behave identically pre-/post-merge.
+    calendarStatus: vi
+      .fn()
+      .mockResolvedValue({ connected: false, tokenStatus: 'missing', queueDepth: 0 }),
+    calendarConnect: vi.fn().mockResolvedValue({ ok: true, email: 'cal@bar.com' }),
+    calendarDisconnect: vi.fn().mockResolvedValue({ ok: true }),
+    calendarForceSync: vi.fn().mockResolvedValue({ ok: true }),
   };
   // jsdom global
   (globalThis as unknown as { window: { aria: AriaStub } }).window.aria = stub;
