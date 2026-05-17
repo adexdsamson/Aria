@@ -15,6 +15,7 @@
 import type * as React from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { BackupRestoreSection } from '../onboarding/BackupRestoreSection';
+import { BriefingSettingsSection } from './BriefingSettingsSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
 import { FrontierKeySection } from './FrontierKeySection';
 import { IntegrationsSection } from './IntegrationsSection';
@@ -28,6 +29,7 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'ollama', label: 'Local model' },
   { to: 'integrations', label: 'Integrations' },
   { to: 'news-sources', label: 'News sources' },
+  { to: 'briefing', label: 'Briefing' },
   { to: 'onboarding', label: 'Backup & restore' },
   { to: 'diagnostics', label: 'Diagnostics' },
 ];
@@ -72,6 +74,15 @@ export function SettingsScreen(): JSX.Element {
               <div data-testid="settings-news-sources-route">
                 {/* mount point for data-testid="settings-news-sources" (NewsSourcesSection root) */}
                 <NewsSourcesSection />
+              </div>
+            }
+          />
+          <Route
+            path="briefing"
+            element={
+              <div data-testid="settings-briefing">
+                {/* mount point — BriefingSettingsSection root also carries data-testid="settings-briefing" */}
+                <BriefingSettingsSection />
               </div>
             }
           />
