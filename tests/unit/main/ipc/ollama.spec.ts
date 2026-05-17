@@ -124,4 +124,71 @@ describe('registerOllamaHandlers', () => {
     expect(status.ollama.reachable).toBe(false);
     expect(status.frontierConfigured).toBe(false);
   });
+
+  // ── OLLAMA_GET_ACTIVE_MODEL / OLLAMA_SET_ACTIVE_MODEL ──────────────────────
+
+  it('OLLAMA_GET_ACTIVE_MODEL returns source=default when nothing persisted', async () => {
+    const { ipc, CHANNELS } = await setupModules(dataDir, true);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const am = (await invoke(CHANNELS.OLLAMA_GET_ACTIVE_MODEL, undefined)) as any;
+    expect(am.source).toBe('default');
+    expect(typeof am.modelId).toBe('string');
+    expect(am.modelId.length).toBeGreaterThan(0);
+  });
+
+  it('OLLAMA_GET_ACTIVE_MODEL returns source=persisted after set', async () => {
+    const { ipc, secrets, CHANNELS } = await setupModules(dataDir, true);
+    secrets.setOllamaModelId('llama3.1:8b');
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const am = (await invoke(CHANNELS.OLLAMA_GET_ACTIVE_MODEL, undefined)) as any;
+    expect(am.source).toBe('persisted');
+    expect(am.modelId).toBe('llama3.1:8b');
+  });
+
+  it('OLLAMA_SET_ACTIVE_MODEL accepts a model in the tags list and persists it', async () => {
+    const { ipc, secrets, CHANNELS } = await setupModules(dataDir, true);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const res = (await invoke(CHANNELS.OLLAMA_SET_ACTIVE_MODEL, {
+      modelId: 'llama3.1:8b',
+    })) as any;
+    expect(res.ok).toBe(true);
+    expect(res.modelId).toBe('llama3.1:8b');
+    expect(secrets.getOllamaModelId()).toBe('llama3.1:8b');
+  });
+
+  it('OLLAMA_SET_ACTIVE_MODEL rejects model-not-installed when missing from tags', async () => {
+    const { ipc, secrets, CHANNELS } = await setupModules(dataDir, true);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const res = (await invoke(CHANNELS.OLLAMA_SET_ACTIVE_MODEL, {
+      modelId: 'dolphin3:not-installed',
+    })) as any;
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('model-not-installed');
+    expect(secrets.getOllamaModelId()).toBeNull();
+  });
+
+  it('OLLAMA_SET_ACTIVE_MODEL rejects ollama-unreachable when probe fails', async () => {
+    const { ipc, secrets, CHANNELS } = await setupModules(dataDir, false);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const res = (await invoke(CHANNELS.OLLAMA_SET_ACTIVE_MODEL, {
+      modelId: 'llama3.1:8b',
+    })) as any;
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('ollama-unreachable');
+    expect(secrets.getOllamaModelId()).toBeNull();
+  });
+
+  it('OLLAMA_SET_ACTIVE_MODEL rejects invalid-model-id for empty payload', async () => {
+    const { ipc, CHANNELS } = await setupModules(dataDir, true);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const res = (await invoke(CHANNELS.OLLAMA_SET_ACTIVE_MODEL, { modelId: '   ' })) as any;
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('invalid-model-id');
+  });
 });

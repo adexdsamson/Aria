@@ -19,6 +19,8 @@ export const CHANNELS = {
   SECRETS_GET_ACTIVE_PROVIDER: 'aria:secrets:get-provider',
   SECRETS_SET_ACTIVE_PROVIDER: 'aria:secrets:set-provider',
   OLLAMA_STATUS: 'aria:ollama:status',
+  OLLAMA_GET_ACTIVE_MODEL: 'aria:ollama:get-active-model',
+  OLLAMA_SET_ACTIVE_MODEL: 'aria:ollama:set-active-model',
   DIAGNOSTICS_ROUTING_LOG: 'aria:diagnostics:routing-log',
   DIAGNOSTICS_STATUS: 'aria:diagnostics:status',
   BACKUP_CREATE: 'aria:backup:create',
@@ -84,6 +86,25 @@ export interface OllamaStatus {
   models: string[];
   error?: string;
 }
+
+/**
+ * Provenance for the active local-model id:
+ *   - 'persisted'   — user picked this in Settings and we stored it.
+ *   - 'auto-picked' — bootstrap saw a null persisted value and chose tags[0].
+ *   - 'default'     — nothing persisted; falling back to DEFAULT_LOCAL_MODEL
+ *                     (likely will 404 against Ollama if user pulled something
+ *                     else — drives the Settings dropdown nudge).
+ */
+export type OllamaModelSource = 'persisted' | 'default' | 'auto-picked';
+
+export interface OllamaActiveModel {
+  modelId: string | null;
+  source: OllamaModelSource;
+}
+
+export type OllamaSetActiveModelResult =
+  | { ok: true; modelId: string }
+  | { ok: false; error: string };
 
 export interface DiagnosticsStatus {
   ollama: OllamaStatus;
@@ -268,6 +289,8 @@ export interface AriaApi {
   secretsSetActiveProvider(req: { provider: ProviderId }): Promise<{ ok: boolean } | IpcError>;
 
   ollamaStatus(): Promise<OllamaStatus | IpcError>;
+  ollamaGetActiveModel(): Promise<OllamaActiveModel | IpcError>;
+  ollamaSetActiveModel(req: { modelId: string }): Promise<OllamaSetActiveModelResult | IpcError>;
 
   diagnosticsRoutingLog(req?: { limit?: number }): Promise<RoutingLogEntry[] | IpcError>;
   diagnosticsStatus(): Promise<DiagnosticsStatus | IpcError>;
@@ -317,6 +340,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   SECRETS_GET_ACTIVE_PROVIDER: 'secretsGetActiveProvider',
   SECRETS_SET_ACTIVE_PROVIDER: 'secretsSetActiveProvider',
   OLLAMA_STATUS: 'ollamaStatus',
+  OLLAMA_GET_ACTIVE_MODEL: 'ollamaGetActiveModel',
+  OLLAMA_SET_ACTIVE_MODEL: 'ollamaSetActiveModel',
   DIAGNOSTICS_ROUTING_LOG: 'diagnosticsRoutingLog',
   DIAGNOSTICS_STATUS: 'diagnosticsStatus',
   BACKUP_CREATE: 'backupCreate',

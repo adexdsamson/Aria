@@ -122,6 +122,33 @@ describe('safeStorage frontier-key module', () => {
     });
   });
 
+  // ── ollamaModelId persistence (user-configurable local model) ────────────
+
+  it('getOllamaModelId returns null when nothing is persisted', async () => {
+    const m = await freshModule(dataDir);
+    expect(m.getOllamaModelId()).toBeNull();
+  });
+
+  it('round-trips set → get → clear for ollamaModelId', async () => {
+    const m = await freshModule(dataDir);
+    m.setOllamaModelId('dolphin3:latest');
+    expect(m.getOllamaModelId()).toBe('dolphin3:latest');
+    m.setOllamaModelId(null);
+    expect(m.getOllamaModelId()).toBeNull();
+  });
+
+  it('setOllamaModelId preserves providers/activeProvider in secrets.json', async () => {
+    const m = await freshModule(dataDir);
+    await m.setFrontierKey({ provider: 'anthropic', key: 'sk-ant-keep' });
+    await m.setActiveProvider('anthropic');
+    m.setOllamaModelId('qwen2.5:7b');
+    const raw = fs.readFileSync(path.join(dataDir, 'secrets.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.ollamaModelId).toBe('qwen2.5:7b');
+    expect(parsed.activeProvider).toBe('anthropic');
+    expect(typeof parsed.providers.anthropic).toBe('string');
+  });
+
   it('throws SafeStorageUnavailableError when isEncryptionAvailable is false', async () => {
     vi.resetModules();
     vi.doMock('electron', async () => ({

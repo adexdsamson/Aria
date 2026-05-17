@@ -12,6 +12,7 @@ import type {
   DiagnosticsStatus,
   GmailIntegrationStatus,
   IpcError,
+  OllamaActiveModel,
 } from '../../../shared/ipc-contract';
 
 const POLL_MS = 10_000;
@@ -80,12 +81,15 @@ export function IntegrationStatusRow({ kind }: { kind: 'gmail' | 'calendar' }): 
 
 export function StatusPanel(): JSX.Element {
   const [status, setStatus] = useState<DiagnosticsStatus | null>(null);
+  const [activeModel, setActiveModel] = useState<OllamaActiveModel | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function tick(): Promise<void> {
       const next = (await window.aria.diagnosticsStatus()) as DiagnosticsStatus;
       if (!cancelled) setStatus(next);
+      const am = (await window.aria.ollamaGetActiveModel()) as OllamaActiveModel | IpcError;
+      if (!cancelled && !isErr(am)) setActiveModel(am);
     }
     void tick();
     const id = setInterval(() => void tick(), POLL_MS);
@@ -120,6 +124,11 @@ export function StatusPanel(): JSX.Element {
             {status.ollama.reachable
               ? `reachable${status.ollama.version ? ` (v${status.ollama.version})` : ''}, ${status.ollama.models.length} model(s)`
               : `unreachable (${status.ollama.error ?? 'unknown'})`}
+            {status.ollama.reachable && activeModel && (
+              <span data-testid="status-ollama-active">
+                {' '}· active: <strong>{activeModel.modelId ?? '(unset)'}</strong>
+              </span>
+            )}
           </dd>
           <dt>Frontier</dt>
           <dd>

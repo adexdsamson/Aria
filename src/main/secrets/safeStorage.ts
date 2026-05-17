@@ -59,6 +59,12 @@ interface SecretsFile {
   providers: Partial<Record<ProviderId, string>>;
   activeProvider: ProviderId | null;
   googleTokens?: Partial<Record<GoogleTokenKind, GoogleTokenEntry>>;
+  /**
+   * User-selected Ollama model id (e.g. 'dolphin3:latest', 'llama3.1:8b-instruct-q4_K_M').
+   * NOT a secret — co-located here only to avoid introducing a second settings
+   * store. `null` / absent → fall back to providers.DEFAULT_LOCAL_MODEL.
+   */
+  ollamaModelId?: string | null;
 }
 
 const SECRETS_FILE = 'secrets.json';
@@ -225,6 +231,34 @@ export function getGoogleTokens(kind: GoogleTokenKind): GoogleTokens | null {
   } catch {
     throw new SafeStorageUnavailableError('decrypt-failed');
   }
+}
+
+// ============================================================================
+// Ollama active-model id (non-secret; persisted alongside frontier keys to
+// avoid a second settings store). Plaintext on disk by design — the model id
+// itself carries no privilege. See providers.getLocalModel().
+// ============================================================================
+
+/**
+ * Read the persisted Ollama model id (or null when unset). Returns null on
+ * missing file / corrupt file / missing field — callers must fall back to
+ * providers.DEFAULT_LOCAL_MODEL in that case. Sync because providers.getLocalModel
+ * is sync at every call site.
+ */
+export function getOllamaModelId(): string | null {
+  const data = readFile();
+  const v = data.ollamaModelId;
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+/**
+ * Persist the Ollama model id. Pass null to clear. Other secrets-file fields
+ * (providers / activeProvider / googleTokens) are preserved untouched.
+ */
+export function setOllamaModelId(modelId: string | null): void {
+  const data = readFile();
+  data.ollamaModelId = modelId && modelId.length > 0 ? modelId : null;
+  writeFileAtomic(data);
 }
 
 /**

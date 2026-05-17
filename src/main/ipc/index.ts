@@ -94,7 +94,12 @@ export function registerHandlers(
     secretsChannels.forEach((c) => skip.add(c));
   }
 
-  const ollamaChannels = [CHANNELS.OLLAMA_STATUS, CHANNELS.DIAGNOSTICS_STATUS];
+  const ollamaChannels = [
+    CHANNELS.OLLAMA_STATUS,
+    CHANNELS.OLLAMA_GET_ACTIVE_MODEL,
+    CHANNELS.OLLAMA_SET_ACTIVE_MODEL,
+    CHANNELS.DIAGNOSTICS_STATUS,
+  ];
   if (dataDir && !ollamaChannels.every((c) => skip.has(c))) {
     registerOllamaHandlers(ipcMain, { logger, dataDir });
     ollamaChannels.forEach((c) => skip.add(c));

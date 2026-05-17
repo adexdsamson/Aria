@@ -72,6 +72,9 @@ import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
 import { createDbHolder } from './ipc/onboarding';
+import { probeOllama } from './llm/ollamaProbe';
+import { autoPickOllamaModel } from './llm/autoPickModel';
+import { getOllamaModelId, setOllamaModelId } from './secrets/safeStorage';
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -234,6 +237,14 @@ async function bootstrap(): Promise<void> {
   // ASK_ARIA and DIAGNOSTICS_ROUTING_LOG remain as no-op stubs until Plan 04.
   const dbHolder = createDbHolder();
   registerHandlers(ipcMain, { logger, dataDir, dbHolder });
+
+  // Ollama active-model auto-pick on first connect. See autoPickOllamaModel.
+  void autoPickOllamaModel({
+    logger,
+    getModelId: getOllamaModelId,
+    setModelId: setOllamaModelId,
+    probe: probeOllama,
+  });
 
   createMainWindow();
 

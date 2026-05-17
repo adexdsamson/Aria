@@ -36,6 +36,7 @@ import { classifySensitivity, type ClassifierResult } from './classifier';
 import {
   DEFAULT_LOCAL_MODEL,
   defaultModelIdFor,
+  getActiveLocalModelId,
   OllamaUnavailableError,
   FrontierUnavailableError,
 } from './providers';
@@ -87,8 +88,16 @@ export interface LLMRouterDeps {
   ollamaReachableFn?: () => Promise<boolean>;
   /** Sensitivity classifier (default uses regex hard-rules). */
   classifierFn?: (prompt: string) => ClassifierResult;
-  /** Override the local model id (tests). */
+  /**
+   * Override the local model id (tests). When set, takes precedence over
+   * `localModelIdFn`. When neither is set, the router re-resolves the active
+   * id via `getActiveLocalModelId()` on every classify() call so a user who
+   * changes the model in Settings sees the new id immediately (no router
+   * reconstruction).
+   */
   localModelId?: string;
+  /** Override the per-call local-model-id resolver (tests). */
+  localModelIdFn?: () => string;
 }
 
 export class LLMRouter {
@@ -96,14 +105,29 @@ export class LLMRouter {
   private readonly hasKey: LLMRouterDeps['hasFrontierKeyFn'];
   private readonly ollamaReachable: NonNullable<LLMRouterDeps['ollamaReachableFn']>;
   private readonly classify_: NonNullable<LLMRouterDeps['classifierFn']>;
-  private readonly localModelId: string;
+  private readonly localModelIdFn: () => string;
 
   constructor(deps: LLMRouterDeps) {
     this.getActive = deps.getActiveProviderFn;
     this.hasKey = deps.hasFrontierKeyFn;
     this.ollamaReachable = deps.ollamaReachableFn ?? (async () => true);
     this.classify_ = deps.classifierFn ?? classifySensitivity;
-    this.localModelId = deps.localModelId ?? DEFAULT_LOCAL_MODEL;
+    if (deps.localModelId !== undefined) {
+      const pinned = deps.localModelId;
+      this.localModelIdFn = () => pinned;
+    } else if (deps.localModelIdFn) {
+      this.localModelIdFn = deps.localModelIdFn;
+    } else {
+      // Re-resolve each call so live Settings changes take effect without
+      // reconstructing the router.
+      this.localModelIdFn = () => {
+        try {
+          return getActiveLocalModelId();
+        } catch {
+          return DEFAULT_LOCAL_MODEL;
+        }
+      };
+    }
   }
 
   /**
@@ -187,7 +211,7 @@ export class LLMRouter {
     return {
       route: 'LOCAL',
       reason,
-      model: this.localModelId,
+      model: this.localModelIdFn(),
       provider: 'ollama',
     };
   }

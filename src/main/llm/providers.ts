@@ -18,7 +18,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOllama } from 'ollama-ai-provider-v2';
 import type { ProviderId } from '../../shared/ipc-contract';
-import { getFrontierKey } from '../secrets/safeStorage';
+import { getFrontierKey, getOllamaModelId } from '../secrets/safeStorage';
 
 export const DEFAULT_LOCAL_MODEL = 'llama3.1:8b-instruct-q4_K_M';
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5';
@@ -59,8 +59,26 @@ export interface LocalModelOptions {
   baseURL?: string;
 }
 
+/**
+ * Resolve the active local model id. Persisted user choice wins; the exported
+ * `DEFAULT_LOCAL_MODEL` is the documented fallback for users who haven't
+ * picked a model yet (e.g. fresh-install Ollama with a single non-default tag).
+ *
+ * Sync by design — `secrets.json` is tiny and every Ollama call hits this once.
+ * Safe to call before app.isReady() (returns null → fallback).
+ */
+export function getActiveLocalModelId(): string {
+  try {
+    const persisted = getOllamaModelId();
+    if (persisted && persisted.length > 0) return persisted;
+  } catch {
+    // safeStorage may throw pre-ready; fall through to default.
+  }
+  return DEFAULT_LOCAL_MODEL;
+}
+
 export function getLocalModel(opts: LocalModelOptions = {}): ModelLike {
-  const modelId = opts.modelId ?? DEFAULT_LOCAL_MODEL;
+  const modelId = opts.modelId ?? getActiveLocalModelId();
   const baseURL = opts.baseURL ?? DEFAULT_OLLAMA_BASE_URL;
   const cacheKey = `ollama:${baseURL}:${modelId}`;
   const cached = cache.get(cacheKey);
