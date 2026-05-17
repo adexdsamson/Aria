@@ -30,6 +30,7 @@ import {
 } from '../vault/unlock';
 import { deriveDbKey } from '../vault/derive';
 import { openDb, closeDb, type Db } from '../db/connect';
+import { reapInterruptedOnStartup } from '../approvals/persist';
 
 export interface DbHolder {
   db: Db | null;
@@ -140,6 +141,20 @@ export function registerOnboardingHandlers(
       dbHolder.close();
       const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: true });
       dbHolder.set(db);
+      // RESEARCH Pattern 2 — convert any stale 'generating' rows BEFORE the
+      // approvals IPC layer can be invoked. (IPC handlers register at boot;
+      // the DB only becomes reachable at this point via dbHolder.set().)
+      try {
+        const reaped = reapInterruptedOnStartup(db);
+        if (reaped > 0) {
+          logger.info({ event: 'approvals.reap-interrupted', count: reaped });
+        }
+      } catch (err) {
+        logger.warn({
+          event: 'approvals.reap-interrupted.failed',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       logger.info({ event: 'onboarding.sealed' });
       return { ok: true };
     } finally {
@@ -159,6 +174,17 @@ export function registerOnboardingHandlers(
         dbHolder.close();
         const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: true });
         dbHolder.set(db);
+        try {
+          const reaped = reapInterruptedOnStartup(db);
+          if (reaped > 0) {
+            logger.info({ event: 'approvals.reap-interrupted', count: reaped });
+          }
+        } catch (err) {
+          logger.warn({
+            event: 'approvals.reap-interrupted.failed',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         logger.info({ event: 'onboarding.unlocked' });
         return { ok: true };
       } finally {
