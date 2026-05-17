@@ -115,7 +115,7 @@ export type BriefingLLMObject = z.infer<typeof BriefingSchema>;
 
 // ---------------------------------------------------------------------------
 // Prompt assembly. KEEP redaction-aware — buildBriefingPrompt never sees raw
-// candidates; caller MUST pass the result of redactEmailsInBriefingInput.
+// candidates; caller MUST pass the result of redactPiiInBriefingInput.
 // ---------------------------------------------------------------------------
 
 export function buildBriefingPrompt(

@@ -68,16 +68,6 @@ export function redactAllPii(s: string): string {
   return out;
 }
 
-/**
- * @deprecated — prefer `redactAllPii`. Kept as a thin wrapper around the
- * email pattern only so existing call sites and tests don't break.
- */
-export function redactEmailString(s: string): string {
-  if (typeof s !== 'string' || s.length === 0) return s;
-  // Build a fresh regex per call to avoid lastIndex carry-over across calls.
-  return s.replace(new RegExp(EMAIL_TOKEN_REGEX.source, 'g'), '<EMAIL>');
-}
-
 export interface CalendarCandidate {
   id: string;
   title: string;
@@ -130,9 +120,3 @@ export function redactPiiInBriefingInput(c: BriefingCandidates): BriefingCandida
     })),
   };
 }
-
-/**
- * @deprecated — prefer `redactPiiInBriefingInput`. Kept as an alias so
- * pre-Gap-9 call sites still compile. Will be removed in a follow-up cleanup.
- */
-export const redactEmailsInBriefingInput = redactPiiInBriefingInput;

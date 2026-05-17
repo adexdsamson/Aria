@@ -9,16 +9,38 @@
 
 export const REDACTED = '[REDACTED]';
 
-/** Default PII regex set. Order matters — see DEFAULT_PII_PATTERN_NAMES /_TOKENS. */
+/**
+ * Default PII regex set. Order matters — see DEFAULT_PII_PATTERN_NAMES /_TOKENS.
+ *
+ * Phone-pattern permissiveness (intentional, do not narrow):
+ *   The phone regex matches any NANP-shaped 3-3-4 sequence with separators OR
+ *   ~10+ contiguous digits with an optional country code. This is deliberately
+ *   loose and will produce false-positive `<PHONE>` redactions on:
+ *     - Unix epoch timestamps (e.g. `1715800000` in log payloads)
+ *     - Hacker News item IDs, RSS GUIDs, generic article slugs with digit IDs
+ *     - Conference dial-in / meeting ID strings embedded in calendar event
+ *       bodies and email snippets
+ *     - Long order numbers, invoice numbers, ticket IDs
+ *   These collisions are a defense-in-depth tradeoff: in an exec-assistant
+ *   pipeline that hands third-party content to a FRONTIER LLM, a false-positive
+ *   redaction is harmless (the briefing still renders; the classifier still
+ *   sees a clean prompt) but a false-negative is a PII leak across a trust
+ *   boundary. We accept the cosmetic noise to keep the leak surface small.
+ *   If you tighten this regex, you MUST add new test cases covering the
+ *   above shapes to prove the leak invariant still holds.
+ */
 export const DEFAULT_PII_PATTERNS: RegExp[] = [
   // Email (RFC 5322-lite). Global so `replace` hits every occurrence.
   /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
   // SSN — must come before phone so 123-45-6789 isn't masked as a phone fragment.
   /\b\d{3}-\d{2}-\d{4}\b/g,
   // Phone (E.164 / NANP-ish): optional +, optional country, separators or none, 7-15 digits total.
+  // See block comment above for why this is intentionally permissive.
   /(?:(?:\+?\d{1,3}[-.\s])?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4})/g,
-  // Currency amounts: $1, $1.50, $1,234.56
-  /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?|\$\d+(?:\.\d+)?/g,
+  // Currency amounts: $1, $1.50, $1,234.56, plus optional magnitude suffix
+  // (K/M/B/T, case-insensitive) so `$50M Series B` redacts cleanly to
+  // `<AMOUNT> Series B` rather than leaving a stray `M` behind.
+  /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?[KkMmBbTt]?|\$\d+(?:\.\d+)?[KkMmBbTt]?/g,
   // Plan 02-01 (T-02-01-02): OAuth bearer access tokens. Conservative; this
   // covers Google's URL-safe base64 access_token format including '.' / '-' / '_' / '+' / '/' / '~' / '=' padding.
   /Bearer\s+[A-Za-z0-9._\-~+/]+=*/g,

@@ -1,16 +1,14 @@
 /**
  * Plan 02-04 Task 1 — M1 PII redaction module tests.
  *
- * Asserts the regex-zero invariant: after redactEmailsInBriefingInput, no
+ * Asserts the regex-zero invariant: after redactPiiInBriefingInput, no
  * string in the candidate set matches /\S+@\S+\.\S+/. This is what preserves
  * FRONTIER routing through Phase 1's classifier.
  */
 import { describe, it, expect } from 'vitest';
 import {
   EMAIL_TOKEN_REGEX,
-  redactEmailString,
   redactAllPii,
-  redactEmailsInBriefingInput,
   redactPiiInBriefingInput,
   type BriefingCandidates,
 } from '../../../../src/main/briefing/redact';
@@ -18,30 +16,30 @@ import { classifySensitivity } from '../../../../src/main/llm/classifier';
 
 const PROMPT_LEAK_PATTERN = /\S+@\S+\.\S+/;
 
-describe('redactEmailsInBriefingInput', () => {
+describe('redactPiiInBriefingInput', () => {
   it('Case 1 — single email in subject replaced with <EMAIL>', () => {
-    expect(redactEmailString('Re: contract from foo@bar.com')).toBe(
+    expect(redactAllPii('Re: contract from foo@bar.com')).toBe(
       'Re: contract from <EMAIL>',
     );
   });
 
   it('Case 2 — display-name preserved; address replaced', () => {
-    expect(redactEmailString('Adex Samson <adex@example.com>')).toBe(
+    expect(redactAllPii('Adex Samson <adex@example.com>')).toBe(
       'Adex Samson <<EMAIL>>',
     );
     // The above shows display-name preservation; the inner address is gone.
-    expect(redactEmailString('Adex Samson <adex@example.com>')).not.toMatch(
+    expect(redactAllPii('Adex Samson <adex@example.com>')).not.toMatch(
       PROMPT_LEAK_PATTERN,
     );
   });
 
   it('Case 3 — multiple emails in one string: both replaced', () => {
-    const out = redactEmailString('Email a@b.com or c@d.co.uk for details');
+    const out = redactAllPii('Email a@b.com or c@d.co.uk for details');
     expect(out).toBe('Email <EMAIL> or <EMAIL> for details');
   });
 
   it('Case 4 — no email in string: unchanged', () => {
-    expect(redactEmailString('Quarterly board call — you owe a slide.')).toBe(
+    expect(redactAllPii('Quarterly board call — you owe a slide.')).toBe(
       'Quarterly board call — you owe a slide.',
     );
   });
@@ -59,7 +57,7 @@ describe('redactEmailsInBriefingInput', () => {
         },
       ],
     };
-    const out = redactEmailsInBriefingInput(c);
+    const out = redactPiiInBriefingInput(c);
     expect(out.news[0].title).toBe('Send tips to <EMAIL> — anonymized');
     // url preserved verbatim — not PII for the classifier.
     expect(out.news[0].url).toBe('https://nytimes.com/article/leak@nytimes.com-anonymized');
@@ -81,8 +79,8 @@ describe('redactEmailsInBriefingInput', () => {
       ],
       news: [],
     };
-    const once = redactEmailsInBriefingInput(c);
-    const twice = redactEmailsInBriefingInput(once);
+    const once = redactPiiInBriefingInput(c);
+    const twice = redactPiiInBriefingInput(once);
     expect(JSON.stringify(twice)).toBe(JSON.stringify(once));
   });
 
@@ -116,7 +114,7 @@ describe('redactEmailsInBriefingInput', () => {
         },
       ],
     };
-    const redacted = redactEmailsInBriefingInput(c);
+    const redacted = redactPiiInBriefingInput(c);
 
     // Simulate prompt assembly: stringify everything that would land in the
     // prompt body (i.e. all string fields EXCEPT news[i].url).
@@ -142,7 +140,7 @@ describe('redactEmailsInBriefingInput', () => {
 });
 
 describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
-  it('email pattern → <EMAIL> (back-compat with redactEmailString)', () => {
+  it('email pattern → <EMAIL>', () => {
     expect(redactAllPii('mail foo@bar.com please')).toBe('mail <EMAIL> please');
   });
 
@@ -162,6 +160,25 @@ describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
       'Invoice for <AMOUNT> due Friday',
     );
     expect(redactAllPii('paid $50')).toBe('paid <AMOUNT>');
+  });
+
+  it('currency with magnitude suffix → <AMOUNT> (K/M/B/T, case-insensitive)', () => {
+    // The reason this test exists: previously `$50M Series B` redacted to
+    // `<AMOUNT>M Series B`, leaving a stray `M` next to the placeholder.
+    // Harmless for the classifier invariant (no `$<digits>` remained) but ugly
+    // in any debug surface that renders the redacted prompt body.
+    expect(redactAllPii('Acme raises $50M Series B')).toBe(
+      'Acme raises <AMOUNT> Series B',
+    );
+    expect(redactAllPii('Valuation hit $1.2B last quarter')).toBe(
+      'Valuation hit <AMOUNT> last quarter',
+    );
+    expect(redactAllPii('seed round $300k closed')).toBe(
+      'seed round <AMOUNT> closed',
+    );
+    expect(redactAllPii('national debt $30T projection')).toBe(
+      'national debt <AMOUNT> projection',
+    );
   });
 
   it('Bearer token → <BEARER>', () => {
@@ -184,10 +201,6 @@ describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
     expect(classifySensitivity(before).sensitive).toBe(true);
     const after = redactAllPii(before);
     expect(classifySensitivity(after).sensitive).toBe(false);
-  });
-
-  it('redactPiiInBriefingInput is the canonical name; legacy alias still works', () => {
-    expect(redactPiiInBriefingInput).toBe(redactEmailsInBriefingInput);
   });
 
   it('briefing candidates with mixed PII: phone in event title + currency in email snippet are all redacted', () => {
@@ -222,9 +235,9 @@ describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
     expect(out.calendar[0].title).toBe('Investor call — dial <PHONE>');
     expect(out.email[0].from_addr).toBe('<EMAIL>');
     expect(out.email[0].snippet).toBe('wire <AMOUNT> by EOD');
-    // Currency pattern matches `$50` then the trailing `M` survives — that's
-    // fine for the M1 invariant (classifier sees `<AMOUNT>M`, no `$<digits>`).
-    expect(out.news[0].title).toBe('Acme raises <AMOUNT>M Series B');
+    // Currency pattern now consumes the trailing magnitude suffix so the
+    // redacted prompt body is clean (`<AMOUNT> Series B`).
+    expect(out.news[0].title).toBe('Acme raises <AMOUNT> Series B');
     // url preserved verbatim.
     expect(out.news[0].url).toBe('https://example.com/acme');
 
@@ -238,13 +251,5 @@ describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
       out.news[0].title,
     ].join('\n');
     expect(classifySensitivity(body).sensitive).toBe(false);
-  });
-});
-
-// Touch redactEmailString to keep the deprecated wrapper covered without
-// adding a new describe block.
-describe('redactEmailString (deprecated wrapper)', () => {
-  it('still replaces emails with <EMAIL> for back-compat', () => {
-    expect(redactEmailString('a@b.co and c@d.co')).toBe('<EMAIL> and <EMAIL>');
   });
 });
