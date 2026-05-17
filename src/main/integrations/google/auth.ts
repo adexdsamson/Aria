@@ -228,8 +228,10 @@ function defaultDeps(kind: GoogleTokenKind): Required<Omit<ConnectGoogleDeps, 'c
       // calendar-only token returns 403 "Insufficient Permission" (UAT Test 4
       // Gap 5). For `calendar`, primary CalendarListEntry.id IS the user's
       // email by Google convention; data.summary is a belt-and-braces fallback.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { google } = require('googleapis') as typeof import('googleapis');
+      // Dynamic import so `vi.doMock('googleapis', ...)` can intercept in unit
+      // tests (vitest reliably intercepts ESM dynamic-import but not CJS
+      // `require` from a TS source under our build target).
+      const { google } = (await import('googleapis')) as typeof import('googleapis');
       if (kind === 'calendar') {
         const calendar = google.calendar({ version: 'v3', auth: client });
         const res = await calendar.calendarList.get({ calendarId: 'primary' });

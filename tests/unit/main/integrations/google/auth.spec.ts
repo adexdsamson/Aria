@@ -275,10 +275,20 @@ describe('connectGoogle OAuth loopback flow (Plan 02-01 Task 2)', () => {
   ): Promise<{ result: { ok: true; email: string } | null; error: unknown }> {
     const { OAuth2Client } = await import('google-auth-library');
     const stubClient = new OAuth2Client('client-id', 'client-secret', 'http://127.0.0.1:1/callback');
-    vi.spyOn(stubClient, 'getToken').mockResolvedValue({
-      tokens: { refresh_token: 'rt', access_token: 'at' },
-      res: null,
-    } as Awaited<ReturnType<OAuth2Client['getToken']>>);
+    // Attach getToken as an own property (rather than vi.spyOn on the prototype)
+    // so the stub is hit deterministically regardless of how getToken is dispatched
+    // inside google-auth-library (it has internal getTokenAsync hops that can
+    // bypass a prototype spy in some module-cache states). Also stub `request`
+    // as a hard backstop in case any code path tries to issue a real HTTP call
+    // through gaxios after a getToken success.
+    // Attach getToken as an own property (rather than vi.spyOn on the prototype)
+    // so the stub is hit deterministically regardless of how getToken is
+    // dispatched inside google-auth-library across module-cache states.
+    (stubClient as unknown as { getToken: (...a: unknown[]) => Promise<unknown> }).getToken =
+      vi.fn().mockResolvedValue({
+        tokens: { refresh_token: 'rt', access_token: 'at' },
+        res: null,
+      } as Awaited<ReturnType<OAuth2Client['getToken']>>);
 
     let capturedState = '';
     try {
