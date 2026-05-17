@@ -178,16 +178,36 @@ async function gatherCalendarCandidates(
   });
 }
 
+/**
+ * Plan 03-03 — Phase 2 IMPORTANT-label filter removed. Email candidates now
+ * sourced from the `email_triage` table (EMAIL-03), selecting messages whose
+ * triage classifier marked priority IN ('urgent','needs-you'). Urgent rows
+ * sort first; received_at DESC within priority bucket.
+ *
+ * Gracefully degrades on schema-not-present (test envs that skip migration
+ * 008): returns empty list, callers fall through to "Triage in progress"
+ * empty-state copy per RESEARCH §Pitfall 8.
+ */
 async function gatherEmailCandidates(db: Db): Promise<EmailCandidate[]> {
-  const rows = db
-    .prepare(
-      `SELECT id, subject, from_addr, snippet, received_at
-       FROM gmail_message
-       WHERE is_unread = 1 AND is_important = 1 AND received_at >= datetime('now','-24 hours')
-       ORDER BY received_at DESC LIMIT 20`,
-    )
-    .all() as EmailCandidate[];
-  return rows;
+  try {
+    const rows = db
+      .prepare(
+        `SELECT m.id AS id, m.subject AS subject, m.from_addr AS from_addr,
+                m.snippet AS snippet, m.received_at AS received_at
+         FROM gmail_message m
+         INNER JOIN email_triage t ON t.message_id = m.id
+         WHERE t.priority IN ('urgent','needs-you')
+           AND m.received_at >= datetime('now','-24 hours')
+         ORDER BY CASE t.priority WHEN 'urgent' THEN 0 ELSE 1 END,
+                  m.received_at DESC
+         LIMIT 20`,
+      )
+      .all() as EmailCandidate[];
+    return rows;
+  } catch {
+    // email_triage table not yet migrated (e.g. test env on older schema).
+    return [];
+  }
 }
 
 interface NewsSource {
@@ -323,18 +343,28 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   }
 
   // ── B4 SC2 fallback detection (BEFORE LLM call) ───────────────────────────
+  // Plan 03-03 supersedes Phase 2's `no-important-label` placeholder. When the
+  // triage-JOIN selects zero rows AND there are gmail_message rows in the
+  // window that have NOT yet been triaged (backlog), fall back to "triage in
+  // progress" semantics. emailEmptyStateReason remains a literal `'no-important-label'`
+  // for ipc-contract compatibility, but renderer copy is reinterpreted as
+  // "Triage in progress — N messages awaiting classification" (RESEARCH
+  // §Pitfall 8). The presence of unread+untriaged backlog is the trigger.
   let emailEmptyStateReason: BriefingPayload['emailEmptyStateReason'];
   if (emailRes.status === 'fulfilled' && emailCandidates.length === 0) {
     try {
       const probe = db
         .prepare(
-          `SELECT COUNT(*) AS n FROM gmail_message
-           WHERE is_unread = 1 AND received_at >= datetime('now','-24 hours')`,
+          `SELECT COUNT(*) AS n FROM gmail_message m
+           LEFT JOIN email_triage t ON t.message_id = m.id
+           WHERE m.received_at >= datetime('now','-24 hours')
+             AND t.message_id IS NULL`,
         )
         .get() as { n: number };
       if (probe.n > 0) emailEmptyStateReason = 'no-important-label';
     } catch {
-      /* gmail_message may not exist if user hasn't connected — best effort. */
+      /* gmail_message or email_triage may not exist if user hasn't connected
+       * or migration 008 hasn't run — best effort. */
     }
   }
 

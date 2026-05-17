@@ -57,7 +57,50 @@ export const CHANNELS = {
   // Plan 03-02 sensitivity classifier + routing-log query
   CLASSIFY: 'aria:classify',
   ROUTING_LOG_QUERY: 'aria:routing-log:query',
+  // Plan 03-03 email triage + on-demand thread summary
+  TRIAGE_SUMMARIZE_THREAD: 'aria:triage:summarize-thread',
+  TRIAGE_GET_FOR_MESSAGE: 'aria:triage:get-for-message',
 } as const;
+
+// Plan 03-03 triage DTOs ----------------------------------------------------
+
+export type TriagePriority = 'urgent' | 'needs-you' | 'fyi' | 'archive';
+
+export type TriageSignal =
+  | 'from-vip'
+  | 'thread-active'
+  | 'deadline-mentioned'
+  | 'money-amount'
+  | 'awaiting-reply'
+  | 'mention'
+  | 'question-asked'
+  | 'newsletter'
+  | 'automated'
+  | 'reply-needed'
+  | 'attachment'
+  | 'direct-to-me';
+
+export interface TriageResultDto {
+  priority: TriagePriority;
+  signals: TriageSignal[];
+  summary: string;
+  classifier_version: string;
+}
+
+export interface ThreadSummaryDto {
+  summary: string;
+  decisions: string[];
+  open_questions: string[];
+  participants: string[];
+}
+
+export interface SummarizeThreadRequest {
+  threadId: string;
+}
+
+export interface GetTriageForMessageRequest {
+  messageId: string;
+}
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
 
@@ -396,6 +439,14 @@ export interface AriaApi {
     category?: string;
     limit?: number;
   }): Promise<{ rows: RoutingLogClassifiedRow[] } | IpcError>;
+
+  // Plan 03-03
+  triageSummarizeThread(
+    req: SummarizeThreadRequest,
+  ): Promise<ThreadSummaryDto | IpcError>;
+  triageGetForMessage(
+    req: GetTriageForMessageRequest,
+  ): Promise<TriageResultDto | null | IpcError>;
 }
 
 /**
@@ -474,4 +525,6 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   APPROVALS_BATCH_APPROVE: 'approvalsBatchApprove',
   CLASSIFY: 'classify',
   ROUTING_LOG_QUERY: 'routingLogQuery',
+  TRIAGE_SUMMARIZE_THREAD: 'triageSummarizeThread',
+  TRIAGE_GET_FOR_MESSAGE: 'triageGetForMessage',
 } as const;

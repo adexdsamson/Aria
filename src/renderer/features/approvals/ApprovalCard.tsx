@@ -12,8 +12,11 @@
  * Interrupted state: shows badge + "Regenerate" button (no-op in Plan 03-01;
  * Plan 03-04 wires the drafting agent).
  */
-import { useState } from 'react';
-import type { ApprovalRowDto } from '../../../shared/ipc-contract';
+import { useEffect, useState } from 'react';
+import type {
+  ApprovalRowDto,
+  TriageResultDto,
+} from '../../../shared/ipc-contract';
 
 export interface ApprovalCardProps {
   row: ApprovalRowDto;
@@ -54,6 +57,32 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
   const [busy, setBusy] = useState(false);
 
   const [rationaleOpen, setRationaleOpen] = useState(false);
+
+  // Plan 03-03 — triage chips + summary line. Fetched on mount when the
+  // approval row has a source_message_id (email_send kind). Failures are
+  // silently swallowed; chips simply don't render.
+  const [triage, setTriage] = useState<TriageResultDto | null>(null);
+  useEffect(() => {
+    if (!row.source_message_id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        // window.aria is set by preload (typed against AriaApi).
+        const result = await window.aria.triageGetForMessage({
+          messageId: row.source_message_id!,
+        });
+        if (cancelled) return;
+        if (result && typeof result === 'object' && !('error' in result)) {
+          setTriage(result as TriageResultDto);
+        }
+      } catch {
+        /* triage row optional; chips don't render on failure */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row.source_message_id]);
 
   const recipients = parseRecipients(row.recipients_json);
   const categories = parseCategories(row.categories_json);
@@ -183,6 +212,45 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
               style={{ marginTop: 4, fontSize: 12, color: '#374151' }}
             >
               {row.classifier_rationale}
+            </div>
+          )}
+        </div>
+      )}
+
+      {triage && (
+        <div
+          data-testid={`approval-triage-${row.id}`}
+          style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}
+        >
+          <span
+            data-testid={`approval-triage-priority-${row.id}`}
+            style={{
+              ...chipStyle(),
+              background: triage.priority === 'urgent' ? '#fee2e2' : '#e0f2fe',
+              color: triage.priority === 'urgent' ? '#991b1b' : '#075985',
+            }}
+          >
+            priority: {triage.priority}
+          </span>
+          {triage.signals.map((s) => (
+            <span
+              key={s}
+              data-testid={`approval-triage-signal-${row.id}-${s}`}
+              style={chipStyle()}
+            >
+              {s}
+            </span>
+          ))}
+          {triage.summary && (
+            <div
+              data-testid={`approval-triage-summary-${row.id}`}
+              style={{
+                marginTop: 4,
+                fontStyle: 'italic',
+                color: '#374151',
+              }}
+            >
+              {triage.summary}
             </div>
           )}
         </div>

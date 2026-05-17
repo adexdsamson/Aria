@@ -83,6 +83,16 @@ function seedGmailMessages(db: ReturnType<typeof freshDb>, rows: Array<{ id: str
       important: r.important,
       fetched_at: now,
     });
+    // Plan 03-03 — briefing now JOINs email_triage instead of filtering on
+    // is_important. Preserve test intent: messages flagged `important: 1`
+    // get a triage row with priority='urgent' (was: visible). Non-important
+    // messages get triaged 'fyi' (excluded from briefing JOIN; matches the
+    // legacy is_important=0 → excluded behavior).
+    db.prepare(
+      `INSERT INTO email_triage
+       (message_id, classifier_version, priority, signals_json, summary, ts)
+       VALUES (?, 'test-v1', ?, '[]', '', ?)`,
+    ).run(r.id, r.important ? 'urgent' : 'fyi', now);
   }
 }
 
@@ -286,6 +296,11 @@ describe('runBriefing', () => {
           is_unread, is_important, history_id, fetched_at)
          VALUES (@id, @id, 'x@x.co', @subject, '', @now, '[]', 1, 1, '0', @now)`,
       ).run({ id: `m${i}`, subject: `S${i}`, now });
+      // Plan 03-03 — briefing JOINs email_triage; seed urgent priority.
+      db.prepare(
+        `INSERT INTO email_triage (message_id, classifier_version, priority,
+          signals_json, summary, ts) VALUES (?, 'test-v1', 'urgent', '[]', '', ?)`,
+      ).run(`m${i}`, now);
     }
     const gen = genObjectSuccess({
       calendar: [],

@@ -37,6 +37,15 @@ export interface GmailSyncDeps {
   scheduler: { queue: InstanceType<typeof PQueueImport> };
   logger?: Pick<Logger, 'info' | 'warn'>;
   now?: () => Date;
+  /**
+   * Plan 03-03 — post-insert hook. Invoked AFTER `applyRowsAndAdvanceCursor`
+   * commits, with the list of message ids that were freshly inserted (NOT
+   * idempotent re-runs). The hook is responsible for enqueueing triage
+   * (or other downstream work) onto its own queue; we do NOT await it so
+   * sync completion isn't gated on triage drain (CONTEXT cross-cutting
+   * + plan §triage-on-sync delta-only).
+   */
+  onMessagesInserted?: (ids: string[]) => void;
 }
 
 const FROM_HEADER = 'From';
@@ -87,6 +96,7 @@ export class GmailSync {
   private readonly scheduler: { queue: InstanceType<typeof PQueueImport> };
   private readonly logger?: Pick<Logger, 'info' | 'warn'>;
   private readonly now: () => Date;
+  private readonly onMessagesInserted?: (ids: string[]) => void;
 
   constructor(deps: GmailSyncDeps) {
     this.db = deps.db;
@@ -94,6 +104,7 @@ export class GmailSync {
     this.scheduler = deps.scheduler;
     this.logger = deps.logger;
     this.now = deps.now ?? (() => new Date());
+    this.onMessagesInserted = deps.onMessagesInserted;
   }
 
   /**
@@ -220,6 +231,22 @@ export class GmailSync {
     fetchedAtIso: string,
   ): void {
     const rows = metadatas.map((m) => toRow(m, fetchedAtIso));
+    // Plan 03-03 — pre-compute newly inserted ids (delta-only): inspect
+    // existing rows BEFORE upsert. Skips when the prepared statement is not
+    // available (in-memory test shims that don't implement SELECT id FROM
+    // gmail_message). Best-effort: a missing existence probe means we may
+    // re-fire the hook on a re-run, but the triage-side INSERT OR IGNORE
+    // makes that a no-op (store-once immutable).
+    let preExistingIds = new Set<string>();
+    try {
+      const sel = this.db.prepare('SELECT id FROM gmail_message WHERE id = ?');
+      for (const r of rows) {
+        const hit = sel.get(r.id) as { id: string } | undefined;
+        if (hit) preExistingIds.add(r.id);
+      }
+    } catch {
+      preExistingIds = new Set();
+    }
     const tx = this.db.transaction(() => {
       // INSERT OR REPLACE INTO gmail_message — upsert; idempotent on retry.
       const stmt = this.db.prepare(
@@ -237,6 +264,22 @@ export class GmailSync {
         .run({ history_id: newHistoryId, last_synced_at: fetchedAtIso });
     });
     tx();
+    if (this.onMessagesInserted) {
+      const newlyInserted = rows
+        .map((r) => r.id)
+        .filter((id) => !preExistingIds.has(id));
+      if (newlyInserted.length > 0) {
+        try {
+          this.onMessagesInserted(newlyInserted);
+        } catch (err) {
+          // Hook errors must not break sync. Log and continue.
+          this.logger?.warn(
+            { scope: 'gmail-sync', event: 'onMessagesInserted-failed', err: (err as Error).message },
+            'post-sync hook threw; triage enqueue skipped for this batch',
+          );
+        }
+      }
+    }
   }
 
   private recordAuthError(reason: 'expired' | 'revoked'): void {
