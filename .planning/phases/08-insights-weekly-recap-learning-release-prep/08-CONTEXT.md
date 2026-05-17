@@ -94,11 +94,11 @@ Final v1 phase. Delivers:
 
 ### Release prep
 - **Auto-updater feed: GitHub Releases** (electron-updater built-in `github` provider). Zero infra; public; works for v1 solo-dev. Config structured so swap to S3/R2 generic provider is config-only later.
-- **Signing — flagged conflict with XCUT-05 / SC-5:**
-  - **User's chosen v1 posture:** macOS Developer ID + notarization; **Windows unsigned in v1 with SmartScreen warning**, OV cert deferred.
-  - **ROADMAP-locked requirements XCUT-05 and SC-5 demand Windows OV signing.** This is a deliberate deviation.
-  - **Action for planner:** Surface this conflict to the user **before plan 4 begins**. Two paths: (a) update REQUIREMENTS to defer Windows OV to v1.1, or (b) buy the OV cert (~$200/yr) and notarize per spec. Do NOT proceed with plan 4 silently.
-  - Documented here as `<flagged_deviation>` rather than silently overriding the requirement.
+- **Signing — staged approach (user-confirmed 2026-05-17):**
+  - **macOS:** Developer ID + notarization at v1 release.
+  - **Windows:** Ship v1 **unsigned** with SmartScreen warning. OV cert acquired and Windows builds signed **after a tester usage period** (real users put hours on the unsigned build, surface bugs, then sign for general availability).
+  - **REQUIREMENTS amendment needed:** XCUT-05 and SC-5 currently require Windows OV signing in v1. Amend to: Windows OV signing required for **GA release**, not the initial v1 tester build. Planner to update REQUIREMENTS.md in plan 4 prep.
+  - Trigger to acquire OV cert: "testers have used it for some time" (no specific count locked; solo-dev judgment).
 - **Pre-migration DB backup + restore (XCUT-04): snapshot + verify, rollback on count drift.**
   - Before any migration, copy SQLCipher DB file to `userData/backups/{timestamp}-{prevSchemaVersion}.db`. Keep last 5.
   - Migration runner records expected row counts per critical table pre-migration; verifies post-migration counts match (allowing schema changes that intentionally drop columns but not rows).
@@ -122,9 +122,9 @@ Final v1 phase. Delivers:
 
 </decisions>
 
-<flagged_deviation>
-- **Windows code signing vs XCUT-05 / SC-5.** User's v1 choice (Windows unsigned, OV deferred) conflicts with the ROADMAP-locked requirement that demands Windows OV-signing and SmartScreen reputation seed. The planner MUST surface this to the user before plan 4 starts and either (a) get REQUIREMENTS updated to defer XCUT-05's Windows clause to v1.1, or (b) acquire the OV cert. CONTEXT.md cannot silently override locked requirements.
-</flagged_deviation>
+<requirements_amendment>
+- **XCUT-05 / SC-5 Windows-signing clause** — amend to apply at GA release, not initial v1 tester build. User-confirmed staged approach: ship Windows unsigned to testers, acquire OV cert and sign once testers have used it for some time. Planner updates REQUIREMENTS.md in plan 4 prep. No blocker.
+</requirements_amendment>
 
 <deferred>
 - **S3 / R2 updater hosting** — config-ready, swap when going commercial
@@ -161,5 +161,5 @@ From ROADMAP (locked):
 3. Drafts after week two are observably closer to the user voice than week one (manual eval)
 4. Auto-updater installs a new version, runs schema migration, and restores from backup if migration fails (verified in test)
 5. macOS build passes notarization; Windows build is OV-signed and installs cleanly past SmartScreen reputation seed
-   - ⚠ Conflicts with user's chosen v1 Windows-unsigned posture; see `<flagged_deviation>` above. Must resolve before plan 4.
+   - Amended: applies at GA release. Initial v1 tester build ships Windows-unsigned; OV signing happens after a tester usage period. See `<requirements_amendment>`.
 </success_criteria_recap>
