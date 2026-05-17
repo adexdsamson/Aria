@@ -102,7 +102,10 @@ export const BriefingSchema = z.object({
         title: z.string(),
         why: z.string().max(140),
         source_kind: z.enum(['hn', 'rss', 'bundle']),
-        url: z.string().url(),
+        // UAT Gap 11: was z.string().url() but OpenAI Structured Outputs rejects
+        // JSON Schema "format":"uri" (only a narrow allowlist of formats is supported).
+        // URL shape is trusted: this field is carried straight from BriefingCandidate.news[i].url.
+        url: z.string(),
       }),
     )
     .max(3),
