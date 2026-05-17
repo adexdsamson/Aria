@@ -20,8 +20,8 @@ describe('db/migrations', () => {
     const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: false });
     const applied = runMigrations(db, { dir: MIGRATIONS_DIR });
     // Plan 01-02 added migration 001; Plan 02-01 added 002 (Gmail tables);
-    // Plan 02-02 added 003 (Calendar tables). Assert all ran on first open, in order.
-    expect(applied).toEqual([1, 2, 3]);
+    // Plan 02-02 added 003 (Calendar tables); Plan 02-03 added 004 (news_source).
+    expect(applied).toEqual([1, 2, 3, 4]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -32,7 +32,7 @@ describe('db/migrations', () => {
     expect(tables).toContain('routing_log');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(3);
+    expect(version).toBe(4);
 
     closeDb(db);
   });

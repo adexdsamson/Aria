@@ -33,6 +33,11 @@ export const CHANNELS = {
   CALENDAR_STATUS: 'aria:calendar:status',
   CALENDAR_DISCONNECT: 'aria:calendar:disconnect',
   CALENDAR_FORCE_SYNC: 'aria:calendar:force-sync',
+  // Plan 02-03 News sources
+  NEWS_LIST_SOURCES: 'aria:news:list-sources',
+  NEWS_ADD_RSS: 'aria:news:add-rss',
+  NEWS_REMOVE_SOURCE: 'aria:news:remove-source',
+  NEWS_SET_BUNDLE: 'aria:news:set-bundle',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -159,6 +164,28 @@ export interface CalendarEventRow {
   fetched_at: string;
 }
 
+/**
+ * Plan 02-03 — News source row shape persisted in the `news_source` table
+ * (migration 004). One row per source the user wants the briefing engine to
+ * consider. `kind` discriminates:
+ *   - 'hn'     — Hacker News top-stories firehose; url/title/country/sector all null
+ *   - 'rss'    — User-added RSS URL; url required, title optional
+ *   - 'bundle' — Curated country/sector feed; country + sector + url all set
+ *
+ * `enabled` is reserved for future toggles; v1 always inserts 1 and the
+ * renderer's Remove action DELETEs the row outright.
+ */
+export interface NewsSourceRow {
+  id: number;
+  kind: 'hn' | 'rss' | 'bundle';
+  country: string | null;
+  sector: string | null;
+  url: string | null;
+  title: string | null;
+  enabled: 0 | 1;
+  added_at: string;
+}
+
 /** Standardized error envelope returned by stub handlers in Plan 01b. */
 export interface IpcError {
   error: string;
@@ -200,6 +227,11 @@ export interface AriaApi {
   calendarStatus(): Promise<CalendarIntegrationStatus | IpcError>;
   calendarDisconnect(): Promise<{ ok: boolean } | IpcError>;
   calendarForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
+
+  newsListSources(): Promise<{ sources: NewsSourceRow[] } | IpcError>;
+  newsAddRss(req: { url: string; title?: string }): Promise<{ ok: true; id: number } | { ok: false; error: string } | IpcError>;
+  newsRemoveSource(req: { id: number }): Promise<{ ok: boolean } | IpcError>;
+  newsSetBundle(req: { country: string; sectors: string[] }): Promise<{ ok: boolean } | IpcError>;
 }
 
 /**
@@ -232,4 +264,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   CALENDAR_STATUS: 'calendarStatus',
   CALENDAR_DISCONNECT: 'calendarDisconnect',
   CALENDAR_FORCE_SYNC: 'calendarForceSync',
+  NEWS_LIST_SOURCES: 'newsListSources',
+  NEWS_ADD_RSS: 'newsAddRss',
+  NEWS_REMOVE_SOURCE: 'newsRemoveSource',
+  NEWS_SET_BUNDLE: 'newsSetBundle',
 } as const;

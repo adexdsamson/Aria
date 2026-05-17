@@ -1,0 +1,30 @@
+{
+  "country": "NG",
+  "feeds": [
+    {
+      "url": "https://www.cbn.gov.ng/rss/rss.asp",
+      "title": "Central Bank of Nigeria",
+      "sector": "finance"
+    },
+    {
+      "url": "https://www.sec.gov.ng/feed/",
+      "title": "Securities & Exchange Commission Nigeria",
+      "sector": "finance"
+    },
+    {
+      "url": "https://punchng.com/feed/",
+      "title": "The Punch Nigeria",
+      "sector": "gov"
+    },
+    {
+      "url": "https://guardian.ng/feed/",
+      "title": "The Guardian Nigeria",
+      "sector": "gov"
+    },
+    {
+      "url": "https://techcabal.com/feed/",
+      "title": "TechCabal",
+      "sector": "tech"
+    }
+  ]
+}

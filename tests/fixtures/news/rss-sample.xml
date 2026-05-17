@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample Feed</title>
+    <link>https://example.com/</link>
+    <description>For Pitfall 17 regression</description>
+    <item>
+      <title>Absolute link item</title>
+      <link>https://example.com/articles/absolute-one</link>
+      <guid>abs-1</guid>
+      <pubDate>Mon, 12 May 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Relative link item</title>
+      <link>/article/123</link>
+      <guid>rel-1</guid>
+      <pubDate>Mon, 12 May 2026 13:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

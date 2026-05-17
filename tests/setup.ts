@@ -60,6 +60,60 @@ export function mockGoogleapis(): { gmail: GmailClientFake; calendar: CalendarCl
   };
 }
 
+/**
+ * Plan 02-03: fetch-mocking helpers. Tests opt in by calling `mockFetch` /
+ * `mockFetchSequence` and resetting via `restoreFetch`.
+ */
+export interface MockedResponse {
+  ok?: boolean;
+  status?: number;
+  /** JSON body (will be returned from .json()). */
+  json?: unknown;
+  /** Plain-text body (will be returned from .text()). */
+  text?: string;
+  /** Throw instead of returning a response. */
+  error?: Error;
+}
+
+function buildResponse(r: MockedResponse): Response {
+  if (r.error) throw r.error;
+  const status = r.status ?? (r.ok === false ? 500 : 200);
+  const ok = r.ok ?? (status >= 200 && status < 300);
+  return {
+    ok,
+    status,
+    json: async () => r.json,
+    text: async () => r.text ?? (r.json ? JSON.stringify(r.json) : ''),
+  } as unknown as Response;
+}
+
+const originalFetch = globalThis.fetch;
+
+export function mockFetch(handler: (url: string) => MockedResponse | Promise<MockedResponse>): void {
+  (globalThis as { fetch: typeof fetch }).fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : (input as URL).toString();
+    const r = await handler(url);
+    return buildResponse(r);
+  }) as typeof fetch;
+}
+
+export function mockFetchSequence(responses: MockedResponse[]): { calls: string[] } {
+  const calls: string[] = [];
+  let i = 0;
+  (globalThis as { fetch: typeof fetch }).fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : (input as URL).toString();
+    calls.push(url);
+    const r = responses[Math.min(i, responses.length - 1)];
+    i++;
+    return buildResponse(r);
+  }) as typeof fetch;
+  return { calls };
+}
+
+export function restoreFetch(): void {
+  (globalThis as { fetch: typeof fetch }).fetch = originalFetch;
+}
+
 vi.mock('electron', () => {
   return {
     safeStorage: {
