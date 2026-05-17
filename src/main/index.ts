@@ -24,13 +24,30 @@ import { createDbHolder } from './ipc/onboarding';
  * Content-Security-Policy applied to every response. `connect-src` is a hard
  * allowlist: Ollama localhost + the three frontier APIs. New hosts require
  * explicit grep-verified edits per T-01-01b-05.
+ *
+ * The dev variant adds 'unsafe-inline' for Vite React Fast-Refresh and
+ * ws://localhost:5173 + http://localhost:5173 for HMR; prod-strict path is
+ * `prodCspHeader()` and is the value shipped to users.
  */
-const CSP_HEADER =
-  "default-src 'self'; " +
-  "script-src 'self'; " +
-  "style-src 'self' 'unsafe-inline'; " +
-  "connect-src 'self' http://127.0.0.1:11434 https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
-  "img-src 'self' data:";
+function prodCspHeader(): string {
+  return (
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "connect-src 'self' http://127.0.0.1:11434 https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
+    "img-src 'self' data:"
+  );
+}
+
+function devCspHeader(): string {
+  return (
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "connect-src 'self' ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
+    "img-src 'self' data:"
+  );
+}
 
 /**
  * Electron Fuses configuration (RESOLVED Open Question 6).
@@ -59,11 +76,19 @@ export const ELECTRON_FUSES_CONFIG = {
 } as const;
 
 function applyCsp(): void {
+  const isDev = Boolean(process.env['ELECTRON_RENDERER_URL']);
+  const header = isDev ? devCspHeader() : prodCspHeader();
+  if (isDev) {
+    getLogger().info(
+      { scope: 'csp', mode: 'dev' },
+      "dev CSP active — script-src includes 'unsafe-inline'; do NOT ship to users"
+    );
+  }
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [CSP_HEADER],
+        'Content-Security-Policy': [header],
       },
     });
   });
