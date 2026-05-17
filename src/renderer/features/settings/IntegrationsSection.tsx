@@ -180,6 +180,12 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
           </div>
         )}
 
+        {status?.connected && status.tokenStatus === 'ok' && status.lastError && (
+          <p data-testid="gmail-sync-error" style={{ color: 'red', fontSize: 12, margin: '4px 0 0 0' }}>
+            Last sync: {status.lastError}. See Status panel for history.
+          </p>
+        )}
+
         <div style={actionsStyle()}>
           {!status?.connected && (
             <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-connect-btn">
@@ -304,6 +310,12 @@ function CalendarRow(): JSX.Element {
           <div role="alert" data-testid="calendar-connect-error" style={bannerStyle()}>
             <p style={{ margin: 0 }}>{connectError}</p>
           </div>
+        )}
+
+        {status?.connected && status.tokenStatus === 'ok' && status.lastError && (
+          <p data-testid="calendar-sync-error" style={{ color: 'red', fontSize: 12, margin: '4px 0 0 0' }}>
+            Last sync: {status.lastError}. See Status panel for history.
+          </p>
         )}
 
         <div style={actionsStyle()}>

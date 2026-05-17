@@ -221,43 +221,78 @@ export class CalendarSync {
       pageToken = page.nextPageToken;
     }
 
-    // Step 2: bootstrap call to obtain a fresh nextSyncToken.
+    // Step 2: bootstrap page-loop to obtain a fresh nextSyncToken.
+    //
+    // Per Google Calendar API docs, nextSyncToken is ONLY present on the LAST
+    // page of a paginated response. A busy primary calendar (>~250 events)
+    // returns nextPageToken on the first page with no nextSyncToken — we MUST
+    // page through to the end. The empty-calendar case still returns
+    // nextSyncToken on its single page, so no special-casing required.
     let nextSyncToken: string | undefined;
-    let bootstrapItems: CalendarEventRaw[] = [];
+    const bootstrapItems: CalendarEventRaw[] = [];
+    const MAX_PAGES = 50; // safety guard — primary calendars can have thousands of events
+    let bootstrapOverflow = false;
+    let bootstrapPagesSeen = 0;
     try {
-      const bootstrap = await this.scheduler.queue.add(() =>
-        this.client.listEvents({ pageToken: undefined }),
-      );
-      if (bootstrap) {
-        bootstrapItems = bootstrap.items;
-        nextSyncToken = bootstrap.nextSyncToken;
+      let pageToken2: string | undefined = undefined;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const page = await this.scheduler.queue.add(() =>
+          this.client.listEvents({ pageToken: pageToken2 }),
+        );
+        bootstrapPagesSeen = i + 1;
+        if (!page) break;
+        for (const it of page.items) bootstrapItems.push(it);
+        if (page.nextSyncToken) {
+          nextSyncToken = page.nextSyncToken;
+          break;
+        }
+        if (!page.nextPageToken) break;
+        pageToken2 = page.nextPageToken;
+        if (i === MAX_PAGES - 1) {
+          bootstrapOverflow = true;
+        }
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
       if (err instanceof SyncTokenInvalidatedError) {
         // Extremely unlikely — we just bootstrapped without a syncToken.
-        // Retry once.
-        try {
-          const retry = await this.scheduler.queue.add(() =>
-            this.client.listEvents({ pageToken: undefined }),
-          );
-          if (retry) {
-            bootstrapItems = retry.items;
-            nextSyncToken = retry.nextSyncToken;
-          }
-        } catch {
-          this.recordError('sync-token-bootstrap-failed');
-          return;
-        }
+        this.logger?.warn(
+          { scope: 'calendar-sync', err: errorMessage, stack: errorStack },
+          'bootstrap step 2 failed with SyncTokenInvalidatedError (unexpected without syncToken)',
+        );
+        this.recordError('sync-token-bootstrap-failed');
+        return;
       } else if (err instanceof TokenInvalidError) {
+        this.logger?.warn(
+          { scope: 'calendar-sync', err: errorMessage, stack: errorStack, reason: err.reason },
+          'bootstrap step 2 failed with TokenInvalidError',
+        );
         this.recordAuthError(err.reason);
         throw err;
       } else {
+        this.logger?.warn(
+          { scope: 'calendar-sync', err: errorMessage, stack: errorStack },
+          'bootstrap step 2 failed with unexpected error',
+        );
         throw err;
       }
     }
 
     if (!nextSyncToken) {
-      this.recordError('sync-token-bootstrap-failed');
+      if (bootstrapOverflow) {
+        this.logger?.warn(
+          { scope: 'calendar-sync', pages: bootstrapPagesSeen, max_pages: MAX_PAGES },
+          'bootstrap page-loop exhausted MAX_PAGES without nextSyncToken',
+        );
+        this.recordError('sync-token-bootstrap-paginated-overflow');
+      } else {
+        this.logger?.warn(
+          { scope: 'calendar-sync', pages: bootstrapPagesSeen },
+          'bootstrap page-loop ended without nextSyncToken (no overflow)',
+        );
+        this.recordError('sync-token-bootstrap-failed');
+      }
       return;
     }
 
@@ -309,6 +344,12 @@ export class CalendarSync {
   }
 
   private recordError(value: string): void {
+    // ALWAYS log before the DB UPDATE — even if the DB write fails the
+    // original error context surfaces in the dev terminal (Problem B).
+    this.logger?.warn(
+      { scope: 'calendar-sync', last_error: value },
+      'calendar sync recorded error',
+    );
     try {
       this.db
         .prepare('UPDATE calendar_account SET last_error = ? WHERE id = 1')

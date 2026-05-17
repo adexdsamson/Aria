@@ -291,6 +291,79 @@ describe('CalendarSync.tick', () => {
     expect(addSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('Case 9a (UAT Gap 6) — bootstrap pages through to nextSyncToken on page 3', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: null,
+      last_synced_at: null,
+      last_error: null,
+    });
+    const client = makeFakeClient();
+    client.listEventsWindow.mockResolvedValue({ items: [] });
+    // Three-page bootstrap; nextSyncToken only on the last page (busy calendar).
+    client.listEvents
+      .mockResolvedValueOnce({ items: [timedEvent('b1')], nextPageToken: 'bp2' })
+      .mockResolvedValueOnce({ items: [timedEvent('b2')], nextPageToken: 'bp3' })
+      .mockResolvedValueOnce({ items: [timedEvent('b3')], nextSyncToken: 'st-paged' });
+
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    await sync.tick();
+
+    expect(client.listEvents).toHaveBeenCalledTimes(3);
+    // pageToken progresses across the three calls.
+    expect((client.listEvents.mock.calls[0]![0] as Record<string, unknown>).pageToken).toBeUndefined();
+    expect((client.listEvents.mock.calls[1]![0] as Record<string, unknown>).pageToken).toBe('bp2');
+    expect((client.listEvents.mock.calls[2]![0] as Record<string, unknown>).pageToken).toBe('bp3');
+    expect(db._inspect.events().size).toBe(3);
+    expect(db._inspect.account()?.sync_token).toBe('st-paged');
+    expect(db._inspect.account()?.last_error).toBeNull();
+  });
+
+  it('Case 9b (UAT Gap 6) — empty-calendar bootstrap: single page with nextSyncToken and no items', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: null,
+      last_synced_at: null,
+      last_error: null,
+    });
+    const client = makeFakeClient();
+    client.listEventsWindow.mockResolvedValue({ items: [] });
+    client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-empty' });
+
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    await sync.tick();
+
+    expect(client.listEvents).toHaveBeenCalledTimes(1);
+    expect(db._inspect.events().size).toBe(0);
+    expect(db._inspect.account()?.sync_token).toBe('st-empty');
+    expect(db._inspect.account()?.last_error).toBeNull();
+  });
+
+  it('Case 9c (UAT Gap 6) — MAX_PAGES exhaustion records sync-token-bootstrap-paginated-overflow', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: null,
+      last_synced_at: null,
+      last_error: null,
+    });
+    const client = makeFakeClient();
+    client.listEventsWindow.mockResolvedValue({ items: [] });
+    // Always return nextPageToken, never nextSyncToken → loop hits MAX_PAGES.
+    client.listEvents.mockImplementation(async () => ({
+      items: [timedEvent('overflow')],
+      nextPageToken: 'never-ending',
+    }));
+
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    await sync.tick();
+
+    // MAX_PAGES is 50 in the implementation.
+    expect(client.listEvents).toHaveBeenCalledTimes(50);
+    expect(db._inspect.account()?.last_error).toBe('sync-token-bootstrap-paginated-overflow');
+    // sync_token NOT advanced — must remain null.
+    expect(db._inspect.account()?.sync_token).toBeNull();
+  });
+
   it('Case 9 — M2 bootstrap call shape: listEvents({pageToken: undefined}) with NO syncToken/timeMin/timeMax/singleEvents', async () => {
     const db = createInMemoryDb({
       email: 'me@x.com',

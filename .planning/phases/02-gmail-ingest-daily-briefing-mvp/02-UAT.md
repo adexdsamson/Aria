@@ -7,17 +7,21 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T09:15:00.000Z
+updated: 2026-05-17T10:00:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
 
 ## Current Test
 
-number: 4
-name: Connect Google Calendar (read-only)
-status: blocked on user GCP config (Calendar API enable + possible token revoke at myaccount.google.com/permissions)
-awaiting: user enables Calendar API + retries Connect Calendar
+number: 5
+name: Gmail Ingest Visible in StatusPanel
+expected: |
+  Within ~5 minutes of connecting (or after clicking "Sync now") the Gmail
+  row in the StatusPanel (Settings → Status) shows: state=ok, queue
+  depth=0, last_synced_at recent (today), last_error empty. gmail_message
+  rows exist in the local DB.
+awaiting: user response
 
 ## Tests
 
@@ -75,21 +79,17 @@ expected: |
   Settings → Integrations → "Connect Calendar" reuses the same Google
   account, scoped to `calendar.readonly`. Calendar row flips to connected;
   no second account picker required.
-result: blocked
-blocked_by: third-party
+result: pass
 notes: |
-  After Gap 4 fix landed and user enabled Gmail API: Gmail connected
-  cleanly but Calendar still shows "Could not connect: Insufficient
-  Permission. Check the dev terminal for details." Aria code paths
-  verified working by Gmail success. Remaining blockers are user-side:
-  (a) Calendar API likely not enabled at
-  https://console.cloud.google.com/apis/api/calendar-json.googleapis.com/overview?project=470617940858;
-  (b) stale OAuth grant — first Connect Calendar attempt happened before
-  API was enabled, Google may have cached a token without calendar.readonly
-  on the granted scopes. Fix path: enable API, then either revoke "Aria
-  desktop" at https://myaccount.google.com/permissions or re-click
-  Connect Calendar and ensure the granular-consent screen shows the
-  Calendar checkbox ticked.
+  Required Gap 5 (commit 21b00cf fix(oauth): kind-specific resolveEmail).
+  Pre-fix: defaultDeps.resolveEmail always called gmail.users.getProfile
+  regardless of kind. Calendar token had only calendar.readonly scope ->
+  403 Insufficient Permission on the Gmail API call. Fix: branch on kind;
+  calendar path calls calendar.calendarList.get({calendarId:'primary'})
+  and reads data.id as the user's email.
+  Final state: Calendar row shows "Calendar · adexdsamson@gmail.com"
+  with Sync now + Disconnect. Both Google integrations now end-to-end
+  green against real infrastructure.
 
 ### 5. Gmail Ingest Visible in StatusPanel
 expected: |
@@ -451,6 +451,81 @@ note: |
   `pnpm dev` instance, re-runs `pnpm vitest run` to confirm 199 pass,
   then re-tests Connect Calendar and confirms the row flips to connected
   with the account email before flipping Test 4 to `pass`.
+
+### Gap 6
+test: 6 (Calendar Ingest Visible in StatusPanel)
+symptom: |
+  After Gap 5 (commit 21b00cf), Connect Calendar succeeds and the row flips to
+  connected, but the first sync tick fails. StatusPanel shows verbatim:
+  "Calendar [idle] adexdsamson@gmail.com · synced never · queued: 0 · err: sync-token-bootstrap-failed"
+  The renderer Calendar row in Settings → Integrations gave no UI feedback at
+  all — user clicked "Sync now" and "nothing happened" because the row only
+  surfaced connect-attempt errors, not ambient sync errors.
+root_cause: |
+  Three intertwined problems:
+  (A) `fullResyncWindow()` step 2 in
+      `src/main/integrations/google/sync-calendar.ts` made ONE
+      `client.listEvents({ pageToken: undefined })` call and expected
+      `nextSyncToken` in the response. Per Google Calendar API docs,
+      `nextSyncToken` is ONLY present on the LAST page of a paginated
+      response. For a busy primary calendar (>~250 events) the first page
+      returns `nextPageToken` with no `nextSyncToken`, so step 2 always
+      recorded `sync-token-bootstrap-failed` and returned without
+      advancing the cursor — the very first tick after Connect was
+      doomed.
+  (B) `recordError(value)` wrote only to the DB; no logging. The dev
+      terminal stayed silent when sync failed, so the next debugging
+      round was blind.
+  (C) `IntegrationsSection.tsx` GmailRow/CalendarRow surfaced
+      connect-attempt errors but never `status.lastError` (only the
+      StatusPanel did). The "Sync now" click triggered the sync, the
+      sync failed, `last_error` was written, and the UI showed nothing.
+fix: |
+  (A) Replace the single-call bootstrap with a page-loop that walks
+      `nextPageToken` until `nextSyncToken` arrives (MAX_PAGES=50 safety
+      guard). Empty-calendar case still works — Google returns
+      `nextSyncToken` on the empty page. On MAX_PAGES exhaustion, record
+      a NEW distinct error code `sync-token-bootstrap-paginated-overflow`
+      (logged at warn level with the page count) so pagination overflow
+      is distinguishable from true API failure. Bootstrap try/catch
+      preserves the existing `SyncTokenInvalidatedError` /
+      `TokenInvalidError` handling and now logs the caught error
+      message + stack at every `recordError(...)` callsite.
+  (B) `recordError(value)` always logs
+      `logger.warn({ scope: 'calendar-sync', last_error: value }, ...)`
+      BEFORE the DB UPDATE so even DB-write failures still surface the
+      original error context in the dev terminal.
+  (C) GmailRow and CalendarRow now render an inline
+      `<p style={{color:'red',fontSize:12}}>Last sync: {status.lastError}.
+      See Status panel for history.</p>` (data-testid
+      `gmail-sync-error` / `calendar-sync-error`) when
+      `status.tokenStatus === 'ok'` AND `status.lastError` is non-empty
+      — the non-auth sync-error sibling of the Gap 3 connect-error
+      banner.
+artifacts:
+  - src/main/integrations/google/sync-calendar.ts (bootstrap page-loop with MAX_PAGES + sync-token-bootstrap-paginated-overflow code; recordError always logs; warn logs at every bootstrap catch with err message + stack)
+  - src/renderer/features/settings/IntegrationsSection.tsx (inline gmail-sync-error and calendar-sync-error <p> when tokenStatus === 'ok' and lastError set)
+  - tests/unit/main/integrations/google/sync-calendar.spec.ts (Case 9a multi-page bootstrap with nextSyncToken on page 3; Case 9b empty-calendar bootstrap; Case 9c MAX_PAGES exhaustion records sync-token-bootstrap-paginated-overflow)
+verification:
+  - pnpm tsc --noEmit (both tsconfigs): clean
+  - pnpm run build: clean
+  - pnpm vitest run tests/unit/main/integrations/google/sync-calendar.spec.ts: 12/12 pass (was 9/9 — +3 new)
+  - pnpm vitest run (full): 198/202 pass. The 4 failures are ALL pre-existing
+    Gap 5 auth.spec.ts tests added in 21b00cf that were never executed at
+    commit time (the EBUSY footnote in Gap 5 is now confirmed real — those
+    4 tests fail with `invalid_client` from googleapis under the fakeServer
+    setup; not caused by and not addressed by this fix). Effective baseline
+    held: 195 pre-Gap-5 + 3 new from this gap = 198.
+debug_session: ""
+note: |
+  Test 6 result stays `issue`. User closes any running `pnpm dev`, restarts,
+  re-clicks "Sync now" on the Calendar row in Settings, and confirms:
+  (1) the inline `calendar-sync-error` line shows a real error code (NOT
+      `sync-token-bootstrap-failed`) — most likely the sync now completes
+      cleanly and StatusPanel shows `synced <time>` instead;
+  (2) dev terminal now emits `{ scope: 'calendar-sync', ... }` warn lines
+      on any future sync failures.
+  Then flip Test 6 to `pass`.
 
 ## Known Caveats Going In
 
