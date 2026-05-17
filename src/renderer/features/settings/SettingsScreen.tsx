@@ -46,6 +46,7 @@ export function SettingsScreen(): JSX.Element {
             <li key={t.to} style={{ marginBottom: 4 }}>
               <NavLink
                 to={t.to}
+                data-testid={`settings-nav-${t.to}`}
                 style={({ isActive }) => ({
                   display: 'block',
                   padding: '6px 10px',

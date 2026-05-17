@@ -41,12 +41,11 @@ test('hello-Aria: LOCAL route with reason=frontier-not-configured + routing-log 
     return;
   }
 
-  // Navigate to Settings → Diagnostics. The settings nav lives in the app shell.
-  await w.getByRole('link', { name: /settings/i }).first().click().catch(() => {});
-  // Fallback: navigate by hash if the side-nav link isn't named "settings".
-  await w.evaluate(() => {
-    window.location.hash = '#/settings/diagnostics';
-  });
+  // Navigate to Settings → Diagnostics via real SideNav clicks. The app uses
+  // MemoryRouter (App.tsx), which does not observe window.location.hash, so
+  // hash writes are no-ops. Click the stable testids instead.
+  await w.getByTestId('sidenav-settings').click();
+  await w.getByTestId('settings-nav-diagnostics').click();
 
   await w.getByTestId('settings-diagnostics').waitFor({ timeout: 15_000 });
   await w.getByTestId('ask-aria-box').waitFor({ timeout: 5_000 });

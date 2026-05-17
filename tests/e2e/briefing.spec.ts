@@ -87,10 +87,14 @@ test('briefing walking skeleton: generate-now → 3 sections → dismiss news �
 
     // Diagnostics: route to settings → briefing settings (M3 reinstantiation
     // — see BriefingSettingsSection.spec case 5 for the unit-level dispatch).
-    await w.evaluate(() => {
-      window.location.hash = '#/settings/briefing';
-    });
-    await w.getByTestId('settings-briefing').waitFor({ timeout: 10_000 });
+    //
+    // Navigate via real SideNav clicks. The app uses MemoryRouter (App.tsx),
+    // which does not observe window.location.hash, so hash writes are no-ops.
+    await w.getByTestId('sidenav-settings').click();
+    await w.getByTestId('settings-nav-briefing').click();
+    // settings-briefing testid appears on both the route wrapper <div> and the
+    // <section> inside BriefingSettingsSection. Either is fine — take the first.
+    await w.getByTestId('settings-briefing').first().waitFor({ timeout: 10_000 });
     const timeSelect = w.getByTestId('briefing-time-select');
     await timeSelect.waitFor({ timeout: 5_000 });
     await timeSelect.selectOption('06:00');

@@ -4,11 +4,15 @@ import { NavLink } from 'react-router-dom';
  * Left-rail side nav listing the three Phase-1 sections.
  * Active link uses the D-13 accent color via inline style; downstream phases
  * can swap to Tailwind utility classes once the design system stabilizes.
+ *
+ * NavLink testid pattern: `sidenav-<slug>` (e.g. sidenav-briefing, sidenav-settings).
+ * Tests should click these rather than writing window.location.hash — the app
+ * uses MemoryRouter, which ignores hash changes.
  */
-const ITEMS: ReadonlyArray<{ to: string; label: string }> = [
-  { to: '/briefing', label: 'Briefing' },
-  { to: '/approvals', label: 'Approvals' },
-  { to: '/settings', label: 'Settings' },
+const ITEMS: ReadonlyArray<{ to: string; label: string; testid: string }> = [
+  { to: '/briefing', label: 'Briefing', testid: 'sidenav-briefing' },
+  { to: '/approvals', label: 'Approvals', testid: 'sidenav-approvals' },
+  { to: '/settings', label: 'Settings', testid: 'sidenav-settings' },
 ];
 
 export function SideNav(): JSX.Element {
@@ -38,6 +42,7 @@ export function SideNav(): JSX.Element {
           <li key={item.to} style={{ marginBottom: 'var(--aria-space-xs)' }}>
             <NavLink
               to={item.to}
+              data-testid={item.testid}
               style={({ isActive }) => ({
                 display: 'block',
                 padding: 'var(--aria-space-sm) var(--aria-space-md)',
