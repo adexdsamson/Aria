@@ -195,4 +195,20 @@ ALTER TABLE routing_log ADD COLUMN classifier_version TEXT;
 CREATE INDEX IF NOT EXISTS idx_routing_log_severity ON routing_log(severity);
 `,
   },
+  {
+    version: 8,
+    file: '008_email_triage.sql',
+    sql: `
+CREATE TABLE email_triage (
+  message_id TEXT PRIMARY KEY,
+  classifier_version TEXT NOT NULL,
+  priority TEXT NOT NULL CHECK (priority IN ('urgent','needs-you','fyi','archive')),
+  signals_json TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  ts TEXT NOT NULL,
+  FOREIGN KEY (message_id) REFERENCES gmail_message(id)
+);
+CREATE INDEX idx_email_triage_priority ON email_triage(priority, ts DESC);
+`,
+  },
 ];
