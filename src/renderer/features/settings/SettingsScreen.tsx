@@ -18,6 +18,7 @@ import { BackupRestoreSection } from '../onboarding/BackupRestoreSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
 import { FrontierKeySection } from './FrontierKeySection';
 import { IntegrationsSection } from './IntegrationsSection';
+import { NewsSourcesSection } from './NewsSourcesSection';
 import { OllamaSection } from './OllamaSection';
 import { StatusPanel } from './StatusPanel';
 
@@ -26,6 +27,7 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'frontier-key', label: 'Frontier key' },
   { to: 'ollama', label: 'Local model' },
   { to: 'integrations', label: 'Integrations' },
+  { to: 'news-sources', label: 'News sources' },
   { to: 'onboarding', label: 'Backup & restore' },
   { to: 'diagnostics', label: 'Diagnostics' },
 ];
@@ -64,6 +66,15 @@ export function SettingsScreen(): JSX.Element {
           <Route path="frontier-key" element={<FrontierKeySection />} />
           <Route path="ollama" element={<OllamaSection />} />
           <Route path="integrations" element={<IntegrationsSection />} />
+          <Route
+            path="news-sources"
+            element={
+              <div data-testid="settings-news-sources-route">
+                {/* mount point for data-testid="settings-news-sources" (NewsSourcesSection root) */}
+                <NewsSourcesSection />
+              </div>
+            }
+          />
           <Route path="onboarding" element={<BackupRestoreSection />} />
           <Route path="diagnostics" element={<DiagnosticsSection />} />
           <Route path="*" element={<Navigate to="status" replace />} />

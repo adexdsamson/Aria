@@ -31,6 +31,7 @@ import { registerAskHandlers } from './ask';
 import { registerDiagnosticsHandlers } from './diagnostics';
 import { registerGmailHandlers } from './gmail';
 import { registerCalendarHandlers } from './calendar';
+import { registerNewsHandlers } from './news';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -138,6 +139,17 @@ export function registerHandlers(
   if (!calendarChannels.every((c) => skip.has(c))) {
     registerCalendarHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
     calendarChannels.forEach((c) => skip.add(c));
+  }
+
+  const newsChannels = [
+    CHANNELS.NEWS_LIST_SOURCES,
+    CHANNELS.NEWS_ADD_RSS,
+    CHANNELS.NEWS_REMOVE_SOURCE,
+    CHANNELS.NEWS_SET_BUNDLE,
+  ];
+  if (!newsChannels.every((c) => skip.has(c))) {
+    registerNewsHandlers(ipcMain, { logger, dbHolder });
+    newsChannels.forEach((c) => skip.add(c));
   }
 }
 

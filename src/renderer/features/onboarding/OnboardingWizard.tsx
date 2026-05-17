@@ -7,8 +7,9 @@
 import { useEffect, useState } from 'react';
 import { MnemonicShow } from './MnemonicShow';
 import { MnemonicConfirm } from './MnemonicConfirm';
+import { CountrySectorPicker } from './CountrySectorPicker';
 
-type Step = 'loading' | 'show' | 'confirm' | 'password' | 'sealing' | 'done';
+type Step = 'loading' | 'show' | 'confirm' | 'news-picker' | 'password' | 'sealing' | 'done';
 
 export interface OnboardingWizardProps {
   onComplete: () => void;
@@ -71,9 +72,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
       <MnemonicConfirm
         positions={positions}
         onPositionsUpdated={setPositions}
-        onConfirmed={() => setStep('password')}
+        onConfirmed={() => setStep('news-picker')}
       />
     );
+  }
+  if (step === 'news-picker') {
+    return <CountrySectorPicker onSubmitted={() => setStep('password')} />;
   }
   if (step === 'password' || step === 'sealing') {
     return (
