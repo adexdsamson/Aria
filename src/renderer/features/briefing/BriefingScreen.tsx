@@ -16,6 +16,7 @@ import { GenerateNowAffordance } from './GenerateNowAffordance';
 import { SectionCalendar } from './SectionCalendar';
 import { SectionEmail } from './SectionEmail';
 import { SectionNews } from './SectionNews';
+import { InlineApprovalsPreview } from '../approvals/InlineApprovalsPreview';
 
 function isPayload(v: unknown): v is BriefingPayload {
   return !!v && typeof v === 'object' && 'date' in (v as object) && 'sections' in (v as object) === false
@@ -155,6 +156,7 @@ export function BriefingScreen(): JSX.Element {
         </div>
       )}
 
+      <InlineApprovalsPreview />
       <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
       <SectionEmail
         items={payload.email}

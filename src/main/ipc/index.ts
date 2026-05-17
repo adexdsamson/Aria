@@ -33,6 +33,7 @@ import { registerGmailHandlers } from './gmail';
 import { registerCalendarHandlers } from './calendar';
 import { registerNewsHandlers } from './news';
 import { registerBriefingHandlers } from './briefing';
+import { registerApprovalsHandlers } from './approvals';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -169,6 +170,18 @@ export function registerHandlers(
   if (!briefingChannels.every((c) => skip.has(c))) {
     registerBriefingHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
     briefingChannels.forEach((c) => skip.add(c));
+  }
+
+  const approvalsChannels = [
+    CHANNELS.APPROVALS_LIST,
+    CHANNELS.APPROVALS_APPROVE,
+    CHANNELS.APPROVALS_REJECT,
+    CHANNELS.APPROVALS_SNOOZE,
+    CHANNELS.APPROVALS_BATCH_APPROVE,
+  ];
+  if (!approvalsChannels.every((c) => skip.has(c))) {
+    registerApprovalsHandlers(ipcMain, { logger, dbHolder });
+    approvalsChannels.forEach((c) => skip.add(c));
   }
 }
 
