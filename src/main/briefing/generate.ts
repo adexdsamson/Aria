@@ -7,9 +7,18 @@
  *      (BRIEF-06 + Pitfall 15).
  *   2. B4 SC2 fallback: when gatherEmail = 0 rows AND `gmail_message` has unread
  *      in last 24h, set emailEmptyStateReason='no-important-label' on payload.
- *   3. M1 PII redaction (BEFORE prompt assembly): every raw email in calendar /
- *      email / news string fields becomes `<EMAIL>`. The prompt-leak invariant
- *      is asserted: /\S+@\S+\.\S+/ MUST NOT match the assembled prompt.
+ *   3. M1 PII redaction (BEFORE prompt assembly + AFTER prompt assembly).
+ *      Per-field redaction (`redactPiiInBriefingInput`) covers calendar / email
+ *      / news string fields EXCEPT `news[i].url` (renderer needs raw href).
+ *      Then a final-prompt redactAllPii pass (UAT Gap 10) catches PII shapes
+ *      embedded inside URLs — most notably the loose phone regex matching
+ *      10+ contiguous digits in HN item IDs, RSS GUIDs, article slugs, etc.
+ *
+ *      M1 invariant (post-Gap-9 + Gap-10): both per-candidate redaction AND
+ *      a final-prompt redactAllPii pass; classifier sees zero PII patterns;
+ *      news URLs are preserved verbatim in the rendered payload
+ *      (`payload.news[i].url`) for back-links — only the LLM-bound prompt
+ *      sees the redacted form.
  *   4. router.classify({prompt, source:'generic'}) — Phase 1's router. Since
  *      the prompt is PII-free post-redaction, the classifier does NOT trip and
  *      generic routes to FRONTIER when configured (CONTEXT cost expectation).
@@ -48,11 +57,16 @@ import { fetchRssFeed } from '../news/rss';
 import { fetchBundleCandidates } from '../news/country-bundle';
 import {
   redactPiiInBriefingInput,
+  redactAllPii,
   EMAIL_TOKEN_REGEX,
   type CalendarCandidate,
   type EmailCandidate,
   type BriefingCandidates,
 } from './redact';
+import {
+  DEFAULT_PII_PATTERNS,
+  DEFAULT_PII_PATTERN_NAMES,
+} from '../log/redact';
 import { upsertBriefing, hashFromUrl } from './persist';
 import * as crypto from 'node:crypto';
 
@@ -342,6 +356,32 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
 
   // ── Build prompt ──────────────────────────────────────────────────────────
   const prompt = buildBriefingPrompt(persona, recentTopics, redacted);
+  // UAT Gap 10 — final-prompt belt-and-braces redaction. Per-field redaction
+  // (above) intentionally preserves news[i].url verbatim because the renderer
+  // payload needs raw URLs for back-links. But the loose phone regex matches
+  // 10+ contiguous digits, which appear in many real URLs (HN item IDs, RSS
+  // GUIDs, timestamps, slugs) → classifier would still trip on
+  // `pii-pattern-matched:phone`. Redact the assembled prompt string ONCE more
+  // here; only the LLM-bound + classifier-bound prompt sees this form. The
+  // renderer payload (built later from `redacted.news`) still has raw URLs.
+  const redactedPrompt = redactAllPii(prompt);
+  // Defense-in-depth: scan every DEFAULT_PII_PATTERN against the redacted
+  // prompt. If anything still matches, that's a redactor bug — warn-log and
+  // continue (don't crash; the per-field redaction already cleaned the
+  // candidate set, so a leak here would be a pattern/token mismatch).
+  for (let i = 0; i < DEFAULT_PII_PATTERNS.length; i++) {
+    const re = DEFAULT_PII_PATTERNS[i]!;
+    const name = DEFAULT_PII_PATTERN_NAMES[i] ?? `pattern-${i}`;
+    re.lastIndex = 0;
+    const hit = re.test(redactedPrompt);
+    re.lastIndex = 0;
+    if (hit) {
+      logger.warn(
+        { scope: 'briefing', event: 'M1-residual-pattern', pattern: name },
+        'redactAllPii left a PII pattern in the assembled prompt; investigate',
+      );
+    }
+  }
 
   // ── Skip path: no candidates at all ──────────────────────────────────────
   const totalCandidates =
@@ -350,7 +390,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   // ── Router decision ──────────────────────────────────────────────────────
   let decision: RoutingDecision;
   try {
-    decision = await router.classify({ prompt, source: 'generic' });
+    decision = await router.classify({ prompt: redactedPrompt, source: 'generic' });
   } catch (err) {
     logger.warn({ scope: 'briefing', err: describeErr(err) }, 'router.classify failed');
     decision = {
@@ -362,7 +402,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   }
 
   const generatedAt = new Date().toISOString();
-  const promptHashValue = hashPrompt(prompt);
+  const promptHashValue = hashPrompt(redactedPrompt);
 
   // ── No-candidates path: skip LLM, write ok=0 routing_log, persist ok=0. ──
   // UAT Gap 9: preserve original routing decision reason in the log, suffixed
@@ -445,7 +485,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
     const result = await gen({
       model: model as Parameters<typeof gen>[0]['model'],
       schema: BriefingSchema,
-      prompt,
+      prompt: redactedPrompt,
     } as Parameters<typeof gen>[0]);
     const latency_ms = Math.max(0, Date.now() - startMs);
     const obj = (result as { object: BriefingLLMObject }).object;

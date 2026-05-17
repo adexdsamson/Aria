@@ -7,7 +7,7 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T12:10:00.000Z
+updated: 2026-05-17T12:30:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
@@ -852,6 +852,123 @@ note: |
     helpers (`redactEmailString`, `redactEmailsInBriefingInput` alias)
     once Plan 03 lands — they exist only for back-compat with this
     point-in-time refactor.
+
+### Gap 10
+test: 7 (Generate Today's Briefing)
+symptom: |
+  After Gap 9 (commit 549512b — full PII pattern set + preserved
+  decision.reason), Test 7 re-run at 11:14:00 today still produced a
+  degraded briefing. RoutingLogPanel top row showed verbatim:
+    "LOCAL · generic · pii-pattern-matched:phone | generateObject-failed:AI_APICallError"
+  The preserved-reason fix from Gap 9 (`<decision.reason> | <post-call>`)
+  did its job — it exposed that the classifier was STILL matching the
+  phone pattern even after the per-field redactor was broadened. That's
+  what the audit-trail change was supposed to surface.
+root_cause: |
+  URL-bypass of redaction. `redactPiiInBriefingInput` (Gap 9) intentionally
+  preserves `news[i].url` verbatim because the renderer payload needs raw
+  URLs for back-links (see comment in `src/main/briefing/redact.ts` and the
+  explicit exclusion in `generate.ts:334` `// url excluded (intentional)`).
+  But `buildBriefingPrompt` embeds those raw URLs into the assembled prompt
+  string at `generate.ts:133`:
+    lines.push(`- id=${n.id} title="${n.title}" url=${n.url}`);
+  The loose phone regex (`DEFAULT_PII_PATTERNS[2]`) matches ANY 10+
+  contiguous digits, which appears in many real URLs (HN item IDs of the
+  form `https://news.ycombinator.com/item?id=1234567890`, RSS GUIDs,
+  Unix timestamps in slugs, generic numeric article slugs). Result: the
+  classifier saw the URL's digit run via the prompt body, matched
+  `pii-pattern-matched:phone`, routed LOCAL — even in HYBRID mode where
+  FRONTIER was configured and reachable. The PER-FIELD redactor was
+  doing its job; the PROMPT was the leak channel.
+fix: |
+  Belt-and-braces final-prompt redaction. Single atomic commit.
+
+  - `src/main/briefing/generate.ts`:
+      • Import `redactAllPii` from `./redact` and
+        `DEFAULT_PII_PATTERNS` + `DEFAULT_PII_PATTERN_NAMES` from
+        `../log/redact`.
+      • After `buildBriefingPrompt(...)`, compute
+        `const redactedPrompt = redactAllPii(prompt);`. Per-field
+        redaction still runs first (defense in depth + cleaner
+        candidates for any future per-field downstream consumers).
+      • Replace ALL downstream uses of `prompt` with `redactedPrompt`:
+        - `router.classify({ prompt: redactedPrompt, ... })`
+        - `hashPrompt(redactedPrompt)`
+        - `gen({ ..., prompt: redactedPrompt })` (generateObject)
+      • Add a generalized residual-pattern warn-log: walk every
+        `DEFAULT_PII_PATTERNS` against `redactedPrompt` and emit
+        `event: 'M1-residual-pattern', pattern: <name>` if any still
+        matches. Same shape as the existing `M1-residual-email` warn but
+        covers all 6 patterns. Doesn't crash — a residual would be a
+        redactor bug, not a runtime error.
+      • Updated the file's header comment block to document the
+        post-Gap-10 M1 invariant: "both per-candidate redaction AND a
+        final-prompt redactAllPii pass; classifier sees zero PII
+        patterns; news URLs are preserved verbatim in the rendered
+        payload (`payload.news[i].url`) for back-links — only the
+        LLM-bound prompt sees the redacted form."
+
+  Renderer payload is unchanged: `payload.news[i].url` is still the raw
+  URL (built from the LLM's `obj.news[].url` echo of the candidate URL,
+  which was never redacted at the per-field stage). Back-links work
+  exactly as before.
+
+  Tests:
+  - generate.spec.ts Case 12 — seeds a calendar event whose title
+    contains `https://example.com/article/1234567890123` and asserts
+    (a) the prompt captured by the mock generateObject contains
+    `<PHONE>` and has no `\d{10,}` run, (b) the LLM-echoed news URL in
+    the resulting payload is the raw verbatim URL.
+  - generate.spec.ts Case 13 — exercises the M1-residual-pattern
+    warn-log path with a hand-rolled residual prompt (the real
+    redactor is too good to leave a residual in normal operation, so
+    the test simulates the scan loop directly to assert the warn
+    shape).
+  - redact.spec.ts unchanged — `redactAllPii` already covered.
+artifacts:
+  - src/main/briefing/generate.ts (import redactAllPii + DEFAULT_PII_PATTERNS/NAMES; final-prompt redaction; residual-pattern scan; downstream uses switched to redactedPrompt; header invariant comment updated)
+  - tests/unit/main/briefing/generate.spec.ts (Case 12 URL-bypass + Case 13 residual-warn shape)
+verification:
+  - pnpm tsc --noEmit (tsconfig.json + tsconfig.node.json): clean
+  - pnpm run build: clean (main + preload + renderer)
+  - pnpm vitest run: 225/229 pass (was 223/227 after Gap 9).
+    Net change: +2 passing tests, +2 added (Cases 12 + 13). The 4
+    failures are still the pre-existing Gap-5 auth.spec.ts
+    `invalid_client` cases (out of scope; documented in Gaps 5–9).
+  - stale electron.exe instances killed before vitest run (EBUSY
+    runbook from Gap 5).
+debug_session: ""
+note: |
+  Test 7 stays `issue`. User restarts `pnpm dev`, opens the Briefing
+  screen, regenerates, and confirms:
+  (1) RoutingLogPanel row for the new briefing shows
+      `generic-source-frontier-active | ok` (or `... | ...` if Ollama
+      model issue still trips generateObject in LOCAL paths) — the
+      `pii-pattern-matched:phone` prefix on benign briefing prompts
+      with news URLs should NO longer appear, regardless of route;
+  (2) The renderer's News section back-links still open the real
+      article URL when clicked (verbatim — no `<PHONE>` substitution
+      in the rendered payload);
+  (3) In HYBRID mode with a working frontier key, the briefing
+      route is FRONTIER and `ok=1` lands in routing_log.
+  Then flip Test 7 to `pass`.
+
+  Design observations on the M1 invariant:
+  - The two-stage redaction (per-field FOR the candidate payload +
+    final-prompt FOR the LLM-bound string) is necessary because the
+    payload-vs-prompt have different invariants: the payload must
+    preserve URLs verbatim for back-links; the prompt must be PII-free
+    for the classifier. A single-stage design would force one of the
+    two to compromise.
+  - The phone regex's permissiveness (≥10 contiguous digits) is the
+    right call for the classifier (false-positive redaction is
+    harmless), but it means ANY URL with a long numeric ID will trip
+    it pre-redaction. Gap 10 is the structural fix; further pattern
+    tightening would just move the leak elsewhere.
+  - Future: when `BriefingPayload` ever sends prompts to a remote
+    classifier or audit endpoint, the final-prompt redaction is now
+    the single chokepoint — extend it there once, not at every call
+    site.
 
 ## Known Caveats Going In
 
