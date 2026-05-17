@@ -53,12 +53,23 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
   const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const [rationaleOpen, setRationaleOpen] = useState(false);
+
   const recipients = parseRecipients(row.recipients_json);
   const categories = parseCategories(row.categories_json);
 
   const isInterrupted = row.state === 'interrupted';
   const isReady = row.state === 'ready';
   const isDiffed = row.body_edited !== null && row.body_edited !== row.body_original;
+
+  // Plan 03-02 APPR-07 belt+suspenders: disable the silent-approve UI path
+  // when severity='high' OR categories ∩ {financial,legal,hr} ≠ ∅. gate.ts
+  // (Plan 03-01) enforces this server-side via approval_path='explicit'; the
+  // UI guard is for visibility — the user sees that the silent path is closed.
+  const FORCED_CATEGORIES = new Set(['financial', 'legal', 'hr']);
+  const forceExplicit =
+    row.severity === 'high' ||
+    categories.some((c) => FORCED_CATEGORIES.has(c));
 
   return (
     <article
@@ -128,19 +139,51 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
         <strong>To:</strong> {recipients.join(', ') || '(no recipients)'}
       </p>
 
-      {(row.severity || categories.length > 0 || row.classifier_rationale) && (
+      {(row.severity || categories.length > 0 || row.classifier_rationale || row.routed) && (
         <div
           data-testid={`approval-rationale-${row.id}`}
           style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}
         >
+          {row.routed && (
+            <button
+              type="button"
+              data-testid={`approval-routed-chip-${row.id}`}
+              onClick={() => setRationaleOpen((o) => !o)}
+              style={{
+                ...chipStyle(),
+                cursor: 'pointer',
+                background: '#dbeafe',
+                color: '#1e40af',
+                border: '1px solid #93c5fd',
+              }}
+              aria-expanded={rationaleOpen}
+              title="Toggle rationale"
+            >
+              routed: {row.routed}
+            </button>
+          )}
           {row.severity && <span style={chipStyle()}>severity: {row.severity}</span>}
           {categories.map((c) => (
             <span key={c} style={chipStyle()}>
               {c}
             </span>
           ))}
-          {row.classifier_rationale && (
-            <span style={{ marginLeft: 6 }}>{row.classifier_rationale}</span>
+          {forceExplicit && (
+            <span
+              data-testid={`approval-forced-explicit-${row.id}`}
+              style={{ ...chipStyle(), background: '#fee2e2', color: '#991b1b' }}
+              title="Silent-approve disabled per APPR-07"
+            >
+              explicit-required
+            </span>
+          )}
+          {rationaleOpen && row.classifier_rationale && (
+            <div
+              data-testid={`approval-rationale-expanded-${row.id}`}
+              style={{ marginTop: 4, fontSize: 12, color: '#374151' }}
+            >
+              {row.classifier_rationale}
+            </div>
           )}
         </div>
       )}

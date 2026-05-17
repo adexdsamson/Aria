@@ -23,7 +23,8 @@ describe('db/migrations', () => {
     // Plan 02-02 added 003 (Calendar tables); Plan 02-03 added 004 (news_source);
     // Plan 02-04 added 005 (briefing + briefing_item_dismissed);
     // Plan 03-01 added 006 (approval + approval_tier).
-    expect(applied).toEqual([1, 2, 3, 4, 5, 6]);
+    // Plan 03-02 added 007 (routing_log classifier columns).
+    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -34,7 +35,7 @@ describe('db/migrations', () => {
     expect(tables).toContain('routing_log');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(6);
+    expect(version).toBe(7);
 
     closeDb(db);
   });

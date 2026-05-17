@@ -54,6 +54,9 @@ export const CHANNELS = {
   APPROVALS_REJECT: 'aria:approvals:reject',
   APPROVALS_SNOOZE: 'aria:approvals:snooze',
   APPROVALS_BATCH_APPROVE: 'aria:approvals:batch-approve',
+  // Plan 03-02 sensitivity classifier + routing-log query
+  CLASSIFY: 'aria:classify',
+  ROUTING_LOG_QUERY: 'aria:routing-log:query',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -382,6 +385,43 @@ export interface AriaApi {
   approvalsBatchApprove(req: {
     ids: string[];
   }): Promise<{ ok: true; count: number } | IpcError>;
+
+  // Plan 03-02
+  classify(req: { text: string; approvalId?: string }): Promise<SensitivityResultDto | IpcError>;
+  routingLogQuery(req?: {
+    from?: string;
+    to?: string;
+    route?: Route;
+    source?: string;
+    category?: string;
+    limit?: number;
+  }): Promise<{ rows: RoutingLogClassifiedRow[] } | IpcError>;
+}
+
+/**
+ * Plan 03-02 — DTOs exposed across the renderer/main boundary.
+ */
+export type SensitivityCategoryDto =
+  | 'financial'
+  | 'legal'
+  | 'hr'
+  | 'pii'
+  | 'urgent'
+  | 'none';
+
+export interface SensitivityResultDto {
+  categories: SensitivityCategoryDto[];
+  severity: 'low' | 'med' | 'high';
+  confidence: number;
+  rationale: string;
+  classifier_version: string;
+}
+
+export interface RoutingLogClassifiedRow extends RoutingLogEntry {
+  categories_json: string | null;
+  severity: 'low' | 'med' | 'high' | null;
+  classifier_rationale: string | null;
+  classifier_version: string | null;
 }
 
 /**
@@ -432,4 +472,6 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   APPROVALS_REJECT: 'approvalsReject',
   APPROVALS_SNOOZE: 'approvalsSnooze',
   APPROVALS_BATCH_APPROVE: 'approvalsBatchApprove',
+  CLASSIFY: 'classify',
+  ROUTING_LOG_QUERY: 'routingLogQuery',
 } as const;

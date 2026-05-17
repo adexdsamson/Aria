@@ -34,6 +34,7 @@ import { registerCalendarHandlers } from './calendar';
 import { registerNewsHandlers } from './news';
 import { registerBriefingHandlers } from './briefing';
 import { registerApprovalsHandlers } from './approvals';
+import { registerClassifyHandlers } from './classify';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -182,6 +183,16 @@ export function registerHandlers(
   if (!approvalsChannels.every((c) => skip.has(c))) {
     registerApprovalsHandlers(ipcMain, { logger, dbHolder });
     approvalsChannels.forEach((c) => skip.add(c));
+  }
+
+  const classifyChannels = [CHANNELS.CLASSIFY, CHANNELS.ROUTING_LOG_QUERY];
+  if (!classifyChannels.every((c) => skip.has(c))) {
+    registerClassifyHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      scheduler: getScheduler(),
+    });
+    classifyChannels.forEach((c) => skip.add(c));
   }
 }
 
