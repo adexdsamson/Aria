@@ -9,7 +9,7 @@
 
 export const REDACTED = '[REDACTED]';
 
-/** Default PII regex set. Order is not significant. */
+/** Default PII regex set. Order matters — see DEFAULT_PII_PATTERN_NAMES /_TOKENS. */
 export const DEFAULT_PII_PATTERNS: RegExp[] = [
   // Email (RFC 5322-lite). Global so `replace` hits every occurrence.
   /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
@@ -25,6 +25,38 @@ export const DEFAULT_PII_PATTERNS: RegExp[] = [
   // Plan 02-01 (T-02-01-02): OAuth authorization code (loopback redirect query).
   /code=[A-Za-z0-9._\-/]+/g,
 ];
+
+/**
+ * Stable, ordered names — parallel to DEFAULT_PII_PATTERNS. Used by the
+ * classifier to label which pattern matched in routing_log reasons.
+ *
+ * Single source of truth: anything that reasons about pattern identity
+ * (classifier, briefing M1 redactor) imports this array.
+ */
+export const DEFAULT_PII_PATTERN_NAMES: ReadonlyArray<string> = [
+  'email',
+  'ssn',
+  'phone',
+  'currency',
+  'bearer',
+  'oauth-code',
+] as const;
+
+/**
+ * Per-pattern placeholder tokens — parallel to DEFAULT_PII_PATTERNS. Used by
+ * the briefing M1 redactor (UAT Gap 9) to produce semantic placeholders
+ * (`<EMAIL>`, `<PHONE>`, ...) rather than a single opaque `[REDACTED]`. The
+ * pino log sink keeps using `[REDACTED]` via `redactString` since logs don't
+ * need to preserve semantic shape.
+ */
+export const DEFAULT_PII_PATTERN_TOKENS: ReadonlyArray<string> = [
+  '<EMAIL>',
+  '<SSN>',
+  '<PHONE>',
+  '<AMOUNT>',
+  '<BEARER>',
+  '<OAUTH_CODE>',
+] as const;
 
 /**
  * Redact every match of every pattern in `s` with `[REDACTED]`.

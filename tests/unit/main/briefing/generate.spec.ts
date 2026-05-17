@@ -187,7 +187,9 @@ describe('runBriefing', () => {
       reason: string;
       ok: number;
     };
-    expect(log.reason).toBe('no-candidates');
+    // UAT Gap 9: routing_log reason now preserves the original decision
+    // reason concatenated with the post-call status.
+    expect(log.reason).toBe('frontier-not-configured | no-candidates');
     expect(log.ok).toBe(0);
     expect(payload.errors.calendar).toBeDefined();
   });
@@ -212,7 +214,10 @@ describe('runBriefing', () => {
       reason: string;
       ok: number;
     };
-    expect(log.reason).toMatch(/^generateObject-failed:/);
+    // UAT Gap 9: routing_log reason preserves the original decision reason
+    // (here `frontier-not-configured` for the localRouter) concatenated with
+    // the post-call failure status.
+    expect(log.reason).toBe('frontier-not-configured | generateObject-failed:AISDKError');
     expect(log.ok).toBe(0);
     // Briefing row still upserted (degraded mode).
     expect((db.prepare('SELECT COUNT(*) AS n FROM briefing').get() as { n: number }).n).toBe(1);

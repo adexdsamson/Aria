@@ -9,9 +9,12 @@ import { describe, it, expect } from 'vitest';
 import {
   EMAIL_TOKEN_REGEX,
   redactEmailString,
+  redactAllPii,
   redactEmailsInBriefingInput,
+  redactPiiInBriefingInput,
   type BriefingCandidates,
 } from '../../../../src/main/briefing/redact';
+import { classifySensitivity } from '../../../../src/main/llm/classifier';
 
 const PROMPT_LEAK_PATTERN = /\S+@\S+\.\S+/;
 
@@ -135,5 +138,113 @@ describe('redactEmailsInBriefingInput', () => {
     expect(promptBody).not.toMatch(PROMPT_LEAK_PATTERN);
     // And the EMAIL_TOKEN_REGEX (used by redact) also finds zero matches.
     expect(new RegExp(EMAIL_TOKEN_REGEX.source, 'g').test(promptBody)).toBe(false);
+  });
+});
+
+describe('redactAllPii — UAT Gap 9 (full PII pattern set)', () => {
+  it('email pattern → <EMAIL> (back-compat with redactEmailString)', () => {
+    expect(redactAllPii('mail foo@bar.com please')).toBe('mail <EMAIL> please');
+  });
+
+  it('phone pattern → <PHONE> (covers meeting IDs / dial-ins)', () => {
+    // 10-digit NANP-ish — the classifier hits this and so should the redactor.
+    expect(redactAllPii('Zoom dial-in: 415-555-1234 PIN 9999')).toBe(
+      'Zoom dial-in: <PHONE> PIN 9999',
+    );
+  });
+
+  it('SSN pattern → <SSN>', () => {
+    expect(redactAllPii('SSN on file 123-45-6789')).toBe('SSN on file <SSN>');
+  });
+
+  it('currency pattern → <AMOUNT>', () => {
+    expect(redactAllPii('Invoice for $1,234.56 due Friday')).toBe(
+      'Invoice for <AMOUNT> due Friday',
+    );
+    expect(redactAllPii('paid $50')).toBe('paid <AMOUNT>');
+  });
+
+  it('Bearer token → <BEARER>', () => {
+    expect(redactAllPii('Authorization: Bearer ya29.A0ARrdaM_abcDEF-123')).toBe(
+      'Authorization: <BEARER>',
+    );
+  });
+
+  it('OAuth code= → <OAUTH_CODE>', () => {
+    expect(redactAllPii('redirect /?code=4/0AeanS0abc-123_xyz&state=q')).toBe(
+      'redirect /?<OAUTH_CODE>&state=q',
+    );
+  });
+
+  it('after redactAllPii the classifier reports sensitive=false (root-cause invariant)', () => {
+    // The exact failure mode from UAT Gap 9: a briefing prompt containing a
+    // phone-shaped meeting ID would previously trip the classifier → LOCAL
+    // route. After the broadened redactor, it must not.
+    const before = 'Daily standup — dial 415-555-1234 to join';
+    expect(classifySensitivity(before).sensitive).toBe(true);
+    const after = redactAllPii(before);
+    expect(classifySensitivity(after).sensitive).toBe(false);
+  });
+
+  it('redactPiiInBriefingInput is the canonical name; legacy alias still works', () => {
+    expect(redactPiiInBriefingInput).toBe(redactEmailsInBriefingInput);
+  });
+
+  it('briefing candidates with mixed PII: phone in event title + currency in email snippet are all redacted', () => {
+    const c: BriefingCandidates = {
+      calendar: [
+        {
+          id: 'c1',
+          title: 'Investor call — dial 415-555-1234',
+          startsAt: null,
+          location: 'Conf room A',
+        },
+      ],
+      email: [
+        {
+          id: 'm1',
+          subject: 'Re: invoice',
+          from_addr: 'cfo@x.co',
+          snippet: 'wire $12,500 by EOD',
+          received_at: '2026-05-20T00:00:00.000Z',
+        },
+      ],
+      news: [
+        {
+          id: 'hn-1',
+          title: 'Acme raises $50M Series B',
+          url: 'https://example.com/acme',
+          postedAt: '2026-05-20T00:00:00.000Z',
+        },
+      ],
+    };
+    const out = redactPiiInBriefingInput(c);
+    expect(out.calendar[0].title).toBe('Investor call — dial <PHONE>');
+    expect(out.email[0].from_addr).toBe('<EMAIL>');
+    expect(out.email[0].snippet).toBe('wire <AMOUNT> by EOD');
+    // Currency pattern matches `$50` then the trailing `M` survives — that's
+    // fine for the M1 invariant (classifier sees `<AMOUNT>M`, no `$<digits>`).
+    expect(out.news[0].title).toBe('Acme raises <AMOUNT>M Series B');
+    // url preserved verbatim.
+    expect(out.news[0].url).toBe('https://example.com/acme');
+
+    // Classifier must report not-sensitive on the assembled prompt body.
+    const body = [
+      out.calendar[0].title,
+      out.calendar[0].location,
+      out.email[0].subject,
+      out.email[0].from_addr,
+      out.email[0].snippet,
+      out.news[0].title,
+    ].join('\n');
+    expect(classifySensitivity(body).sensitive).toBe(false);
+  });
+});
+
+// Touch redactEmailString to keep the deprecated wrapper covered without
+// adding a new describe block.
+describe('redactEmailString (deprecated wrapper)', () => {
+  it('still replaces emails with <EMAIL> for back-compat', () => {
+    expect(redactEmailString('a@b.co and c@d.co')).toBe('<EMAIL> and <EMAIL>');
   });
 });

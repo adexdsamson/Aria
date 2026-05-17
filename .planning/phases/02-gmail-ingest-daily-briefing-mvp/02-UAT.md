@@ -7,7 +7,7 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T11:20:00.000Z
+updated: 2026-05-17T12:10:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
@@ -711,6 +711,147 @@ note: |
       confirm modal; clicking Regenerate writes a NEW row in
       `routing_log` and refreshes the on-screen payload.
   Then flip Test 7 to `pass`.
+
+### Gap 9
+test: 7 (Generate Today's Briefing)
+symptom: |
+  After Gap 8 (4-mode taxonomy + Regenerate affordance), Test 7 re-run still
+  produced a degraded briefing. RoutingLogPanel row showed verbatim:
+    "LOCAL · generic · generateObject-failed:AI_APICallError ·
+     llama3.1:8b-instruct-q4_K_M"
+  StatusPanel correctly reported `HYBRID` mode (Ollama reachable + Frontier
+  configured), but every briefing tick still routed LOCAL and failed at the
+  Ollama call with "model not found" (user's local Ollama has `dolphin3`,
+  not `llama3.1:8b-instruct-q4_K_M`). The displayed `reason` only said
+  `generateObject-failed:...` — the WHY of the LOCAL classification was
+  invisible.
+root_cause: |
+  Two intertwined defects, the second of which actively hid the first:
+
+  (A) M1 redactor too narrow vs. the classifier. `src/main/briefing/redact.ts`
+      (`redactEmailsInBriefingInput`) only replaced the EMAIL pattern with
+      `<EMAIL>`. But `src/main/llm/classifier.ts` re-exports the FULL
+      DEFAULT_PII_PATTERNS array from `src/main/log/redact.ts`:
+        - email
+        - ssn
+        - phone (loose 10-digit pattern — matches meeting IDs, Zoom dial-ins,
+          news article IDs, anything 10-ish digits)
+        - currency ($1, $1,234.56)
+        - Bearer tokens
+        - code= params
+      Briefing prompts containing meeting dial-ins, dollar amounts, or
+      generic phone-shaped digit clusters tripped the classifier's PII
+      rule → router step 2 routed LOCAL with reason
+      `pii-pattern-matched:<which>`. In HYBRID mode the FRONTIER_ONLY
+      override doesn't apply, so the LOCAL route was taken as designed
+      given the (broken) classifier signal.
+
+      The classifier also had only 4 PII_PATTERN_NAMES (email/ssn/phone/
+      currency) for 6 patterns — bearer and oauth-code matches were
+      labelled `pattern-4`/`pattern-5` in routing_log reasons. Another
+      drift symptom of the same single-source-of-truth gap.
+
+  (B) Briefing engine overwrote the original routing decision reason.
+      `src/main/briefing/generate.ts` writes ONE routing_log row per
+      briefing — but every failure-path call to `safeWriteLog` set
+      `reason: 'generateObject-failed:<klass>'` (or `'no-candidates'`,
+      `'model-acquire-failed:...'`) verbatim, REPLACING the
+      `decision.reason` string from the router. Result: the routing log
+      told you WHAT broke, but not WHY that route was chosen — the
+      audit trail to debug "why LOCAL when HYBRID is configured?"
+      was destroyed. RoutingLogPanel surfaced the lossy post-call
+      reason, so the M1-too-narrow root cause was invisible during UAT.
+fix: |
+  Two-part atomic fix (single commit).
+
+  Part A — Expand M1 to the full classifier PII pattern set.
+  - `src/main/log/redact.ts` adds `DEFAULT_PII_PATTERN_NAMES` (parallel to
+    DEFAULT_PII_PATTERNS, 6 entries) AND a new
+    `DEFAULT_PII_PATTERN_TOKENS` array of semantic placeholders
+    (`<EMAIL>`, `<SSN>`, `<PHONE>`, `<AMOUNT>`, `<BEARER>`,
+    `<OAUTH_CODE>`). Single source of truth for both classifier name
+    labels and the briefing M1 redactor.
+  - `src/main/llm/classifier.ts` re-exports DEFAULT_PII_PATTERN_NAMES as
+    the canonical PII_PATTERN_NAMES alias — fixes the 4-vs-6 mismatch
+    so routing_log reasons name bearer/oauth-code instead of
+    `pattern-4`/`pattern-5`.
+  - `src/main/briefing/redact.ts` rewritten: new `redactAllPii(s)`
+    iterates DEFAULT_PII_PATTERNS, replacing each with its
+    DEFAULT_PII_PATTERN_TOKENS entry. New
+    `redactPiiInBriefingInput(c)` applies it to every string field of
+    the candidate set EXCEPT `news[i].url`. Legacy
+    `redactEmailsInBriefingInput` exported as an alias for back-compat;
+    legacy `redactEmailString` kept as a deprecated thin wrapper around
+    the email pattern only.
+  - `src/main/briefing/generate.ts` import updated to
+    `redactPiiInBriefingInput`. EMAIL_TOKEN_REGEX residual-leak check
+    preserved as defense-in-depth.
+
+  Part B — Preserve the original routing decision reason in routing_log.
+  - All three failure-path safeWriteLog callsites in
+    `src/main/briefing/generate.ts` (no-candidates, model-acquire-failed,
+    generateObject-failed) now concatenate
+    `reason: \`${decision.reason} | ${postCallStatus}\``.
+    Success path is unchanged — it already used `decision.reason` and
+    `ok=1` carries the success signal.
+  - Example new row:
+    `generic-source-frontier-active | generateObject-failed:AI_APICallError`
+    or
+    `pii-pattern-matched:phone | generateObject-failed:AI_APICallError`
+  - Schema unchanged — `reason` is TEXT, the concatenated string fits.
+
+  Downstream: existing fixture tests that exact-matched
+  `reason: 'generateObject-failed:...'` or `'no-candidates'` updated to
+  the new concatenated format (generate.spec.ts Case 3 + Case 4). New
+  redact tests cover every PII pattern (phone, ssn, currency, bearer,
+  oauth-code) and assert the root-cause invariant: a phone-shape meeting
+  dial-in trips the classifier BEFORE redactAllPii and does NOT trip it
+  AFTER. Test count rose 217 → 227 (+10 new, all passing).
+artifacts:
+  - src/main/log/redact.ts (DEFAULT_PII_PATTERN_NAMES + DEFAULT_PII_PATTERN_TOKENS added; single source of truth)
+  - src/main/llm/classifier.ts (PII_PATTERN_NAMES re-exports DEFAULT_PII_PATTERN_NAMES; fixes 4-vs-6 name drift)
+  - src/main/briefing/redact.ts (redactAllPii + redactPiiInBriefingInput; legacy email-only helpers kept as deprecated wrappers/alias)
+  - src/main/briefing/generate.ts (import switched to redactPiiInBriefingInput; three failure-path routing_log writes now concatenate decision.reason | post-call-status)
+  - tests/unit/main/briefing/redact.spec.ts (8 new tests covering all 6 PII patterns + classifier round-trip invariant)
+  - tests/unit/main/briefing/generate.spec.ts (Cases 3 + 4 fixture strings updated to concatenated reason format)
+verification:
+  - pnpm tsc --noEmit (tsconfig.json + tsconfig.node.json): clean
+  - pnpm run build: clean (main + preload + renderer)
+  - pnpm vitest run: 223/227 pass (was 213/217). The 4 failures are all
+    pre-existing Gap-5 auth.spec.ts invalid_client cases (out of scope;
+    documented in Gaps 5/6/7/8). Net change: +10 passing tests, +10 added.
+  - stale `electron.exe` instances killed before vitest run (EBUSY runbook
+    from Gap 5).
+debug_session: ""
+note: |
+  Test 7 stays `issue`. User restarts `pnpm dev`, opens the Briefing screen,
+  regenerates, and confirms:
+  (1) RoutingLogPanel row for the new briefing shows
+      `generic-source-frontier-active | ...` (or `... | ok` if success)
+      — the original decision reason is preserved alongside the post-call
+      status;
+  (2) No more `pii-pattern-matched:phone` / `:currency` LOCAL routes on
+      benign briefing prompts containing meeting dial-ins or dollar
+      amounts;
+  (3) With HYBRID mode the briefing route is FRONTIER as expected;
+  (4) If LOCAL is still chosen for any briefing, the routing_log row
+      tells you exactly which classifier pattern matched — no more
+      truth-hiding.
+  Then flip Test 7 to `pass`.
+
+  Follow-up observations (not blocking):
+  - Currency `$50M` redacts to `<AMOUNT>M` (trailing magnitude letter
+    survives) — acceptable for the M1 classifier invariant (no
+    `$<digits>` remains), but a future refinement could extend the
+    currency pattern to consume `K`/`M`/`B` suffixes.
+  - The phone regex is intentionally permissive and will continue to
+    redact some non-PII numeric strings (timestamps, IDs). This is
+    the correct tradeoff for the classifier — false-positive
+    redaction is harmless; false-negative is a leak/route bug.
+  - Consider a follow-up plan to delete the deprecated email-only
+    helpers (`redactEmailString`, `redactEmailsInBriefingInput` alias)
+    once Plan 03 lands — they exist only for back-compat with this
+    point-in-time refactor.
 
 ## Known Caveats Going In
 

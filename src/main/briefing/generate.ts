@@ -47,7 +47,7 @@ import { fetchHnTopStories, type NewsCandidate } from '../news/hn';
 import { fetchRssFeed } from '../news/rss';
 import { fetchBundleCandidates } from '../news/country-bundle';
 import {
-  redactEmailsInBriefingInput,
+  redactPiiInBriefingInput,
   EMAIL_TOKEN_REGEX,
   type CalendarCandidate,
   type EmailCandidate,
@@ -321,8 +321,8 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
     }
   }
 
-  // ── M1 redaction ──────────────────────────────────────────────────────────
-  const redacted = redactEmailsInBriefingInput({
+  // ── M1 redaction (UAT Gap 9: full PII pattern set, not just email) ───────
+  const redacted = redactPiiInBriefingInput({
     calendar: calendarCandidates,
     email: emailCandidates,
     news: newsCandidates,
@@ -365,11 +365,14 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   const promptHashValue = hashPrompt(prompt);
 
   // ── No-candidates path: skip LLM, write ok=0 routing_log, persist ok=0. ──
+  // UAT Gap 9: preserve original routing decision reason in the log, suffixed
+  // with the post-call status. Format: `<decision.reason> | <post-call>`.
   if (totalCandidates === 0) {
+    const noCandReason = `${decision.reason} | no-candidates`;
     safeWriteLog(db, logger, {
       ts: generatedAt,
       route: decision.route,
-      reason: 'no-candidates',
+      reason: noCandReason,
       source: 'generic',
       prompt_hash: promptHashValue,
       model: decision.model,
@@ -386,7 +389,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
       errors,
       emailEmptyStateReason,
       route: decision.route,
-      reason: 'no-candidates',
+      reason: noCandReason,
       model: decision.model,
     });
     safeUpsert(db, logger, payload, decision, 0, 0);
@@ -405,7 +408,9 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
     }
   } catch (err) {
     logger.warn({ scope: 'briefing', err: describeErr(err) }, 'model factory failed');
-    const reason = `model-acquire-failed:${describeErr(err)}`;
+    // UAT Gap 9: preserve the original routing decision reason; suffix with
+    // the post-call failure status so the audit trail tells the full story.
+    const reason = `${decision.reason} | model-acquire-failed:${describeErr(err)}`;
     const start = Date.now();
     const degraded = degradedPayload({
       date,
@@ -496,7 +501,9 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   } catch (err) {
     const latency_ms = Math.max(0, Date.now() - startMs);
     const klass = (err as { name?: string }).name ?? 'Error';
-    const reason = `generateObject-failed:${klass}`;
+    // UAT Gap 9: preserve the original routing decision reason; suffix with
+    // the post-call failure status so the audit trail tells the full story.
+    const reason = `${decision.reason} | generateObject-failed:${klass}`;
     logger.warn({ scope: 'briefing', err: describeErr(err) }, 'generateObject threw');
     safeWriteLog(db, logger, {
       ts: generatedAt,

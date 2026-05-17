@@ -1,29 +1,24 @@
 /**
  * Hard-rules sensitivity classifier (Plan 04 Task 1).
  *
- * Re-exports DEFAULT_PII_PATTERNS from src/main/log/redact.ts so the classifier
- * and the pino redactor can never drift. `classifySensitivity(prompt)` walks
+ * Re-exports DEFAULT_PII_PATTERNS + DEFAULT_PII_PATTERN_NAMES from
+ * src/main/log/redact.ts so the classifier, pino redactor, and briefing M1
+ * redactor (UAT Gap 9) can never drift. `classifySensitivity(prompt)` walks
  * each named pattern and returns the list of pattern names that matched.
  *
- * Pattern names (for the verbatim routing-log reason string):
- *   - 'email'
- *   - 'ssn'
- *   - 'phone'
- *   - 'currency'
- *
- * Order matches DEFAULT_PII_PATTERNS in src/main/log/redact.ts.
+ * Pattern names are owned by src/main/log/redact.ts
+ * (DEFAULT_PII_PATTERN_NAMES). Order matches DEFAULT_PII_PATTERNS.
  */
-import { DEFAULT_PII_PATTERNS } from '../log/redact';
+import { DEFAULT_PII_PATTERNS, DEFAULT_PII_PATTERN_NAMES } from '../log/redact';
 
 export { DEFAULT_PII_PATTERNS };
 
-/** Stable, ordered names — parallel to DEFAULT_PII_PATTERNS. */
-export const PII_PATTERN_NAMES: ReadonlyArray<string> = [
-  'email',
-  'ssn',
-  'phone',
-  'currency',
-] as const;
+/**
+ * Stable, ordered names — re-exported from src/main/log/redact.ts as the
+ * canonical alias for back-compat. New code should import
+ * DEFAULT_PII_PATTERN_NAMES directly from `../log/redact`.
+ */
+export const PII_PATTERN_NAMES: ReadonlyArray<string> = DEFAULT_PII_PATTERN_NAMES;
 
 export interface ClassifierResult {
   sensitive: boolean;
