@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 2 in progress
-last_updated: "2026-05-17T05:10:00.000Z"
+status: Phase 2 complete (pending verification)
+last_updated: "2026-05-17T06:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Phase
 
-**Phase 2: Gmail + Daily Briefing MVP** — Waves 1–3 complete (02-01 Gmail, 02-02 Calendar, 02-03 News sources); Wave 4 (02-04 Briefing engine) up next.
+**Phase 2 complete (pending verification)** — All 4 waves shipped: 02-01 Gmail, 02-02 Calendar, 02-03 News, 02-04 Briefing engine. 194/194 unit tests pass. Awaiting `/gsd-verify-work 2`.
 
 ## Phase Status
 
 - [x] Phase 1: Foundation
-- [ ] Phase 2: Gmail + Daily Briefing MVP
+- [x] Phase 2: Gmail + Daily Briefing MVP (pending verification)
 - [ ] Phase 3: Approval Queue + Sensitivity Router + Email Triage/Drafting/Send
 - [ ] Phase 4: Calendar Smart-Scheduling (Google)
 - [ ] Phase 5: Outlook Parity (email + calendar)
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Next Action
 
-Run `/gsd-execute-phase 2 --wave 4` to execute the Briefing engine plan (02-04).
+Run `/gsd-verify-work 2` to validate Phase 2 against its 5 success criteria.
 
 ## Workflow Config
 
