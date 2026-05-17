@@ -7,17 +7,21 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T06:45:00.000Z
+updated: 2026-05-17T07:15:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
 
 ## Current Test
 
-number: 1
-name: Cold Start Smoke Test
-status: BLOCKER — renderer blank
-awaiting: DevTools console paste to confirm CSP-blocks-Vite-dev hypothesis
+number: 3
+name: Connect Gmail (read-only)
+expected: |
+  Settings → Integrations → "Connect Gmail" opens an OAuth browser window
+  scoped to `gmail.readonly` only. After approval the window closes; the
+  Gmail row in IntegrationsSection flips to connected with the account
+  email displayed.
+awaiting: user response
 
 ## Tests
 
@@ -40,16 +44,18 @@ expected: |
   Selecting "Nigeria" / a sector loads the NG news bundle. Skipping is OK.
   On already-onboarded profile this step is bypassed and the picker is
   available via Settings → News Sources instead.
-result: issue
-reported: "Picker renders correctly (Nigeria default + 4 sector checkboxes pre-checked: Government & policy, Finance & markets, Technology, Energy) but inline red error 'Could not save news sources.' appears above the Continue button."
-severity: major
-hypothesis: |
-  Save IPC failing. Candidates: (a) NEWS_SET_USER_SOURCES handler not
-  registered or throwing, (b) migration 004_news.sql not applied on this
-  profile so news_source table is missing, (c) constraint violation on
-  insert (country/sector shape mismatch), (d) handler exists but renderer
-  is calling the wrong channel name. Awaiting DevTools console paste to
-  pinpoint.
+result: pass
+notes: |
+  Initial run: picker rendered fine but "Could not save news sources." red
+  error appeared because OnboardingWizard's news-picker step ran BEFORE
+  password/seal — SQLCipher DB not yet open, NEWS_SET_BUNDLE handler
+  returned bare { ok: false }. Resolved by commit b7c931b: picker now
+  pure collect-and-report-up; OnboardingWizard buffers selection and
+  persists post-seal (non-blocking on failure).
+  Re-run: onboarding completed end-to-end. User landed on main app shell
+  with SideNav (Briefing/Approvals/Settings) and BriefingScreen rendering
+  the GenerateNowAffordance — proves seal + post-seal news persistence
+  fired correctly.
 
 ### 3. Connect Gmail (read-only)
 expected: |
@@ -261,6 +267,64 @@ note: |
   Test 2 result stays `issue` for the record. User re-runs the
   fresh-profile flow and confirms picker advances to password without
   error before flipping to passed.
+
+### Gap 3
+test: 3 (Connect Gmail (read-only))
+symptom: |
+  Settings → Integrations → "Connect Gmail" → in-app warning modal
+  Continue. Modal closes, nothing else happens. No OAuth browser
+  window opens. DevTools console clean. (Same chain affects "Connect
+  Calendar" — Test 4 latent.)
+root_cause: |
+  Three bugs chained:
+  (1) Dev env not loaded — `src/main/integrations/google/auth.ts`
+      reads `process.env.GOOGLE_OAUTH_CLIENT_ID` / `_SECRET`. The
+      file's header comment claimed "dev reads .env.local" but no
+      `dotenv` dependency was installed and no `.env.local` loader
+      was wired anywhere. `process.env.*` was `undefined` in dev, so
+      `readOAuthConfig()` threw `OAuthConfigMissingError` every time.
+  (2) Renderer swallowed the handler error —
+      `IntegrationsSection.tsx` `onModalContinue` (both Gmail and
+      Calendar copies) called `await window.aria.gmailConnect()` /
+      `calendarConnect()` and discarded the result. The handler's
+      `{ ok: false, error: 'oauth-config-missing' }` payload never
+      reached the UI — user only saw `setBusy(false)`.
+  (3) No error surfacing on the integration row at all — even once
+      env loads, future failures (network, user cancels OAuth,
+      invalid creds) would remain invisible.
+fix: |
+  Part A: dev-only `.env.local` loader at the very top of
+  `src/main/index.ts`, BEFORE any module reads `process.env.GOOGLE_*`.
+  Gated on `ELECTRON_RENDERER_URL` (same dev discriminator the CSP
+  fix uses), reads `process.cwd()/.env.local`, ~10-line KEY=VALUE
+  parser (NO `dotenv` dep), strips surrounding quotes, only sets
+  vars not already in `process.env` (shell exports win), logs ONE
+  pino line with `scope: 'env-local', loaded: <N>` — never logs
+  keys or values. Packaged builds (no `ELECTRON_RENDERER_URL`)
+  skip entirely.
+  Part B: `connectError` state added to both `GmailRow` and
+  `CalendarRow`. `onModalContinue` now captures the IPC return; if
+  `result.error` is a string it sets `connectError` via a new
+  `connectErrorCopy(code)` mapper (known codes:
+  `oauth-config-missing`, `access_denied`; generic fallthrough).
+  Rendered inline above the Connect button using the existing
+  banner style (red, role="alert"). Cleared when the user re-clicks
+  Connect.
+commit: 76aa1f5
+artifacts:
+  - src/main/index.ts (dev `.env.local` loader)
+  - src/renderer/features/settings/IntegrationsSection.tsx (connectError state + banner in both rows; connectErrorCopy mapper)
+  - .planning/phases/02-gmail-ingest-daily-briefing-mvp/02-01-SUMMARY.md (Post-UAT Correction)
+verification:
+  - pnpm run typecheck: clean (both tsconfigs)
+  - pnpm vitest run: 195/195 pass (Gap 2 baseline 194/195 — flake passed too; no regression)
+  - pnpm run build: clean
+  - secret-safe re-read of index.ts loader (counts only, never keys/values)
+debug_session: ""
+note: |
+  Test 3 result stays `issue` for the record. User re-runs the
+  Connect Gmail flow and confirms the OAuth browser window opens
+  before flipping to passed.
 
 ## Known Caveats Going In
 
