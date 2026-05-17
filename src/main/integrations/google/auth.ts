@@ -186,7 +186,7 @@ export interface ConnectGoogleDeps {
  * (nodeIntegration: false, contextIsolation: true, sandbox: true) and no preload.
  * Configured per Pitfall 18 / threat T-02-01-03.
  */
-function defaultDeps(_kind: GoogleTokenKind): Required<Omit<ConnectGoogleDeps, 'createOAuthClient'>> & {
+function defaultDeps(kind: GoogleTokenKind): Required<Omit<ConnectGoogleDeps, 'createOAuthClient'>> & {
   createOAuthClient: NonNullable<ConnectGoogleDeps['createOAuthClient']>;
 } {
   return {
@@ -223,9 +223,24 @@ function defaultDeps(_kind: GoogleTokenKind): Required<Omit<ConnectGoogleDeps, '
     createOAuthClient: ({ clientId, clientSecret, redirectUri }) =>
       new OAuth2Client(clientId, clientSecret, redirectUri),
     resolveEmail: async (client) => {
-      // Lazy-require googleapis; the gmail.users.getProfile call returns emailAddress.
+      // Lazy-require googleapis. Branch by kind so we only call APIs whose
+      // scopes we actually requested — using gmail.users.getProfile with a
+      // calendar-only token returns 403 "Insufficient Permission" (UAT Test 4
+      // Gap 5). For `calendar`, primary CalendarListEntry.id IS the user's
+      // email by Google convention; data.summary is a belt-and-braces fallback.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { google } = require('googleapis') as typeof import('googleapis');
+      if (kind === 'calendar') {
+        const calendar = google.calendar({ version: 'v3', auth: client });
+        const res = await calendar.calendarList.get({ calendarId: 'primary' });
+        const isEmail = (s: string | null | undefined): s is string =>
+          typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+        const id = res.data.id;
+        if (isEmail(id)) return id;
+        const summary = res.data.summary;
+        if (isEmail(summary)) return summary;
+        throw new Error('calendarList.get returned no usable email/id');
+      }
       const gmail = google.gmail({ version: 'v1', auth: client });
       const res = await gmail.users.getProfile({ userId: 'me' });
       const email = res.data.emailAddress;

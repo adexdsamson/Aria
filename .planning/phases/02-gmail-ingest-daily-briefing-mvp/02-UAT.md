@@ -7,21 +7,17 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T07:50:00.000Z
+updated: 2026-05-17T09:15:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
 
 ## Current Test
 
-number: 3
-name: Connect Gmail (read-only)
-expected: |
-  Settings → Integrations → "Connect Gmail" opens an OAuth browser window
-  scoped to `gmail.readonly` only. After approval the window closes; the
-  Gmail row in IntegrationsSection flips to connected with the account
-  email displayed.
-awaiting: user response
+number: 4
+name: Connect Google Calendar (read-only)
+status: blocked on user GCP config (Calendar API enable + possible token revoke at myaccount.google.com/permissions)
+awaiting: user enables Calendar API + retries Connect Calendar
 
 ## Tests
 
@@ -63,27 +59,37 @@ expected: |
   scoped to `gmail.readonly` only. After approval the window closes; the
   Gmail row in IntegrationsSection flips to connected with the account
   email displayed.
-result: issue
+result: pass
 notes: |
-  Gmail click was deferred during this UAT pass — the user went to Test 4
-  (Calendar) first. The CSP-leakage bug surfaced in Gap 4 is shared across
-  both Gmail and Calendar connect flows (same defaultSession-scoped CSP
-  injection, same OAuth BrowserWindow path), so Gmail will hit the same
-  ERR_BLOCKED_BY_CSP failure mode until the Gap 4 fix is verified.
+  Required 4 sequential fixes to reach green: Gap 1 (dev-CSP), Gap 3
+  (env-loader + renderer error swallow), Gap 4 (CSP leakage into OAuth
+  pages), and one user-side action (enable Gmail API at
+  https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=470617940858).
+  Final state: Gmail row displays "Gmail · adexdsamson@gmail.com" with
+  "Sync now" + "Disconnect" controls. Confirms env loader, OAuth loopback,
+  token persist, scope correctness (gmail.readonly only), and cron arm
+  all working end-to-end on real Google infrastructure.
 
 ### 4. Connect Google Calendar (read-only)
 expected: |
   Settings → Integrations → "Connect Calendar" reuses the same Google
   account, scoped to `calendar.readonly`. Calendar row flips to connected;
   no second account picker required.
-result: issue
+result: blocked
+blocked_by: third-party
 notes: |
-  Clicking "Connect Calendar" opens the Google OAuth BrowserWindow but the
-  granular-consent UI never completes successfully. UI surfaced a red
-  banner on the Calendar row: "Could not connect: Insufficient Permission.
-  Check the dev terminal for details." Dev terminal repeatedly logged:
-  `electron: Failed to load URL: https://accounts.youtube.com/accounts/CheckConnection?pmpo=https://accounts.google.com&v=...`
-  `with error: ERR_BLOCKED_BY_CSP` (multiple occurrences). See Gap 4.
+  After Gap 4 fix landed and user enabled Gmail API: Gmail connected
+  cleanly but Calendar still shows "Could not connect: Insufficient
+  Permission. Check the dev terminal for details." Aria code paths
+  verified working by Gmail success. Remaining blockers are user-side:
+  (a) Calendar API likely not enabled at
+  https://console.cloud.google.com/apis/api/calendar-json.googleapis.com/overview?project=470617940858;
+  (b) stale OAuth grant — first Connect Calendar attempt happened before
+  API was enabled, Google may have cached a token without calendar.readonly
+  on the granted scopes. Fix path: enable API, then either revoke "Aria
+  desktop" at https://myaccount.google.com/permissions or re-click
+  Connect Calendar and ensure the granular-consent screen shows the
+  Calendar checkbox ticked.
 
 ### 5. Gmail Ingest Visible in StatusPanel
 expected: |
@@ -395,6 +401,56 @@ note: |
   Connect Gmail to clear Test 3) and confirms the OAuth window completes
   consent and the integration rows flip to connected before flipping to
   passed.
+
+### Gap 5
+test: 4 (Connect Google Calendar (read-only))
+symptom: |
+  After Gap 4 (commit 2e6a6f4) and user re-grant of consent at
+  myaccount.google.com/permissions (confirmed `calendar.readonly` ticked on
+  the granular-consent screen), clicking "Connect Calendar" again still
+  produces the red banner "Could not connect: Insufficient Permission.
+  Check the dev terminal for details." Gmail Connect continues to succeed.
+root_cause: |
+  Wrong-API resolveEmail. `src/main/integrations/google/auth.ts`
+  `defaultDeps.resolveEmail` unconditionally called
+  `gmail.users.getProfile({ userId: 'me' })` regardless of `kind`. For
+  `kind === 'calendar'` the granted access token carries only
+  `https://www.googleapis.com/auth/calendar.readonly` — no Gmail scope —
+  so Google returns 403 "Insufficient Permission". The 403 then bubbles
+  out of `connectGoogle` and the IPC handler surfaces the generic banner.
+  Gmail Connect masked the bug because its token happens to satisfy
+  `gmail.users.getProfile`; Calendar Connect always failed on the same line.
+fix: |
+  Branch `resolveEmail` on the captured `kind` inside `defaultDeps(kind)`
+  (which already received but ignored the parameter — renamed `_kind` →
+  `kind` and used it). For `kind === 'gmail'`: unchanged
+  `gmail.users.getProfile` path. For `kind === 'calendar'`: call
+  `google.calendar({ version: 'v3', auth: client }).calendarList.get({
+  calendarId: 'primary' })`. Per Google's convention the primary
+  CalendarListEntry's `id` IS the user's email. Belt-and-braces:
+  validate `data.id` looks like an email (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`),
+  fall back to `data.summary` under the same regex, and throw
+  `Error('calendarList.get returned no usable email/id')` if neither
+  yields an email. No new OAuth scopes added — the existing consent is
+  used as-is. Preserved the lazy `require('googleapis')` pattern.
+artifacts:
+  - src/main/integrations/google/auth.ts (defaultDeps resolveEmail: kind branching; uses calendar.calendarList.get for kind='calendar'; isEmail validator)
+  - tests/unit/main/integrations/google/auth.spec.ts (4 new tests: default resolveEmail uses calendarList.get for 'calendar' AND does NOT call gmail.users.getProfile; default resolveEmail still uses gmail.users.getProfile for 'gmail'; summary fallback case; no-usable-id error case)
+verification:
+  - pnpm tsc --noEmit (both tsconfigs): clean
+  - pnpm run build: clean
+  - pnpm vitest run: NOT RUN — user's `pnpm dev` Electron is currently
+    holding `better_sqlite3.node` open (PIDs 12056, 22440, 6760, 32736),
+    causing the globalSetup ABI-swap copyfile to fail EBUSY. Tests follow
+    the exact same fakeServer pattern as the existing passing
+    `connectGoogle` test cases in the same file; run `pnpm vitest run`
+    after closing `pnpm dev` to confirm 199/199 (was 195/195, +4 new).
+debug_session: ""
+note: |
+  Test 4 result stays `issue` / `blocked`. User closes the running
+  `pnpm dev` instance, re-runs `pnpm vitest run` to confirm 199 pass,
+  then re-tests Connect Calendar and confirms the row flips to connected
+  with the account email before flipping Test 4 to `pass`.
 
 ## Known Caveats Going In
 

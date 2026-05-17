@@ -264,6 +264,158 @@ describe('connectGoogle OAuth loopback flow (Plan 02-01 Task 2)', () => {
     ).rejects.toBeInstanceOf(m.NoRefreshTokenError);
   });
 
+  // ----- Gap 5: default resolveEmail must branch on kind ------------------
+  // gmail.users.getProfile with a calendar-only token returns 403 "Insufficient
+  // Permission". The default resolveEmail must use calendar.calendarList.get
+  // when kind === 'calendar'.
+
+  async function runConnectWithDefaultResolveEmail(
+    m: typeof import('../../../../../src/main/integrations/google/auth'),
+    kind: 'gmail' | 'calendar',
+  ): Promise<{ result: { ok: true; email: string } | null; error: unknown }> {
+    const { OAuth2Client } = await import('google-auth-library');
+    const stubClient = new OAuth2Client('client-id', 'client-secret', 'http://127.0.0.1:1/callback');
+    vi.spyOn(stubClient, 'getToken').mockResolvedValue({
+      tokens: { refresh_token: 'rt', access_token: 'at' },
+      res: null,
+    } as Awaited<ReturnType<OAuth2Client['getToken']>>);
+
+    let capturedState = '';
+    try {
+      const result = await m.connectGoogle(kind, {
+        openAuthWindow: (url: string) => {
+          capturedState = new URL(url).searchParams.get('state') ?? '';
+          return { close: () => undefined };
+        },
+        createLoopback: async () => {
+          const handlers: ((req: unknown, res: unknown) => void)[] = [];
+          const fakeServer = {
+            on: (event: string, cb: (req: unknown, res: unknown) => void) => {
+              if (event === 'request') {
+                handlers.push(cb);
+                queueMicrotask(() => {
+                  const res = { writeHead: () => res, end: () => undefined };
+                  const req = { url: `/callback?code=c&state=${capturedState}` };
+                  for (const h of handlers) h(req, res);
+                });
+              }
+            },
+          } as unknown as import('node:http').Server;
+          return { server: fakeServer, port: 1, close: () => undefined };
+        },
+        createOAuthClient: () => stubClient,
+        // intentionally NO resolveEmail override — exercise default impl
+      });
+      return { result, error: null };
+    } catch (err) {
+      return { result: null, error: err };
+    }
+  }
+
+  it("default resolveEmail uses calendar.calendarList.get for kind='calendar' (Gap 5)", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
+
+    const calendarListGet = vi.fn().mockResolvedValue({
+      data: { id: 'adexdsamson@gmail.com', summary: 'adexdsamson@gmail.com' },
+    });
+    const gmailGetProfile = vi.fn().mockResolvedValue({ data: { emailAddress: 'wrong@bar.com' } });
+
+    vi.doMock('googleapis', () => ({
+      google: {
+        calendar: () => ({ calendarList: { get: calendarListGet } }),
+        gmail: () => ({ users: { getProfile: gmailGetProfile } }),
+      },
+    }));
+
+    const m = await freshAuthModule();
+    const { result, error } = await runConnectWithDefaultResolveEmail(m, 'calendar');
+
+    expect(error).toBeNull();
+    expect(result).toEqual({ ok: true, email: 'adexdsamson@gmail.com' });
+    expect(calendarListGet).toHaveBeenCalledTimes(1);
+    expect(calendarListGet).toHaveBeenCalledWith({ calendarId: 'primary' });
+    // Critical regression guard: must NOT call gmail.users.getProfile with a
+    // calendar-only token (that's the 403 bug).
+    expect(gmailGetProfile).not.toHaveBeenCalled();
+
+    vi.doUnmock('googleapis');
+  });
+
+  it("default resolveEmail still uses gmail.users.getProfile for kind='gmail'", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
+
+    const calendarListGet = vi.fn().mockResolvedValue({ data: { id: 'should-not-be-used' } });
+    const gmailGetProfile = vi.fn().mockResolvedValue({ data: { emailAddress: 'adex@example.com' } });
+
+    vi.doMock('googleapis', () => ({
+      google: {
+        calendar: () => ({ calendarList: { get: calendarListGet } }),
+        gmail: () => ({ users: { getProfile: gmailGetProfile } }),
+      },
+    }));
+
+    const m = await freshAuthModule();
+    const { result, error } = await runConnectWithDefaultResolveEmail(m, 'gmail');
+
+    expect(error).toBeNull();
+    expect(result).toEqual({ ok: true, email: 'adex@example.com' });
+    expect(gmailGetProfile).toHaveBeenCalledTimes(1);
+    expect(calendarListGet).not.toHaveBeenCalled();
+
+    vi.doUnmock('googleapis');
+  });
+
+  it("default resolveEmail (calendar) falls back to data.summary when data.id is not an email", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
+
+    const calendarListGet = vi.fn().mockResolvedValue({
+      data: { id: 'not-an-email', summary: 'fallback@example.com' },
+    });
+
+    vi.doMock('googleapis', () => ({
+      google: {
+        calendar: () => ({ calendarList: { get: calendarListGet } }),
+        gmail: () => ({ users: { getProfile: vi.fn() } }),
+      },
+    }));
+
+    const m = await freshAuthModule();
+    const { result, error } = await runConnectWithDefaultResolveEmail(m, 'calendar');
+
+    expect(error).toBeNull();
+    expect(result).toEqual({ ok: true, email: 'fallback@example.com' });
+
+    vi.doUnmock('googleapis');
+  });
+
+  it("default resolveEmail (calendar) throws clearly when neither id nor summary yields an email", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
+
+    const calendarListGet = vi.fn().mockResolvedValue({
+      data: { id: 'not-an-email', summary: 'My Calendar' },
+    });
+
+    vi.doMock('googleapis', () => ({
+      google: {
+        calendar: () => ({ calendarList: { get: calendarListGet } }),
+        gmail: () => ({ users: { getProfile: vi.fn() } }),
+      },
+    }));
+
+    const m = await freshAuthModule();
+    const { result, error } = await runConnectWithDefaultResolveEmail(m, 'calendar');
+
+    expect(result).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/calendarList\.get returned no usable email\/id/);
+
+    vi.doUnmock('googleapis');
+  });
+
   it('state mismatch on redirect rejects with OAuthStateMismatchError', async () => {
     process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
