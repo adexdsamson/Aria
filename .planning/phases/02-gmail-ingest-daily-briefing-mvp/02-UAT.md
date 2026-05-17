@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 02-gmail-ingest-daily-briefing-mvp
 source:
   - 02-01-SUMMARY.md
@@ -7,21 +7,14 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T12:30:00.000Z
+updated: 2026-05-17T13:00:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
 
 ## Current Test
 
-number: 5
-name: Gmail Ingest Visible in StatusPanel
-expected: |
-  Within ~5 minutes of connecting (or after clicking "Sync now") the Gmail
-  row in the StatusPanel (Settings → Status) shows: state=ok, queue
-  depth=0, last_synced_at recent (today), last_error empty. gmail_message
-  rows exist in the local DB.
-awaiting: user response
+[testing complete — 11/13 pass; 11 + 12 deferred as third-party/manual gates]
 
 ## Tests
 
