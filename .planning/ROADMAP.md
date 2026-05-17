@@ -47,7 +47,7 @@ Plans:
 Cross-cutting in Phase 1: kick off Google CASA security review (multi-week lead time for gmail.send used in Phase 3); document data dir under userData; PII redaction at the log sink.
 
 ### Phase 2: Gmail Ingest + Daily Briefing MVP
-**Goal:** First useful slice - Gmail inbound, today calendar, briefing generated and displayed
+**Goal:** As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet.
 **Mode:** mvp
 **Requirements:** EMAIL-01, EMAIL-07, CAL-01 (read portion), BRIEF-01, BRIEF-03, BRIEF-06, XCUT-01, XCUT-06, XCUT-07
 **Plans:** 4/4 plans complete
