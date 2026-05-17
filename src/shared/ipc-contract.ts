@@ -38,6 +38,13 @@ export const CHANNELS = {
   NEWS_ADD_RSS: 'aria:news:add-rss',
   NEWS_REMOVE_SOURCE: 'aria:news:remove-source',
   NEWS_SET_BUNDLE: 'aria:news:set-bundle',
+  // Plan 02-04 Briefing engine
+  BRIEFING_TODAY: 'aria:briefing:today',
+  BRIEFING_GENERATE_NOW: 'aria:briefing:generate-now',
+  BRIEFING_DISMISS_NEWS_ITEM: 'aria:briefing:dismiss-news-item',
+  BRIEFING_HISTORY: 'aria:briefing:history',
+  BRIEFING_GET_SETTINGS: 'aria:briefing:get-settings',
+  BRIEFING_SET_SETTINGS: 'aria:briefing:set-settings',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -186,6 +193,55 @@ export interface NewsSourceRow {
   added_at: string;
 }
 
+/**
+ * Plan 02-04 — Briefing payload returned by BRIEFING_TODAY.
+ *
+ * Sections are capped at top-3 by the LLM Zod schema. `errors[section]` carries
+ * a per-section warning when that source failed (BRIEF-06 graceful degrade).
+ *
+ * `emailEmptyStateReason='no-important-label'` is the B4 SC2 fallback flag —
+ * set ONLY when the account has unread mail in the last 24h but none flagged
+ * IMPORTANT by Gmail. NOT an error; documented Phase-2 limitation (Phase 3's
+ * sensitivity router replaces it).
+ */
+export interface BriefingItem {
+  id: string;
+  title: string;
+  why: string;
+}
+
+export interface BriefingNewsItem extends BriefingItem {
+  url: string;
+  sourceKind: 'hn' | 'rss' | 'bundle';
+  dismissed: boolean;
+}
+
+export interface BriefingPayload {
+  date: string;
+  generatedAt: string;
+  tz: string;
+  calendar: BriefingItem[];
+  email: BriefingItem[];
+  news: BriefingNewsItem[];
+  errors: { calendar?: string; email?: string; news?: string };
+  emailEmptyStateReason?: 'no-important-label';
+  route: Route;
+  reason: string;
+  model: string;
+}
+
+export interface BriefingSummary {
+  date: string;
+  generatedAt: string;
+  route: Route;
+  ok: number;
+}
+
+export interface BriefingSettings {
+  time: string; // 'HH:00' whole-hour
+  tz: string;
+}
+
 /** Standardized error envelope returned by stub handlers in Plan 01b. */
 export interface IpcError {
   error: string;
@@ -232,6 +288,13 @@ export interface AriaApi {
   newsAddRss(req: { url: string; title?: string }): Promise<{ ok: true; id: number } | { ok: false; error: string } | IpcError>;
   newsRemoveSource(req: { id: number }): Promise<{ ok: boolean } | IpcError>;
   newsSetBundle(req: { country: string; sectors: string[] }): Promise<{ ok: boolean } | IpcError>;
+
+  briefingToday(req?: { date?: string }): Promise<BriefingPayload | { error: string; lastOkDate?: string } | IpcError>;
+  briefingGenerateNow(): Promise<{ ok: boolean; date?: string; error?: string } | IpcError>;
+  briefingDismissNewsItem(req: { date: string; urlHash: string }): Promise<{ ok: true } | IpcError>;
+  briefingHistory(req?: { limit?: number }): Promise<{ entries: BriefingSummary[] } | IpcError>;
+  briefingGetSettings(): Promise<BriefingSettings | IpcError>;
+  briefingSetSettings(req: BriefingSettings): Promise<{ ok: true } | IpcError>;
 }
 
 /**
@@ -268,4 +331,10 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   NEWS_ADD_RSS: 'newsAddRss',
   NEWS_REMOVE_SOURCE: 'newsRemoveSource',
   NEWS_SET_BUNDLE: 'newsSetBundle',
+  BRIEFING_TODAY: 'briefingToday',
+  BRIEFING_GENERATE_NOW: 'briefingGenerateNow',
+  BRIEFING_DISMISS_NEWS_ITEM: 'briefingDismissNewsItem',
+  BRIEFING_HISTORY: 'briefingHistory',
+  BRIEFING_GET_SETTINGS: 'briefingGetSettings',
+  BRIEFING_SET_SETTINGS: 'briefingSetSettings',
 } as const;
