@@ -103,15 +103,25 @@ describe('registerOllamaHandlers', () => {
     expect(status.activeProvider).toBe('anthropic');
   });
 
-  it('DIAGNOSTICS_STATUS returns LOCAL_ONLY when Ollama unreachable even with key', async () => {
+  it('DIAGNOSTICS_STATUS returns FRONTIER_ONLY when Ollama unreachable but key set (UAT Gap 8)', async () => {
     const { ipc, secrets, CHANNELS } = await setupModules(dataDir, false);
     await secrets.setFrontierKey({ provider: 'anthropic', key: 'sk-ant-test' });
     await secrets.setActiveProvider('anthropic');
     const { ipcMain, invoke } = makeStubIpcMain();
     ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
     const status = (await invoke(CHANNELS.DIAGNOSTICS_STATUS, undefined)) as any;
-    expect(status.mode).toBe('LOCAL_ONLY');
+    expect(status.mode).toBe('FRONTIER_ONLY');
     expect(status.ollama.reachable).toBe(false);
     expect(status.frontierConfigured).toBe(true);
+  });
+
+  it('DIAGNOSTICS_STATUS returns NONE when Ollama unreachable AND no key (UAT Gap 8)', async () => {
+    const { ipc, CHANNELS } = await setupModules(dataDir, false);
+    const { ipcMain, invoke } = makeStubIpcMain();
+    ipc.registerOllamaHandlers(ipcMain as any, { logger, dataDir });
+    const status = (await invoke(CHANNELS.DIAGNOSTICS_STATUS, undefined)) as any;
+    expect(status.mode).toBe('NONE');
+    expect(status.ollama.reachable).toBe(false);
+    expect(status.frontierConfigured).toBe(false);
   });
 });

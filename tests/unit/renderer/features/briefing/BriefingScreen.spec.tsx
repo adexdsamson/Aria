@@ -14,6 +14,7 @@ import { NO_IMPORTANT_LABEL_COPY } from '../../../../../src/renderer/features/br
 interface AriaStub {
   briefingToday: ReturnType<typeof vi.fn>;
   briefingGenerateNow: ReturnType<typeof vi.fn>;
+  briefingRegenerateToday: ReturnType<typeof vi.fn>;
   briefingDismissNewsItem: ReturnType<typeof vi.fn>;
   briefingHistory: ReturnType<typeof vi.fn>;
   briefingGetSettings: ReturnType<typeof vi.fn>;
@@ -24,6 +25,7 @@ function installAria(initial: unknown): AriaStub {
   const stub: AriaStub = {
     briefingToday: vi.fn().mockResolvedValue(initial),
     briefingGenerateNow: vi.fn().mockResolvedValue({ ok: true, date: '2026-05-20' }),
+    briefingRegenerateToday: vi.fn(),
     briefingDismissNewsItem: vi.fn().mockResolvedValue({ ok: true }),
     briefingHistory: vi.fn().mockResolvedValue({ entries: [] }),
     briefingGetSettings: vi.fn().mockResolvedValue({ time: '07:00', tz: 'UTC' }),
@@ -160,6 +162,61 @@ describe('BriefingScreen', () => {
     expect(screen.getByTestId('briefing-section-email').textContent).not.toContain(
       'No items today.',
     );
+  });
+
+  it('Case 10 — Regenerate button visible when briefing exists; click opens confirm modal; confirm calls briefingRegenerateToday and refreshes payload (UAT Gap 8)', async () => {
+    const stub = installAria(makePayload());
+    const fresh = makePayload({
+      date: '2026-05-20',
+      generatedAt: '2026-05-20T08:00:00.000Z',
+      calendar: [{ id: 'cf', title: 'FRESH', why: 'just regenerated' }],
+      email: [],
+      news: [],
+      route: 'FRONTIER',
+    });
+    stub.briefingRegenerateToday.mockResolvedValue(fresh);
+
+    const user = userEvent.setup();
+    render(<BriefingScreen />);
+
+    const btn = await screen.findByTestId('briefing-regenerate-btn');
+    expect(btn).toBeTruthy();
+    // Modal not open initially.
+    expect(screen.queryByTestId('briefing-regenerate-confirm')).toBeNull();
+
+    await user.click(btn);
+    await screen.findByTestId('briefing-regenerate-confirm');
+
+    // Cancel path first.
+    await user.click(screen.getByTestId('briefing-regenerate-cancel-btn'));
+    expect(screen.queryByTestId('briefing-regenerate-confirm')).toBeNull();
+    expect(stub.briefingRegenerateToday).not.toHaveBeenCalled();
+
+    // Confirm path.
+    await user.click(screen.getByTestId('briefing-regenerate-btn'));
+    await screen.findByTestId('briefing-regenerate-confirm');
+    await user.click(screen.getByTestId('briefing-regenerate-confirm-btn'));
+
+    await waitFor(() => {
+      expect(stub.briefingRegenerateToday).toHaveBeenCalledTimes(1);
+    });
+    // Payload swapped — the regenerated calendar item should appear.
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-item-cf')).toBeTruthy();
+    });
+  });
+
+  it('Case 11 — Regenerate error path surfaces inline alert (UAT Gap 8)', async () => {
+    const stub = installAria(makePayload());
+    stub.briefingRegenerateToday.mockResolvedValue({ ok: false, error: 'db-locked' });
+
+    const user = userEvent.setup();
+    render(<BriefingScreen />);
+    await user.click(await screen.findByTestId('briefing-regenerate-btn'));
+    await user.click(screen.getByTestId('briefing-regenerate-confirm-btn'));
+
+    const alert = await screen.findByTestId('briefing-regenerate-error');
+    expect(alert.textContent).toContain('db-locked');
   });
 
   it('Case 9 — empty SectionEmail with no unread mail: renders generic "No items today." placeholder', async () => {

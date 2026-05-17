@@ -7,7 +7,7 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T10:30:00.000Z
+updated: 2026-05-17T11:20:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
@@ -114,7 +114,15 @@ expected: |
   produces a briefing in <30s with three sections: Today's Calendar,
   Priority Email, News. Each section caps at 3 items; each item shows a
   one-line "why this mattered" rationale (≤140 chars).
-result: [pending]
+result: issue
+notes: |
+  Briefing rendered but with degraded LLM output: every generateObject call
+  failed with `ECONNREFUSED 127.0.0.1:11434` because mode taxonomy lacked
+  FRONTIER_ONLY, so the router sent generic-source calls to LOCAL even
+  though Frontier was configured (Aria's `.env.local` is Frontier-first;
+  Ollama not installed). Compounded by no "Regenerate" affordance, so the
+  stale degraded row was stuck until tomorrow. See Gap 8. User re-tests
+  after this fix.
 
 ### 8. Briefing — B4 SC2 Email Fallback
 expected: |
@@ -197,8 +205,8 @@ result: [pending]
 
 total: 13 user-flow + 4 technical
 passed: 0
-issues: 2
-pending: 15
+issues: 3
+pending: 14
 skipped: 0
 blocked: 0
 
@@ -599,6 +607,110 @@ note: |
   (3) `calendar_event` table has rows with correctly-populated
       `start_at_utc` OR `start_date` (mutually exclusive per CHECK).
   Then flip Test 6 to `pass`.
+
+### Gap 8
+test: 7 (Generate Today's Briefing)
+symptom: |
+  Briefing rendered but with degraded LLM output. `<userData>/logs/aria.1.log`
+  shows three identical lines per briefing tick:
+    {"level":40,"scope":"briefing","err":"Failed after 3 attempts. Last error:
+     Cannot connect to API: connect ECONNREFUSED 127.0.0.1:11434","msg":
+     "generateObject threw"}
+  StatusPanel reported mode=LOCAL_ONLY despite a Frontier API key being
+  configured (Aria's `.env.local` ships Frontier-first, Ollama optional).
+  After the degraded row persisted, there was no UI affordance to regenerate
+  it — the user was stuck looking at the stale briefing until tomorrow's
+  local date.
+root_cause: |
+  Two related defects:
+  (A) Mode taxonomy gap. `src/main/ipc/ollama.ts` computed
+      `mode = ollama.reachable && frontierConfigured ? 'HYBRID' :
+       'LOCAL_ONLY'`. The two-state union `'LOCAL_ONLY' | 'HYBRID'` in
+      `src/shared/ipc-contract.ts` had no state for "Ollama unreachable
+      BUT Frontier configured" — the very common dev config. Users landed
+      in `LOCAL_ONLY`, the LLM router then routed all generic-source
+      briefing/ask calls to the unavailable LOCAL provider, every
+      generateObject 3x-retried then failed with ECONNREFUSED.
+  (B) No regenerate path. Briefing is idempotent per local YYYY-MM-DD
+      (intentional, per Plan 02-04). But once a degraded row was
+      persisted, there was no "regenerate" affordance — the user could
+      only wait for tomorrow's cron tick.
+fix: |
+  Part A — 4-mode taxonomy:
+  - `DiagnosticsStatus.mode` union extended to
+    `'LOCAL_ONLY' | 'FRONTIER_ONLY' | 'HYBRID' | 'NONE'`.
+  - `ollama.ts` replaces the binary ternary with a 2x2 lookup
+    (reachable × frontierConfigured).
+  - `LLMRouter.classify` now resolves the same 4-mode predicate via
+    a new `resolveMode()` helper. NONE mode throws a new
+    `NoLlmProviderError` (caller surfaces `{ error: 'no-llm-provider' }`).
+    FRONTIER_ONLY mode overrides every rule that would have routed LOCAL
+    (PII match, user-data source, fail-closed unset source, catch-all)
+    to FRONTIER instead, suffixing the reason with `:frontier-only` so
+    routing_log preserves the override audit trail. ASK handler maps
+    NoLlmProviderError to `{ error: 'no-llm-provider' }`. Briefing's
+    existing try/catch around `router.classify` still degrades cleanly
+    for NONE (no architectural change needed — the degraded payload path
+    handles it).
+  - `StatusPanel.tsx` renders mode-specific banners:
+    FRONTIER_ONLY (info: "Local model unavailable — Aria will use
+    Frontier (OpenAI/Anthropic/Google) for all reasoning. Install Ollama
+    for local-first routing.") and NONE (alert: "No LLM provider
+    available. Aria needs either a Frontier API key OR Ollama to generate
+    briefings and respond to Ask-Aria.").
+
+  Part B — Regenerate affordance:
+  - New IPC channel `BRIEFING_REGENERATE_TODAY` ('aria:briefing:
+    regenerate-today') + preload binding `briefingRegenerateToday()`.
+    Handler in `src/main/ipc/briefing.ts` queues DELETE of today's
+    `briefing` row through `scheduler.queue` then re-runs `runBriefing
+    (today, deps)` in the same queue (so it serializes with gmail-sync /
+    calendar-sync writes). Returns the fresh `BriefingPayload` directly
+    (not the `{ok,date}` envelope) so the renderer swaps state in one
+    round-trip.
+  - `BriefingScreen.tsx` renders a "Regenerate" ghost button next to the
+    date header (data-testid `briefing-regenerate-btn`) whenever a
+    briefing row exists. Click opens an inline confirm dialog
+    (data-testid `briefing-regenerate-confirm`) — same pattern as the
+    OAuth pre-confirm modal. On confirm: calls `briefingRegenerateToday`,
+    swaps the payload on success, renders inline alert on failure
+    (data-testid `briefing-regenerate-error`). Never auto-regenerates;
+    user-action only (LLM call cost predictability).
+artifacts:
+  - src/shared/ipc-contract.ts (mode union extended; BRIEFING_REGENERATE_TODAY channel + briefingRegenerateToday method; CHANNEL_METHODS row)
+  - src/main/ipc/ollama.ts (2x2 mode lookup; doc-comment for 4-mode taxonomy)
+  - src/main/llm/router.ts (NoLlmProviderError class; ollamaReachableFn dep; resolveMode helper; FRONTIER_ONLY override rules with `:frontier-only` reason suffix; NONE throws)
+  - src/main/ipc/ask.ts (catches NoLlmProviderError → returns `{ error: 'no-llm-provider' }`)
+  - src/main/ipc/briefing.ts (BRIEFING_REGENERATE_TODAY handler; router constructed with `ollamaReachableFn: probeOllama().reachable`)
+  - src/renderer/features/settings/StatusPanel.tsx (FRONTIER_ONLY + NONE banners)
+  - src/renderer/features/briefing/BriefingScreen.tsx (Regenerate button + inline confirm modal + regenerate error alert)
+  - tests/unit/main/ipc/ollama.spec.ts (Cases for HYBRID, LOCAL_ONLY, FRONTIER_ONLY, NONE — 4 modes × ollama-reachable × frontier-configured permutations)
+  - tests/unit/main/llm/router.spec.ts (UAT Gap 8 block: FRONTIER_ONLY override for generic/user-data/PII/unset-source; NONE throws NoLlmProviderError; LOCAL_ONLY unchanged behavior — 6 new cases)
+  - tests/unit/main/ipc/briefing-regenerate.spec.ts (new file: deletes pre-existing row + regenerates + writes new routing_log row; db-locked early-return)
+  - tests/unit/renderer/features/briefing/BriefingScreen.spec.tsx (Case 10 click-confirm-regenerate happy path; Case 11 regenerate-error inline alert)
+verification:
+  - pnpm tsc --noEmit (tsconfig.json + tsconfig.node.json): clean
+  - pnpm run build: clean (main 134.82 kB; preload 3.75 kB; renderer 367.01 kB)
+  - pnpm vitest run: 213/217 pass. The 4 failures are all pre-existing
+    Gap-5 auth.spec.ts `invalid_client` cases (out of scope; documented
+    in Gap 6/7). Net change from baseline 200/205: +13 passing tests
+    (3 ollama mode cases + 6 router cases + 2 regenerate handler cases +
+    2 BriefingScreen cases). Suite count rose 205 → 217 (+12 added).
+  - stale `electron.exe` instances cleared before vitest run (EBUSY on
+    better_sqlite3.node binary swap — see Gap 5 runbook).
+debug_session: ""
+note: |
+  Test 7 stays `issue`. User restarts `pnpm dev`, opens the Briefing
+  screen, and confirms:
+  (1) StatusPanel Mode row shows `FRONTIER_ONLY` (not `LOCAL_ONLY`)
+      with the info banner about installing Ollama for offline
+      reasoning;
+  (2) Briefing generates with route=FRONTIER and no
+      `generateObject threw` lines in `<userData>/logs/aria.1.log`;
+  (3) "Regenerate" button next to the date header opens the inline
+      confirm modal; clicking Regenerate writes a NEW row in
+      `routing_log` and refreshes the on-screen payload.
+  Then flip Test 7 to `pass`.
 
 ## Known Caveats Going In
 

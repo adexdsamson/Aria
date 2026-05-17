@@ -29,6 +29,9 @@ function isErr(v: unknown): v is IpcError | { error: string } {
 export function BriefingScreen(): JSX.Element {
   const [payload, setPayload] = useState<BriefingPayload | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
     const res = await window.aria.briefingToday();
@@ -38,6 +41,22 @@ export function BriefingScreen(): JSX.Element {
       setPayload(null);
     }
     setLoaded(true);
+  }, []);
+
+  const regenerate = useCallback(async (): Promise<void> => {
+    setConfirmOpen(false);
+    setRegenerating(true);
+    setRegenerateError(null);
+    try {
+      const res = await window.aria.briefingRegenerateToday();
+      if (isPayload(res)) {
+        setPayload(res);
+      } else if (isErr(res)) {
+        setRegenerateError((res as { error: string }).error);
+      }
+    } finally {
+      setRegenerating(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -74,7 +93,67 @@ export function BriefingScreen(): JSX.Element {
         <span data-testid={`route-badge-${payload.route}`} style={badgeStyle(payload.route)}>
           [{payload.route}]
         </span>
+        <button
+          type="button"
+          data-testid="briefing-regenerate-btn"
+          onClick={() => setConfirmOpen(true)}
+          disabled={regenerating}
+          style={{
+            marginLeft: 'auto',
+            background: 'transparent',
+            border: 'none',
+            color: '#1d4ed8',
+            cursor: regenerating ? 'wait' : 'pointer',
+            textDecoration: 'underline',
+            fontSize: 'var(--aria-type-sm)',
+            padding: 0,
+          }}
+        >
+          {regenerating ? 'Regenerating…' : 'Regenerate'}
+        </button>
       </header>
+      {regenerateError && (
+        <p role="alert" data-testid="briefing-regenerate-error" style={{ color: '#b91c1c', fontSize: 12 }}>
+          Could not regenerate: {regenerateError}
+        </p>
+      )}
+      {confirmOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-testid="briefing-regenerate-confirm"
+          style={{
+            border: '1px solid #d1d5db',
+            background: '#f9fafb',
+            padding: 12,
+            borderRadius: 6,
+            marginBottom: 12,
+            fontSize: 13,
+          }}
+        >
+          <p style={{ margin: '0 0 8px 0' }}>
+            Regenerate today’s briefing? This replaces the current one and writes a new routing_log row.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              data-testid="briefing-regenerate-confirm-btn"
+              onClick={() => void regenerate()}
+              disabled={regenerating}
+            >
+              Regenerate
+            </button>
+            <button
+              type="button"
+              data-testid="briefing-regenerate-cancel-btn"
+              onClick={() => setConfirmOpen(false)}
+              disabled={regenerating}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
       <SectionEmail

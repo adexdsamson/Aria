@@ -7,9 +7,21 @@
  * persisted to routing_log.
  *
  * Decision tree (top→bottom; first match wins):
+ *   0. mode === NONE (no provider)   → throw NoLlmProviderError; caller must
+ *                                       surface `no-llm-provider` to the user.
  *   1. source unset/empty            → LOCAL, reason 'fail-closed-source-unset' (LLM-04)
- *   2. classifier flags PII          → LOCAL, reason 'pii-pattern-matched:<names>' (LLM-01)
- *   3. source ∈ user-data-tags       → LOCAL, reason 'user-data-source:<tag>' (D-05)
+ *      (but if local is unreachable AND frontier configured, redirect to
+ *       FRONTIER with reason 'fail-closed-source-unset:frontier-only' so the
+ *       call doesn't dead-end on a missing local model.)
+ *   2. classifier flags PII          → LOCAL — unless mode === FRONTIER_ONLY
+ *                                       (Ollama unreachable). In FRONTIER_ONLY
+ *                                       we deliberately route PII to the
+ *                                       configured Frontier provider rather
+ *                                       than fail; reason
+ *                                       'pii-pattern-matched:<names>:frontier-only'.
+ *   3. source ∈ user-data-tags       → LOCAL — same FRONTIER_ONLY override as
+ *                                       rule 2; reason
+ *                                       'user-data-source:<tag>:frontier-only'.
  *   4. source === 'generic' AND a
  *      frontier provider is active
  *      AND has a key                 → FRONTIER, reason 'generic-source-frontier-active'
@@ -29,6 +41,19 @@ import {
 } from './providers';
 
 export { OllamaUnavailableError, FrontierUnavailableError };
+
+/**
+ * Thrown by LLMRouter.classify when neither Ollama nor a configured Frontier
+ * provider is available (UAT Gap 8 — mode === 'NONE'). The IPC layer turns
+ * this into a structured `{ error: 'no-llm-provider' }` payload.
+ */
+export class NoLlmProviderError extends Error {
+  readonly code = 'no-llm-provider';
+  constructor() {
+    super('no-llm-provider');
+    this.name = 'NoLlmProviderError';
+  }
+}
 
 export interface RoutingDecision {
   route: Route;
@@ -53,6 +78,13 @@ export interface LLMRouterDeps {
   getActiveProviderFn: () => Promise<ProviderId | null>;
   /** Returns true when a key exists for the active provider. */
   hasFrontierKeyFn: (opts: { provider: ProviderId }) => Promise<boolean>;
+  /**
+   * Returns true when the local Ollama daemon is reachable. Defaults to
+   * `() => Promise.resolve(true)` for back-compat with existing tests; the
+   * IPC layer wires it to `probeOllama().reachable` so FRONTIER_ONLY / NONE
+   * modes (UAT Gap 8) can be detected.
+   */
+  ollamaReachableFn?: () => Promise<boolean>;
   /** Sensitivity classifier (default uses regex hard-rules). */
   classifierFn?: (prompt: string) => ClassifierResult;
   /** Override the local model id (tests). */
@@ -62,53 +94,92 @@ export interface LLMRouterDeps {
 export class LLMRouter {
   private readonly getActive: LLMRouterDeps['getActiveProviderFn'];
   private readonly hasKey: LLMRouterDeps['hasFrontierKeyFn'];
+  private readonly ollamaReachable: NonNullable<LLMRouterDeps['ollamaReachableFn']>;
   private readonly classify_: NonNullable<LLMRouterDeps['classifierFn']>;
   private readonly localModelId: string;
 
   constructor(deps: LLMRouterDeps) {
     this.getActive = deps.getActiveProviderFn;
     this.hasKey = deps.hasFrontierKeyFn;
+    this.ollamaReachable = deps.ollamaReachableFn ?? (async () => true);
     this.classify_ = deps.classifierFn ?? classifySensitivity;
     this.localModelId = deps.localModelId ?? DEFAULT_LOCAL_MODEL;
+  }
+
+  /**
+   * Resolve the available provider mode for this request. Mirrors the
+   * `DIAGNOSTICS_STATUS.mode` four-way predicate (UAT Gap 8).
+   */
+  private async resolveMode(): Promise<{
+    mode: 'HYBRID' | 'LOCAL_ONLY' | 'FRONTIER_ONLY' | 'NONE';
+    activeProvider: ProviderId | null;
+  }> {
+    const local = await this.ollamaReachable();
+    const active = await this.getActive();
+    const frontierConfigured = active ? await this.hasKey({ provider: active }) : false;
+    const mode = local && frontierConfigured
+      ? 'HYBRID'
+      : local
+        ? 'LOCAL_ONLY'
+        : frontierConfigured
+          ? 'FRONTIER_ONLY'
+          : 'NONE';
+    return { mode, activeProvider: frontierConfigured ? active : null };
   }
 
   async classify(input: ClassifyInput): Promise<RoutingDecision> {
     const { prompt } = input;
     const source = input.source;
 
+    const { mode, activeProvider } = await this.resolveMode();
+
+    // 0. NONE — no provider at all. Fail fast; caller surfaces no-llm-provider.
+    if (mode === 'NONE') {
+      throw new NoLlmProviderError();
+    }
+
     // 1. Fail-closed on missing source (LLM-04).
     if (source === undefined || source === null || source === '') {
+      if (mode === 'FRONTIER_ONLY' && activeProvider) {
+        return this.frontierDecision(
+          activeProvider,
+          'fail-closed-source-unset:frontier-only',
+        );
+      }
       return this.localDecision('fail-closed-source-unset');
     }
 
     // 2. PII hard-rules (LLM-01).
     const cls = this.classify_(prompt);
     if (cls.sensitive) {
-      return this.localDecision(`pii-pattern-matched:${cls.matched.join(',')}`);
+      const reason = `pii-pattern-matched:${cls.matched.join(',')}`;
+      if (mode === 'FRONTIER_ONLY' && activeProvider) {
+        return this.frontierDecision(activeProvider, `${reason}:frontier-only`);
+      }
+      return this.localDecision(reason);
     }
 
     // 3. User-data sources always route LOCAL (D-05).
     if (USER_DATA_SOURCES.has(String(source))) {
-      return this.localDecision(`user-data-source:${source}`);
+      const reason = `user-data-source:${source}`;
+      if (mode === 'FRONTIER_ONLY' && activeProvider) {
+        return this.frontierDecision(activeProvider, `${reason}:frontier-only`);
+      }
+      return this.localDecision(reason);
     }
 
     // 4. Generic + frontier active + key present → FRONTIER.
-    if (source === 'generic') {
-      const active = await this.getActive();
-      if (active) {
-        const present = await this.hasKey({ provider: active });
-        if (present) {
-          return {
-            route: 'FRONTIER',
-            reason: 'generic-source-frontier-active',
-            model: defaultModelIdFor(active),
-            provider: active,
-          };
-        }
-      }
+    if (source === 'generic' && activeProvider) {
+      return this.frontierDecision(activeProvider, 'generic-source-frontier-active');
     }
 
-    // 5. Fallback LOCAL (D-10 / LLM-05).
+    // 5. FRONTIER_ONLY catch-all for any remaining source values (e.g. custom
+    //    string tags that don't match user-data-tags or 'generic').
+    if (mode === 'FRONTIER_ONLY' && activeProvider) {
+      return this.frontierDecision(activeProvider, `${source}:frontier-only`);
+    }
+
+    // 6. Fallback LOCAL (D-10 / LLM-05).
     return this.localDecision('frontier-not-configured');
   }
 
@@ -118,6 +189,15 @@ export class LLMRouter {
       reason,
       model: this.localModelId,
       provider: 'ollama',
+    };
+  }
+
+  private frontierDecision(provider: ProviderId, reason: string): RoutingDecision {
+    return {
+      route: 'FRONTIER',
+      reason,
+      model: defaultModelIdFor(provider),
+      provider,
     };
   }
 }

@@ -3,9 +3,20 @@
  *
  * OLLAMA_STATUS       → probeOllama()
  * DIAGNOSTICS_STATUS  → aggregate { ollama, frontierConfigured, activeProvider,
- *                                   mode, dataDir }; mode = HYBRID when Ollama
- *                                   reachable AND a frontier key is configured
- *                                   for the active provider, else LOCAL_ONLY.
+ *                                   mode, dataDir }; mode reflects which routing
+ *                                   tier is available:
+ *                                     HYBRID         — Ollama reachable AND a
+ *                                                      frontier key configured
+ *                                                      for the active provider.
+ *                                     LOCAL_ONLY     — Ollama reachable, no
+ *                                                      frontier key configured.
+ *                                     FRONTIER_ONLY  — Ollama unreachable but
+ *                                                      a frontier key IS
+ *                                                      configured (UAT Gap 8).
+ *                                     NONE           — neither available; all
+ *                                                      LLM calls must fail
+ *                                                      fast with `no-llm-
+ *                                                      provider`.
  */
 import { app, type IpcMain } from 'electron';
 import type { Logger } from 'pino';
@@ -39,7 +50,13 @@ export function registerOllamaHandlers(
       frontierConfigured = false;
     }
     const mode: DiagnosticsStatus['mode'] =
-      ollama.reachable && frontierConfigured ? 'HYBRID' : 'LOCAL_ONLY';
+      ollama.reachable && frontierConfigured
+        ? 'HYBRID'
+        : ollama.reachable
+          ? 'LOCAL_ONLY'
+          : frontierConfigured
+            ? 'FRONTIER_ONLY'
+            : 'NONE';
     // Prefer Electron app.getPath when available (tests mock it); fall back to deps.dataDir.
     let resolvedDataDir = dataDir;
     try {

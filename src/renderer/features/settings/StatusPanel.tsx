@@ -16,6 +16,10 @@ import type {
 
 const POLL_MS = 10_000;
 const LOCAL_ONLY_BANNER = 'Frontier disabled — add an API key in Settings.';
+const FRONTIER_ONLY_BANNER =
+  'Local model unavailable — Aria will use Frontier (OpenAI/Anthropic/Google) for all reasoning. Install Ollama for local-first routing.';
+const NONE_BANNER =
+  'No LLM provider available. Aria needs either a Frontier API key OR Ollama to generate briefings and respond to Ask-Aria.';
 
 function isErr(v: unknown): v is IpcError {
   return !!v && typeof v === 'object' && 'error' in (v as object);
@@ -94,9 +98,19 @@ export function StatusPanel(): JSX.Element {
   return (
     <section data-testid="settings-status" style={{ padding: 'var(--aria-space-lg)' }}>
       <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Status</h2>
-      {!status?.frontierConfigured && (
-        <div role="status" style={{ marginBottom: 'var(--aria-space-md)' }}>
+      {status?.mode === 'LOCAL_ONLY' && (
+        <div role="status" data-testid="banner-local-only" style={{ marginBottom: 'var(--aria-space-md)' }}>
           {LOCAL_ONLY_BANNER}
+        </div>
+      )}
+      {status?.mode === 'FRONTIER_ONLY' && (
+        <div role="status" data-testid="banner-frontier-only" style={{ marginBottom: 'var(--aria-space-md)' }}>
+          {FRONTIER_ONLY_BANNER}
+        </div>
+      )}
+      {status?.mode === 'NONE' && (
+        <div role="alert" data-testid="banner-no-provider" style={{ marginBottom: 'var(--aria-space-md)', color: '#b91c1c' }}>
+          {NONE_BANNER}
         </div>
       )}
       {status && (

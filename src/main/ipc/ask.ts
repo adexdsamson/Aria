@@ -23,7 +23,8 @@ import {
   type Route,
 } from '../../shared/ipc-contract';
 import type { DbHolder } from './onboarding';
-import { LLMRouter, type RoutingDecision } from '../llm/router';
+import { LLMRouter, NoLlmProviderError, type RoutingDecision } from '../llm/router';
+import { probeOllama } from '../llm/ollamaProbe';
 import {
   getLocalModel,
   getFrontierModel,
@@ -82,6 +83,7 @@ export function registerAskHandlers(ipcMain: IpcMain, deps: AskDeps): void {
       getActiveProviderFn: getActiveProvider,
       hasFrontierKeyFn: hasFrontierKey,
       classifierFn: classifySensitivity,
+      ollamaReachableFn: async () => (await probeOllama()).reachable,
     });
   const localModelFactory = deps.getLocalModelFn ?? getLocalModel;
   const frontierModelFactory = deps.getFrontierModelFn ?? getFrontierModel;
@@ -101,6 +103,10 @@ export function registerAskHandlers(ipcMain: IpcMain, deps: AskDeps): void {
       try {
         decision = await router.classify({ prompt, source });
       } catch (e) {
+        if (e instanceof NoLlmProviderError) {
+          logger.warn({ event: 'ask.classify.no-provider' });
+          return { error: 'no-llm-provider' };
+        }
         logger.warn({ event: 'ask.classify.failed', err: (e as Error).message });
         return { error: 'router-failed' };
       }

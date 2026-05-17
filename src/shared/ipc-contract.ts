@@ -41,6 +41,7 @@ export const CHANNELS = {
   // Plan 02-04 Briefing engine
   BRIEFING_TODAY: 'aria:briefing:today',
   BRIEFING_GENERATE_NOW: 'aria:briefing:generate-now',
+  BRIEFING_REGENERATE_TODAY: 'aria:briefing:regenerate-today',
   BRIEFING_DISMISS_NEWS_ITEM: 'aria:briefing:dismiss-news-item',
   BRIEFING_HISTORY: 'aria:briefing:history',
   BRIEFING_GET_SETTINGS: 'aria:briefing:get-settings',
@@ -88,7 +89,7 @@ export interface DiagnosticsStatus {
   ollama: OllamaStatus;
   frontierConfigured: boolean;
   activeProvider: ProviderId | null;
-  mode: 'LOCAL_ONLY' | 'HYBRID';
+  mode: 'LOCAL_ONLY' | 'HYBRID' | 'FRONTIER_ONLY' | 'NONE';
   dataDir: string;
 }
 
@@ -291,6 +292,7 @@ export interface AriaApi {
 
   briefingToday(req?: { date?: string }): Promise<BriefingPayload | { error: string; lastOkDate?: string } | IpcError>;
   briefingGenerateNow(): Promise<{ ok: boolean; date?: string; error?: string } | IpcError>;
+  briefingRegenerateToday(): Promise<BriefingPayload | { ok: false; error: string } | IpcError>;
   briefingDismissNewsItem(req: { date: string; urlHash: string }): Promise<{ ok: true } | IpcError>;
   briefingHistory(req?: { limit?: number }): Promise<{ entries: BriefingSummary[] } | IpcError>;
   briefingGetSettings(): Promise<BriefingSettings | IpcError>;
@@ -333,6 +335,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   NEWS_SET_BUNDLE: 'newsSetBundle',
   BRIEFING_TODAY: 'briefingToday',
   BRIEFING_GENERATE_NOW: 'briefingGenerateNow',
+  BRIEFING_REGENERATE_TODAY: 'briefingRegenerateToday',
   BRIEFING_DISMISS_NEWS_ITEM: 'briefingDismissNewsItem',
   BRIEFING_HISTORY: 'briefingHistory',
   BRIEFING_GET_SETTINGS: 'briefingGetSettings',

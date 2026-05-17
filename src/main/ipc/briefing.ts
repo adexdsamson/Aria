@@ -27,6 +27,7 @@ import {
 import type { DbHolder } from './onboarding';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import { LLMRouter } from '../llm/router';
+import { probeOllama } from '../llm/ollamaProbe';
 import { getActiveProvider, hasFrontierKey } from '../secrets/safeStorage';
 import { classifySensitivity } from '../llm/classifier';
 import { runBriefing } from '../briefing/generate';
@@ -94,6 +95,7 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
       getActiveProviderFn: getActiveProvider,
       hasFrontierKeyFn: hasFrontierKey,
       classifierFn: classifySensitivity,
+      ollamaReachableFn: async () => (await probeOllama()).reachable,
     });
 
   function buildCalendarClient(): CalendarClient | null {
@@ -195,6 +197,41 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     const tz = readSettings().tz;
     const today = computeLocalYmd(tz, new Date());
     return await runOnce(today);
+  });
+
+  // ── BRIEFING_REGENERATE_TODAY ──────────────────────────────────────────────
+  // UAT Gap 8 — escape hatch for the idempotent same-day cache. Deletes
+  // today's `briefing` row (and clears any dismissed-news rows for the date so
+  // the regenerated payload starts fresh) and calls runBriefing(today).
+  // Returns the new BriefingPayload directly (not the {ok,date} envelope used
+  // by GENERATE_NOW) so the renderer can swap state in one round-trip.
+  ipcMain.handle(CHANNELS.BRIEFING_REGENERATE_TODAY, async () => {
+    const db = dbHolder.db;
+    if (!db) return { ok: false as const, error: 'db-locked' };
+    const { tz } = readSettings();
+    const today = computeLocalYmd(tz, new Date());
+    try {
+      await scheduler.queue.add(async () => {
+        db.prepare('DELETE FROM briefing WHERE date = ?').run(today);
+      });
+      await scheduler.queue.add(async () => {
+        await runBriefing({
+          db,
+          date: today,
+          userTz: tz,
+          calendarClient: buildCalendarClient(),
+          router,
+          logger,
+        });
+      });
+      const fresh = readBriefing(db, today);
+      if (!fresh) return { ok: false as const, error: 'regenerate-no-row' };
+      return fresh;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn({ scope: 'briefing-regenerate', err: msg }, 'regenerate failed');
+      return { ok: false as const, error: msg };
+    }
   });
 
   // ── BRIEFING_DISMISS_NEWS_ITEM ─────────────────────────────────────────────
