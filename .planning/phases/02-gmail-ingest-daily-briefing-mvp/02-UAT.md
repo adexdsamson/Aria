@@ -7,7 +7,7 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T10:00:00.000Z
+updated: 2026-05-17T10:30:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
@@ -525,6 +525,79 @@ note: |
       cleanly and StatusPanel shows `synced <time>` instead;
   (2) dev terminal now emits `{ scope: 'calendar-sync', ... }` warn lines
       on any future sync failures.
+  Then flip Test 6 to `pass`.
+
+### Gap 7
+test: 6 (Calendar Ingest Visible in StatusPanel)
+symptom: |
+  After Gap 6 (commit a2f23ff family — diagnostic logging at every
+  calendar-sync error path), the dev terminal now surfaces the real
+  underlying failure. From `<userData>/logs/aria.1.log`, three identical
+  lines per tick:
+    {"level":40,"scope":"calendar-sync","err":"CHECK constraint failed:
+     (start_at_utc IS NOT NULL) OR (start_date IS NOT NULL)","msg":"calendar
+     tick failed"}
+  StatusPanel error code is whatever was last recorded; the row never
+  advances past the bootstrap because the entire transaction rolls back on
+  the first offending row.
+root_cause: |
+  `toEventRow` in `src/main/integrations/google/sync-calendar.ts` produced a
+  row with BOTH `start_at_utc` and `start_date` set to `null` whenever the
+  source `CalendarEventRaw` had no `start` field. Google's
+  `events.list` returns cancelled events as tombstones — for a
+  syncToken-driven incremental response a cancelled event signals "this
+  previously-known event is deleted" and arrives with `{ id, status:
+  'cancelled' }` and no `start` block. The normalizer mapped these straight
+  into INSERT params and the migration-003 CHECK
+  `(start_at_utc IS NOT NULL) OR (start_date IS NOT NULL)` rejected them.
+  Because all rows were upserted inside ONE `db.transaction(...)`, a single
+  tombstone in the response burned the entire tick — no rows persisted, no
+  cursor advance, repeat on the next tick.
+fix: |
+  Strategy A: skip cancelled tombstones on insert; delete by id when an
+  existing row matches.
+  - New exported `normalizeEvent(raw, fetchedAtIso)` returns a discriminated
+    union `{ kind: 'upsert' | 'delete' | 'skip', ... }`. Cancelled events →
+    `delete` regardless of whether they carry start fields. Confirmed events
+    with no start.dateTime AND no start.date → `skip` (defensive; logged at
+    warn with `event_id` + `reason: 'no-start'`). Otherwise → `upsert` via
+    the existing pure `toEventRow` builder.
+  - `applyRowsAndAdvanceCursor` partitions actions into upserts + deletes,
+    runs INSERT OR REPLACE for upserts and `DELETE FROM calendar_event
+    WHERE id = ?` for deletes, then advances `sync_token` — all in the same
+    transaction (atomicity preserved).
+  - Bootstrap path semantics: a cancelled event in
+    `fullResyncWindow()` step 1/2 has no prior row to delete; the DELETE is
+    a no-op and the row is silently dropped. Nothing is half-inserted.
+  - Migration-003 CHECK is INTENTIONALLY unchanged — calendar rows without
+    a start are meaningless to display (Strategy B explicitly rejected).
+artifacts:
+  - src/main/integrations/google/sync-calendar.ts (new `normalizeEvent` discriminated-union normalizer + `NormalizeAction` type; `applyRowsAndAdvanceCursor` consumes upsert/delete/skip actions; logger type widened to include `debug`; existing `toEventRow` preserved as pure row builder)
+  - tests/unit/main/integrations/google/sync-calendar.spec.ts (in-memory db shim now handles `DELETE FROM calendar_event WHERE id = ?`; Case 7 contract flipped — cancelled-with-start is now a tombstone, NOT an upsert; three new cases: 10a bootstrap drops cancelled-no-start tombstone, 10b incremental cancelled event deletes pre-existing row, 10c confirmed-no-start emits warn log + skips)
+verification:
+  - pnpm tsc --noEmit (both tsconfigs): clean
+  - pnpm run build: clean
+  - pnpm vitest run tests/unit/main/integrations/google/sync-calendar.spec.ts: 15/15 pass (was 12/12; +3 new, +1 contract flip on Case 7)
+  - pnpm vitest run (full): 200/205 pass. The 5 failures are pre-existing
+    and unchanged from Gap 6's baseline: 4 × Gap-5 auth.spec.ts cases
+    (the fakeServer's /token endpoint returns 401 invalid_client before the
+    calendarList.get path is exercised — restructuring the OAuth mock is
+    out of scope for this gap), plus the long-documented
+    `ask-local-handler.spec.ts > LOCAL path` flake. No regression from Gap 6.
+  - Stale `electron.exe` instances killed via PowerShell
+    `Stop-Process -Name electron -Force` before vitest run (EBUSY on
+    better_sqlite3.node binary swap; documented runbook in Gap 5).
+commit: (see git log — fix landed in the same commit as this UAT update)
+debug_session: ""
+note: |
+  Test 6 stays `issue`. User restarts `pnpm dev`, re-clicks "Sync now" on
+  the Calendar row, and confirms:
+  (1) `<userData>/logs/aria.1.log` no longer emits the
+      `CHECK constraint failed` line on calendar tick;
+  (2) StatusPanel Calendar row shows `synced <time>`, `err: ` (empty),
+      `last_error: NULL`;
+  (3) `calendar_event` table has rows with correctly-populated
+      `start_at_utc` OR `start_date` (mutually exclusive per CHECK).
   Then flip Test 6 to `pass`.
 
 ## Known Caveats Going In

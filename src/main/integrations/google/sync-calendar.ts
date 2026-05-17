@@ -49,13 +49,30 @@ export interface CalendarSyncDeps {
   db: Db;
   client: CalendarClient;
   scheduler: { queue: InstanceType<typeof PQueueImport> };
-  logger?: Pick<Logger, 'info' | 'warn'>;
+  logger?: Pick<Logger, 'info' | 'warn' | 'debug'>;
   now?: () => Date;
   /** Backfill window lower bound in days before now. Default 1. */
   windowDaysBack?: number;
   /** Backfill window upper bound in days after now. Default 30. */
   windowDaysForward?: number;
 }
+
+/**
+ * Sentinel returned by `toEventRow` for events that must NOT be inserted —
+ * cancelled tombstones (incremental syncToken responses signal deletion this
+ * way) and defensively-malformed events with no start field.
+ *
+ * UAT Gap 7: prior to this guard, the normalizer produced rows with both
+ * `start_at_utc` and `start_date` null, violating migration-003's CHECK
+ * constraint and failing the entire transaction.
+ *
+ * - 'delete': caller should DELETE any row with this id (incremental tombstone)
+ * - 'skip':   caller should ignore (no start field at all — malformed)
+ */
+type NormalizeAction =
+  | { kind: 'upsert'; row: EventRow }
+  | { kind: 'delete'; id: string; reason: 'cancelled' }
+  | { kind: 'skip'; id: string; reason: 'cancelled' | 'no-start' };
 
 interface EventRow {
   id: string;
@@ -77,6 +94,34 @@ interface EventRow {
 /**
  * Normalize a Google CalendarEventRaw into the migration-003 row shape.
  * Exported for testing the XCUT-07 timezone correctness path independently.
+ *
+ * UAT Gap 7 contract: returns a `NormalizeAction` discriminated union rather
+ * than always producing an EventRow. Cancelled events (Google's tombstone
+ * signal on syncToken responses) and malformed events with no start field
+ * MUST NOT be inserted — migration-003 CHECK requires exactly-one of
+ * `start_at_utc` / `start_date` non-null.
+ *
+ * Strategy A (chosen): caller deletes any stored row with the same id when
+ * action.kind === 'delete'; silently drops `'skip'` actions. Defensive against
+ * confirmed-but-no-start events (logged at warn).
+ */
+export function normalizeEvent(raw: CalendarEventRaw, fetchedAtIso: string): NormalizeAction {
+  const hasStart = !!(raw.start?.dateTime || raw.start?.date);
+  if (raw.status === 'cancelled') {
+    // Tombstone — incremental sync deletes; bootstrap (no prior row) silently drops.
+    return { kind: 'delete', id: raw.id, reason: 'cancelled' };
+  }
+  if (!hasStart) {
+    // Confirmed but malformed (no start.dateTime or start.date). Skip defensively.
+    return { kind: 'skip', id: raw.id, reason: 'no-start' };
+  }
+  return { kind: 'upsert', row: toEventRow(raw, fetchedAtIso) };
+}
+
+/**
+ * Pure row builder. Caller guarantees `raw.start` has either `dateTime` or
+ * `date` — invariant enforced by `normalizeEvent`. Migration-003 CHECK is
+ * satisfied by construction.
  */
 export function toEventRow(raw: CalendarEventRaw, fetchedAtIso: string): EventRow {
   const isTimed = !!raw.start?.dateTime;
@@ -106,7 +151,7 @@ export class CalendarSync {
   private readonly db: Db;
   private readonly client: CalendarClient;
   private readonly scheduler: { queue: InstanceType<typeof PQueueImport> };
-  private readonly logger?: Pick<Logger, 'info' | 'warn'>;
+  private readonly logger?: Pick<Logger, 'info' | 'warn' | 'debug'>;
   private readonly now: () => Date;
   private readonly windowDaysBack: number;
   private readonly windowDaysForward: number;
@@ -317,17 +362,54 @@ export class CalendarSync {
     newSyncToken: string,
     fetchedAtIso: string,
   ): void {
-    const rows = items.map((r) => toEventRow(r, fetchedAtIso));
+    // UAT Gap 7: partition raw items into upserts/deletes/skips. Cancelled
+    // events are tombstones — DELETE existing row (or silently drop on
+    // bootstrap). Malformed (confirmed-but-no-start) events are logged + skipped
+    // rather than allowed to violate migration-003 CHECK.
+    const upserts: EventRow[] = [];
+    const deletes: string[] = [];
+    for (const raw of items) {
+      const action = normalizeEvent(raw, fetchedAtIso);
+      if (action.kind === 'upsert') {
+        upserts.push(action.row);
+      } else if (action.kind === 'delete') {
+        deletes.push(action.id);
+        this.logger?.debug?.(
+          { scope: 'calendar-sync', event_id: action.id, reason: action.reason },
+          'normalizer: cancelled event → delete',
+        );
+      } else {
+        // skip
+        if (action.reason === 'no-start') {
+          this.logger?.warn(
+            { scope: 'calendar-sync', event_id: action.id, reason: action.reason },
+            'normalizer: confirmed event has no start field — skipping',
+          );
+        } else {
+          this.logger?.debug?.(
+            { scope: 'calendar-sync', event_id: action.id, reason: action.reason },
+            'normalizer: cancelled event with no prior row → skip',
+          );
+        }
+      }
+    }
+
     const tx = this.db.transaction(() => {
-      const stmt = this.db.prepare(
-        `INSERT OR REPLACE INTO calendar_event
-         (id, calendar_id, summary, location, start_at_utc, end_at_utc, start_date, end_date,
-          start_timezone, attendees, status, recurring_id, updated_at, fetched_at)
-         VALUES (@id, @calendar_id, @summary, @location, @start_at_utc, @end_at_utc,
-                 @start_date, @end_date, @start_timezone, @attendees, @status,
-                 @recurring_id, @updated_at, @fetched_at)`,
-      );
-      for (const r of rows) stmt.run(r);
+      if (upserts.length > 0) {
+        const stmt = this.db.prepare(
+          `INSERT OR REPLACE INTO calendar_event
+           (id, calendar_id, summary, location, start_at_utc, end_at_utc, start_date, end_date,
+            start_timezone, attendees, status, recurring_id, updated_at, fetched_at)
+           VALUES (@id, @calendar_id, @summary, @location, @start_at_utc, @end_at_utc,
+                   @start_date, @end_date, @start_timezone, @attendees, @status,
+                   @recurring_id, @updated_at, @fetched_at)`,
+        );
+        for (const r of upserts) stmt.run(r);
+      }
+      if (deletes.length > 0) {
+        const del = this.db.prepare(`DELETE FROM calendar_event WHERE id = ?`);
+        for (const id of deletes) del.run(id);
+      }
       this.db
         .prepare(
           `UPDATE calendar_account

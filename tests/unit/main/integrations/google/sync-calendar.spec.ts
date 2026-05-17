@@ -52,6 +52,13 @@ function createInMemoryDb(initial?: AccountRow) {
           },
         };
       }
+      if (/^DELETE FROM calendar_event WHERE id = \?/.test(s)) {
+        return {
+          run: (id: string) => {
+            events.delete(String(id));
+          },
+        };
+      }
       if (/^UPDATE calendar_account\s+SET sync_token/.test(s)) {
         return {
           run: (row: { sync_token: string; last_synced_at: string }) => {
@@ -247,7 +254,11 @@ describe('CalendarSync.tick', () => {
     expect(db._inspect.account()?.sync_token).toBe('st-keep');
   });
 
-  it('Case 7 — cancelled event still upserts with status=cancelled', async () => {
+  it('Case 7 (UAT Gap 7) — cancelled event with start is a tombstone: not upserted', async () => {
+    // Pre-Gap-7 contract was "upsert with status=cancelled". Post-Gap-7:
+    // cancelled events are tombstones regardless of whether they still carry
+    // start fields — incremental responses signal deletion this way. We assert
+    // the row is NOT present after the tick.
     const db = createInMemoryDb({
       email: 'me@x.com',
       sync_token: 'st',
@@ -270,7 +281,8 @@ describe('CalendarSync.tick', () => {
     const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
     await sync.tick();
 
-    expect(db._inspect.events().get('ev1')?.status).toBe('cancelled');
+    expect(db._inspect.events().has('ev1')).toBe(false);
+    expect(db._inspect.account()?.sync_token).toBe('st-2');
   });
 
   it('Case 8 — queue routing: scheduler.queue.add called for API call AND for DB transaction', async () => {
@@ -385,5 +397,98 @@ describe('CalendarSync.tick', () => {
     expect(callArg.timeMin).toBeUndefined();
     expect(callArg.timeMax).toBeUndefined();
     expect(callArg.singleEvents).toBeUndefined();
+  });
+
+  // ==========================================================================
+  // UAT Gap 7 — CHECK-constraint failure on cancelled / malformed events.
+  // ==========================================================================
+
+  it('Case 10a (UAT Gap 7) — bootstrap response with a cancelled (no-start) event: NOT inserted, no throw', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: null,
+      last_synced_at: null,
+      last_error: null,
+    });
+    const client = makeFakeClient();
+    // Bootstrap window page returns a tombstone alongside a real event.
+    client.listEventsWindow.mockResolvedValue({
+      items: [
+        timedEvent('keep'),
+        { id: 'cancelled-no-start', status: 'cancelled' } as CalendarEventRaw,
+      ],
+    });
+    client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-bs' });
+
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    await expect(sync.tick()).resolves.toBeUndefined();
+
+    // Only the real event is inserted; tombstone is silently dropped.
+    expect(db._inspect.events().size).toBe(1);
+    expect(db._inspect.events().has('keep')).toBe(true);
+    expect(db._inspect.events().has('cancelled-no-start')).toBe(false);
+    expect(db._inspect.account()?.sync_token).toBe('st-bs');
+  });
+
+  it('Case 10b (UAT Gap 7) — incremental cancelled event whose id matches existing row: row deleted', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: 'st-prev',
+      last_synced_at: null,
+      last_error: null,
+    });
+    // Pre-seed an existing row that the incremental tick will tombstone.
+    // We do this by running a first tick with the event present, then a
+    // second tick that cancels it.
+    const client = makeFakeClient();
+    client.listEvents
+      .mockResolvedValueOnce({ items: [timedEvent('to-cancel')], nextSyncToken: 'st-mid' })
+      .mockResolvedValueOnce({
+        items: [{ id: 'to-cancel', status: 'cancelled' } as CalendarEventRaw],
+        nextSyncToken: 'st-final',
+      });
+
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    await sync.tick();
+    expect(db._inspect.events().has('to-cancel')).toBe(true);
+
+    await sync.tick();
+    expect(db._inspect.events().has('to-cancel')).toBe(false);
+    expect(db._inspect.account()?.sync_token).toBe('st-final');
+  });
+
+  it('Case 10c (UAT Gap 7) — confirmed event with NO start field: skipped with warn log', async () => {
+    const db = createInMemoryDb({
+      email: 'me@x.com',
+      sync_token: 'st',
+      last_synced_at: null,
+      last_error: null,
+    });
+    const warn = vi.fn();
+    const client = makeFakeClient();
+    client.listEvents.mockResolvedValue({
+      items: [
+        timedEvent('ok'),
+        { id: 'malformed', status: 'confirmed' } as CalendarEventRaw,
+      ],
+      nextSyncToken: 'st-2',
+    });
+
+    const sync = createCalendarSync({
+      db: db as never,
+      client,
+      scheduler: { queue },
+      logger: { info: vi.fn(), warn, debug: vi.fn() },
+    });
+    await sync.tick();
+
+    expect(db._inspect.events().has('ok')).toBe(true);
+    expect(db._inspect.events().has('malformed')).toBe(false);
+    // Assert the warn line fired for the malformed event.
+    const warnedForMalformed = warn.mock.calls.some((call) => {
+      const ctx = call[0] as Record<string, unknown> | undefined;
+      return ctx?.event_id === 'malformed' && ctx?.reason === 'no-start';
+    });
+    expect(warnedForMalformed).toBe(true);
   });
 });
