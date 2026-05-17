@@ -40,6 +40,17 @@ import {
   OllamaUnavailableError,
   FrontierUnavailableError,
 } from './providers';
+import type PQueueImport from 'p-queue';
+import {
+  classify as classifySensitivityLLM,
+  CLASSIFIER_VERSION,
+  type SensitivityResult,
+} from './sensitivityClassifier';
+import {
+  tokenizeForFrontier,
+  rehydrate,
+  disposeDraftTable,
+} from './tokenize';
 
 export { OllamaUnavailableError, FrontierUnavailableError };
 
@@ -225,3 +236,148 @@ export class LLMRouter {
     };
   }
 }
+
+// =============================================================================
+// Plan 03-02 — Hybrid routing layer on top of the sensitivity classifier.
+// =============================================================================
+
+/** Forced-local categories per CONTEXT.md `decisions §Sensitivity router design`. */
+const FORCED_LOCAL_CATEGORIES = new Set<string>(['financial', 'legal', 'hr']);
+
+/** Routed surface (matches approval.routed column + UI chip). */
+export type RoutedLabel = 'local' | 'frontier' | 'hybrid';
+
+export interface HybridRoutingDecision {
+  /** Underlying classifier result (always populated; never throws). */
+  classifier: SensitivityResult;
+  /** Three-way routed label used by approval.routed + /routing-log + UI chip. */
+  routed: RoutedLabel;
+  /** Verbatim reason persisted to routing_log.reason. */
+  reason: string;
+  /** Classifier version stamped onto routing_log + approval row. */
+  classifier_version: string;
+}
+
+export interface HybridRoutingInput {
+  /** Stable id; if absent the caller is signalling a non-drafting classify-only call. */
+  approvalId?: string;
+  /** Raw prompt text the caller would otherwise send to the LLM. */
+  prompt: string;
+  /** PQueue from the shared scheduler. */
+  queue: InstanceType<typeof PQueueImport>;
+}
+
+/**
+ * Plan 03-02 hybrid routing decision (CONTEXT-locked rules):
+ *
+ *   1. categories ∩ {financial,legal,hr} ≠ ∅ AND severity ∈ {med,high}
+ *      → routed='local' (Ollama only; never frontier).
+ *   2. else if categories includes 'pii'
+ *      → routed='hybrid' (caller MUST tokenize + frontier-dispatch + rehydrate).
+ *   3. else
+ *      → routed='frontier' (caller may dispatch raw prompt to frontier).
+ *
+ * Reason strings are deterministic and used verbatim by routing_log + tests.
+ */
+export async function decideHybridRoute(
+  input: HybridRoutingInput,
+): Promise<HybridRoutingDecision> {
+  const cls = await classifySensitivityLLM(input.prompt, input.queue);
+  const forced = cls.categories.some((c) => FORCED_LOCAL_CATEGORIES.has(c));
+  const sevMedOrHigh = cls.severity === 'med' || cls.severity === 'high';
+
+  if (forced && sevMedOrHigh) {
+    const cats = cls.categories
+      .filter((c) => FORCED_LOCAL_CATEGORIES.has(c))
+      .join(',');
+    return {
+      classifier: cls,
+      routed: 'local',
+      reason: `forced-local:${cats}:${cls.severity}`,
+      classifier_version: CLASSIFIER_VERSION,
+    };
+  }
+  if (cls.categories.includes('pii')) {
+    return {
+      classifier: cls,
+      routed: 'hybrid',
+      reason: 'pii-tokenize-frontier',
+      classifier_version: CLASSIFIER_VERSION,
+    };
+  }
+  return {
+    classifier: cls,
+    routed: 'frontier',
+    reason: 'no-sensitive-categories',
+    classifier_version: CLASSIFIER_VERSION,
+  };
+}
+
+export interface HybridDispatchInput extends HybridRoutingInput {
+  approvalId: string;
+  /** Run the LOCAL model on `prompt`. Caller injects to keep router pure. */
+  runLocal: (prompt: string) => Promise<string>;
+  /** Run the FRONTIER model on `prompt`. Tokenized when routed='hybrid'. */
+  runFrontier: (prompt: string) => Promise<string>;
+}
+
+export interface HybridDispatchResult extends HybridRoutingDecision {
+  /** Final (rehydrated, if hybrid) response text. */
+  text: string;
+}
+
+/**
+ * Plan 03-02 dispatch wrapper. Decides → tokenizes (if hybrid) → runs the
+ * chosen provider → rehydrates → disposeDraftTable in a try/finally so token
+ * tables don't leak on exception.
+ *
+ * On frontier-side failure during the hybrid path, falls back to a local run
+ * (LLM-05 fail-closed) with reason 'frontier-unavailable:hybrid-fallback'.
+ */
+export async function dispatchHybrid(
+  input: HybridDispatchInput,
+): Promise<HybridDispatchResult> {
+  const decision = await decideHybridRoute(input);
+  if (decision.routed === 'local') {
+    const text = await input.runLocal(input.prompt);
+    return { ...decision, text };
+  }
+  if (decision.routed === 'frontier') {
+    try {
+      const text = await input.runFrontier(input.prompt);
+      return { ...decision, text };
+    } catch (e) {
+      // LLM-05 fail-closed.
+      const text = await input.runLocal(input.prompt);
+      return {
+        ...decision,
+        routed: 'local',
+        reason: `frontier-unavailable:fallback:${(e as Error).message ?? 'unknown'}`,
+        text,
+      };
+    }
+  }
+  // routed === 'hybrid' — tokenize/rehydrate around the frontier call.
+  const { prompt: tokenized } = tokenizeForFrontier(input.approvalId, input.prompt);
+  try {
+    let text: string;
+    try {
+      const frontierOut = await input.runFrontier(tokenized);
+      text = rehydrate(input.approvalId, frontierOut);
+    } catch (e) {
+      // Frontier failed — fall back to LOCAL with the ORIGINAL prompt (not
+      // tokenized; local is allowed to see raw user content).
+      const localOut = await input.runLocal(input.prompt);
+      return {
+        ...decision,
+        routed: 'local',
+        reason: `frontier-unavailable:hybrid-fallback:${(e as Error).message ?? 'unknown'}`,
+        text: localOut,
+      };
+    }
+    return { ...decision, text };
+  } finally {
+    disposeDraftTable(input.approvalId);
+  }
+}
+

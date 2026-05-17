@@ -184,4 +184,15 @@ CREATE TABLE IF NOT EXISTS approval_tier (
 INSERT OR IGNORE INTO approval_tier (content_class, tier) VALUES ('email_send_general','always-confirm');
 `,
   },
+  {
+    version: 7,
+    file: '007_sensitivity_router.sql',
+    sql: `
+ALTER TABLE routing_log ADD COLUMN categories_json TEXT;
+ALTER TABLE routing_log ADD COLUMN severity TEXT;
+ALTER TABLE routing_log ADD COLUMN classifier_rationale TEXT;
+ALTER TABLE routing_log ADD COLUMN classifier_version TEXT;
+CREATE INDEX IF NOT EXISTS idx_routing_log_severity ON routing_log(severity);
+`,
+  },
 ];
