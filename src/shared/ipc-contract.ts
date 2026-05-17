@@ -48,6 +48,12 @@ export const CHANNELS = {
   BRIEFING_HISTORY: 'aria:briefing:history',
   BRIEFING_GET_SETTINGS: 'aria:briefing:get-settings',
   BRIEFING_SET_SETTINGS: 'aria:briefing:set-settings',
+  // Plan 03-01 Approval queue
+  APPROVALS_LIST: 'aria:approvals:list',
+  APPROVALS_APPROVE: 'aria:approvals:approve',
+  APPROVALS_REJECT: 'aria:approvals:reject',
+  APPROVALS_SNOOZE: 'aria:approvals:snooze',
+  APPROVALS_BATCH_APPROVE: 'aria:approvals:batch-approve',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -270,6 +276,48 @@ export interface IpcError {
 }
 
 /**
+ * Plan 03-01 — Approval queue row payload exposed to the renderer.
+ *
+ * Mirrors `ApprovalRow` from `src/main/approvals/persist.ts` exactly. The
+ * renderer never imports from `src/main`; this shape is the contract.
+ */
+export type ApprovalUiState =
+  | 'pending'
+  | 'generating'
+  | 'ready'
+  | 'approved'
+  | 'rejected'
+  | 'snoozed'
+  | 'interrupted'
+  | 'sent';
+
+export interface ApprovalRowDto {
+  id: string;
+  kind: 'email_send';
+  state: ApprovalUiState;
+  created_at: string;
+  updated_at: string;
+  approval_path: 'explicit' | 'silent';
+  source_message_id: string | null;
+  recipients_json: string | null;
+  subject: string | null;
+  body_original: string | null;
+  body_edited: string | null;
+  classifier_version: string | null;
+  categories_json: string | null;
+  severity: 'low' | 'med' | 'high' | null;
+  confidence: number | null;
+  classifier_rationale: string | null;
+  routed: 'local' | 'frontier' | 'hybrid' | null;
+  triage_signals_json: string | null;
+  triage_summary: string | null;
+  rejection_reason: string | null;
+  snooze_until: string | null;
+  sent_at: string | null;
+  send_log_id: number | null;
+}
+
+/**
  * AriaApi mirrors CHANNELS 1:1 in camelCase. Plans 02/03/04 implement bodies;
  * Plan 01b ships no-op stubs that resolve `{ error: 'NOT_IMPLEMENTED' }`.
  */
@@ -320,6 +368,20 @@ export interface AriaApi {
   briefingHistory(req?: { limit?: number }): Promise<{ entries: BriefingSummary[] } | IpcError>;
   briefingGetSettings(): Promise<BriefingSettings | IpcError>;
   briefingSetSettings(req: BriefingSettings): Promise<{ ok: true } | IpcError>;
+
+  approvalsList(req?: {
+    states?: ApprovalUiState[];
+    limit?: number;
+  }): Promise<{ rows: ApprovalRowDto[] } | IpcError>;
+  approvalsApprove(req: {
+    id: string;
+    edited?: { body?: string; subject?: string };
+  }): Promise<{ ok: true } | IpcError>;
+  approvalsReject(req: { id: string; reason?: string }): Promise<{ ok: true } | IpcError>;
+  approvalsSnooze(req: { id: string; until: string }): Promise<{ ok: true } | IpcError>;
+  approvalsBatchApprove(req: {
+    ids: string[];
+  }): Promise<{ ok: true; count: number } | IpcError>;
 }
 
 /**
@@ -365,4 +427,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   BRIEFING_HISTORY: 'briefingHistory',
   BRIEFING_GET_SETTINGS: 'briefingGetSettings',
   BRIEFING_SET_SETTINGS: 'briefingSetSettings',
+  APPROVALS_LIST: 'approvalsList',
+  APPROVALS_APPROVE: 'approvalsApprove',
+  APPROVALS_REJECT: 'approvalsReject',
+  APPROVALS_SNOOZE: 'approvalsSnooze',
+  APPROVALS_BATCH_APPROVE: 'approvalsBatchApprove',
 } as const;

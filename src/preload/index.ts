@@ -22,6 +22,15 @@ function buildApi(): AriaApi {
 
 const api = buildApi();
 
+// E2E-only escape hatches; gated by ARIA_E2E env var so production builds
+// never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
+// 'generating' approval row before forcing a process exit.
+if (process.env['ARIA_E2E'] === '1') {
+  (api as unknown as Record<string, AnyFn>)['__e2eInsertGenerating'] = (
+    req: unknown,
+  ) => ipcRenderer.invoke('aria:approvals:__e2e_insert_generating__', req);
+}
+
 contextBridge.exposeInMainWorld('aria', api);
 
 // Type augmentation for renderer consumers.

@@ -1,0 +1,349 @@
+/**
+ * Plan 03-01 Task 2 — ApprovalCard.
+ *
+ * Renders one approval row with recipients/subject/body (APPR-03), inline
+ * edit-then-approve, reject (with optional reason), snooze (1h default),
+ * and a multi-select checkbox for batch approve.
+ *
+ * Diff view: when `body_edited` differs from `body_original`, render a
+ * two-column placeholder (per RESEARCH §Don't Hand-Roll: defer real diff
+ * library until UI cards exist).
+ *
+ * Interrupted state: shows badge + "Regenerate" button (no-op in Plan 03-01;
+ * Plan 03-04 wires the drafting agent).
+ */
+import { useState } from 'react';
+import type { ApprovalRowDto } from '../../../shared/ipc-contract';
+
+export interface ApprovalCardProps {
+  row: ApprovalRowDto;
+  selectable: boolean;
+  selected: boolean;
+  onSelect(id: string, selected: boolean): void;
+  onApprove(id: string, edited?: { body?: string; subject?: string }): Promise<void>;
+  onReject(id: string, reason?: string): Promise<void>;
+  onSnooze(id: string, until: string): Promise<void>;
+}
+
+function parseRecipients(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseCategories(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
+  const { row } = props;
+  const [editing, setEditing] = useState(false);
+  const [draftBody, setDraftBody] = useState<string>(row.body_edited ?? row.body_original ?? '');
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const recipients = parseRecipients(row.recipients_json);
+  const categories = parseCategories(row.categories_json);
+
+  const isInterrupted = row.state === 'interrupted';
+  const isReady = row.state === 'ready';
+  const isDiffed = row.body_edited !== null && row.body_edited !== row.body_original;
+
+  return (
+    <article
+      data-testid={`approval-card-${row.id}`}
+      data-state={row.state}
+      style={{
+        border: '1px solid #d1d5db',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 12,
+        background: '#fff',
+        opacity: busy ? 0.6 : 1,
+      }}
+    >
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        {props.selectable && (
+          <input
+            type="checkbox"
+            data-testid={`approval-select-${row.id}`}
+            aria-label={`Select ${row.subject ?? row.id}`}
+            checked={props.selected}
+            disabled={!isReady}
+            onChange={(e) => props.onSelect(row.id, e.target.checked)}
+          />
+        )}
+        <strong style={{ flex: '1 1 auto' }}>{row.subject ?? '(no subject)'}</strong>
+        <span
+          data-testid={`approval-state-${row.id}`}
+          style={{
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 4,
+            background: stateBg(row.state),
+            color: '#fff',
+          }}
+        >
+          {row.state}
+        </span>
+      </header>
+
+      {isInterrupted && (
+        <div
+          data-testid={`approval-interrupted-${row.id}`}
+          style={{
+            background: '#fef3c7',
+            color: '#92400e',
+            padding: 8,
+            borderRadius: 4,
+            marginBottom: 8,
+            fontSize: 13,
+          }}
+        >
+          Interrupted — regenerate?{' '}
+          <button
+            type="button"
+            data-testid={`approval-regenerate-${row.id}`}
+            disabled
+            title="Regeneration lands in Plan 03-04"
+            style={{ marginLeft: 8 }}
+          >
+            Regenerate
+          </button>
+        </div>
+      )}
+
+      <p style={{ margin: '4px 0', fontSize: 13, color: '#374151' }}>
+        <strong>To:</strong> {recipients.join(', ') || '(no recipients)'}
+      </p>
+
+      {(row.severity || categories.length > 0 || row.classifier_rationale) && (
+        <div
+          data-testid={`approval-rationale-${row.id}`}
+          style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}
+        >
+          {row.severity && <span style={chipStyle()}>severity: {row.severity}</span>}
+          {categories.map((c) => (
+            <span key={c} style={chipStyle()}>
+              {c}
+            </span>
+          ))}
+          {row.classifier_rationale && (
+            <span style={{ marginLeft: 6 }}>{row.classifier_rationale}</span>
+          )}
+        </div>
+      )}
+
+      {!editing && (
+        <>
+          {isDiffed ? (
+            <div
+              data-testid={`approval-diff-${row.id}`}
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}
+            >
+              <pre style={preStyle('#fef2f2')}>{row.body_original ?? ''}</pre>
+              <pre style={preStyle('#ecfdf5')}>{row.body_edited ?? ''}</pre>
+            </div>
+          ) : (
+            <pre style={preStyle('#f9fafb')}>
+              {row.body_edited ?? row.body_original ?? '(empty draft)'}
+            </pre>
+          )}
+        </>
+      )}
+
+      {editing && (
+        <textarea
+          data-testid={`approval-edit-textarea-${row.id}`}
+          value={draftBody}
+          onChange={(e) => setDraftBody(e.target.value)}
+          rows={8}
+          style={{ width: '100%', fontFamily: 'inherit', fontSize: 13, padding: 8 }}
+        />
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        {isReady && !editing && !rejecting && (
+          <>
+            <button
+              type="button"
+              data-testid={`approval-approve-${row.id}`}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await props.onApprove(row.id);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-edit-${row.id}`}
+              disabled={busy}
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-reject-${row.id}`}
+              disabled={busy}
+              onClick={() => setRejecting(true)}
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-snooze-${row.id}`}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+                  await props.onSnooze(row.id, until);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Snooze 1h
+            </button>
+          </>
+        )}
+        {editing && (
+          <>
+            <button
+              type="button"
+              data-testid={`approval-edit-save-${row.id}`}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await props.onApprove(row.id, { body: draftBody });
+                  setEditing(false);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Save & Approve
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-edit-cancel-${row.id}`}
+              disabled={busy}
+              onClick={() => {
+                setDraftBody(row.body_edited ?? row.body_original ?? '');
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        )}
+        {rejecting && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 100%' }}>
+            <input
+              type="text"
+              data-testid={`approval-reject-reason-${row.id}`}
+              placeholder="Reason (optional)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              style={{ flex: '1 1 auto', padding: 6 }}
+            />
+            <button
+              type="button"
+              data-testid={`approval-reject-confirm-${row.id}`}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await props.onReject(row.id, rejectReason || undefined);
+                  setRejecting(false);
+                  setRejectReason('');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Confirm reject
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-reject-cancel-${row.id}`}
+              disabled={busy}
+              onClick={() => {
+                setRejecting(false);
+                setRejectReason('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function stateBg(s: string): string {
+  switch (s) {
+    case 'pending':
+      return '#6b7280';
+    case 'generating':
+      return '#2563eb';
+    case 'ready':
+      return '#059669';
+    case 'approved':
+      return '#0d9488';
+    case 'rejected':
+      return '#dc2626';
+    case 'snoozed':
+      return '#a16207';
+    case 'interrupted':
+      return '#b45309';
+    case 'sent':
+      return '#1f2937';
+    default:
+      return '#6b7280';
+  }
+}
+
+function chipStyle(): React.CSSProperties {
+  return {
+    display: 'inline-block',
+    padding: '1px 6px',
+    background: '#e5e7eb',
+    borderRadius: 4,
+    marginRight: 4,
+    fontSize: 11,
+  };
+}
+
+function preStyle(bg: string): React.CSSProperties {
+  return {
+    background: bg,
+    padding: 8,
+    fontSize: 13,
+    fontFamily: 'inherit',
+    whiteSpace: 'pre-wrap',
+    margin: 0,
+    borderRadius: 4,
+    border: '1px solid #e5e7eb',
+  };
+}

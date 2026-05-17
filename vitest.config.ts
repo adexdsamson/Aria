@@ -31,6 +31,7 @@ export default defineConfig({
             'src/shared/**/*.{test,spec}.ts',
             'src/preload/**/*.{test,spec}.ts',
             'tests/unit/main/**/*.{test,spec}.ts',
+            'tests/static/**/*.{test,spec}.ts',
           ],
           setupFiles: ['tests/setup.ts'],
         },
