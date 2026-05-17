@@ -11,9 +11,62 @@
  *   7. Apply Electron Fuses to harden the binary (T-01-01b-02 / Open Q 6)
  */
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { getLogger } from './log/pino';
+
+/**
+ * Dev-only `.env.local` loader (UAT Gap 3).
+ *
+ * Production builds inject `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` via
+ * electron-vite `define` (or the user's shell). In `pnpm dev` neither path
+ * applies, so `process.env.GOOGLE_*` is `undefined` and the first OAuth
+ * attempt throws `OAuthConfigMissingError` (renderer silently swallows it —
+ * see IntegrationsSection error surfacing fix).
+ *
+ * This loader runs BEFORE any module that reads `process.env.GOOGLE_*`. It is
+ * a minimal ~10-line parser — we deliberately do NOT add `dotenv` as a
+ * dependency. Existing env vars (shell exports) always win. Secrets are NEVER
+ * logged — only the count of variables loaded.
+ *
+ * Packaged builds (no ELECTRON_RENDERER_URL) skip this entirely.
+ */
+function loadDotEnvLocalInDev(): void {
+  if (!process.env['ELECTRON_RENDERER_URL']) return; // dev-only
+  const envPath = path.join(process.cwd(), '.env.local');
+  let raw: string;
+  try {
+    raw = fs.readFileSync(envPath, 'utf8');
+  } catch {
+    return; // file missing is fine — fall back to shell env
+  }
+  let loaded = 0;
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    // Strip surrounding single or double quotes.
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    // Explicit shell exports win.
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+      loaded += 1;
+    }
+  }
+  // Never log keys or values — refresh tokens / client secrets MUST NOT hit logs.
+  getLogger().info({ scope: 'env-local', loaded }, '.env.local loaded (dev only)');
+}
+loadDotEnvLocalInDev();
+
 import { redactObject } from './log/redact';
 import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';

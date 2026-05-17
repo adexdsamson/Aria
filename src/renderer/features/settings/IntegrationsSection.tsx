@@ -53,6 +53,26 @@ function isErr(v: unknown): v is IpcError {
   return !!v && typeof v === 'object' && 'error' in (v as object);
 }
 
+/**
+ * Map known connect-error codes (UAT Gap 3) to user-facing copy. Unknown
+ * codes fall through to a generic message that points at the dev terminal —
+ * cheap escape hatch while we're still adding handler-side error vocab.
+ */
+function connectErrorCopy(code: string): string {
+  switch (code) {
+    case 'oauth-config-missing':
+      return "Aria can't find Google OAuth credentials. See .env.local.example and your local .env.local file.";
+    case 'access_denied':
+      return 'Connection canceled. Click Connect to try again.';
+    default:
+      return `Could not connect: ${code}. Check the dev terminal for details.`;
+  }
+}
+
+function hasErrorCode(v: unknown): v is { error: string } {
+  return !!v && typeof v === 'object' && 'error' in (v as object) && typeof (v as { error: unknown }).error === 'string';
+}
+
 interface IntegrationsSectionProps {
   /** Hook for tests to start with the pre-OAuth modal already open. */
   initialModalOpen?: boolean;
@@ -77,6 +97,7 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
   const [status, setStatus] = useState<GmailIntegrationStatus | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(initialModalOpen ?? false);
   const [busy, setBusy] = useState<boolean>(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await window.aria.gmailStatus();
@@ -89,12 +110,19 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
     return () => clearInterval(id);
   }, [refresh]);
 
-  const onConnectClick = useCallback(() => setModalOpen(true), []);
+  const onConnectClick = useCallback(() => {
+    setConnectError(null);
+    setModalOpen(true);
+  }, []);
   const onModalContinue = useCallback(async () => {
     setModalOpen(false);
     setBusy(true);
+    setConnectError(null);
     try {
-      await window.aria.gmailConnect();
+      const result = await window.aria.gmailConnect();
+      if (hasErrorCode(result)) {
+        setConnectError(connectErrorCopy(result.error));
+      }
       await refresh();
     } finally {
       setBusy(false);
@@ -146,6 +174,12 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
           </div>
         )}
 
+        {connectError && (
+          <div role="alert" data-testid="gmail-connect-error" style={bannerStyle()}>
+            <p style={{ margin: 0 }}>{connectError}</p>
+          </div>
+        )}
+
         <div style={actionsStyle()}>
           {!status?.connected && (
             <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-connect-btn">
@@ -189,6 +223,7 @@ function CalendarRow(): JSX.Element {
   const [status, setStatus] = useState<CalendarIntegrationStatus | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await window.aria.calendarStatus();
@@ -201,12 +236,19 @@ function CalendarRow(): JSX.Element {
     return () => clearInterval(id);
   }, [refresh]);
 
-  const onConnectClick = useCallback(() => setModalOpen(true), []);
+  const onConnectClick = useCallback(() => {
+    setConnectError(null);
+    setModalOpen(true);
+  }, []);
   const onModalContinue = useCallback(async () => {
     setModalOpen(false);
     setBusy(true);
+    setConnectError(null);
     try {
-      await window.aria.calendarConnect();
+      const result = await window.aria.calendarConnect();
+      if (hasErrorCode(result)) {
+        setConnectError(connectErrorCopy(result.error));
+      }
       await refresh();
     } finally {
       setBusy(false);
@@ -255,6 +297,12 @@ function CalendarRow(): JSX.Element {
           <div role="alert" data-testid="calendar-email07-banner-revoked" style={bannerStyle()}>
             <p style={{ margin: 0 }}>{CALENDAR_EMAIL_07_REVOKED_COPY}</p>
             <button type="button" onClick={onConnectClick} disabled={busy}>Reconnect</button>
+          </div>
+        )}
+
+        {connectError && (
+          <div role="alert" data-testid="calendar-connect-error" style={bannerStyle()}>
+            <p style={{ margin: 0 }}>{connectError}</p>
           </div>
         )}
 
