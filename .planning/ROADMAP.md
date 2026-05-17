@@ -156,6 +156,16 @@ Pre-Phase-3 gate: recruit at least one real SMB-exec design partner per PROJECT.
 4. Auto-updater installs a new version, runs schema migration, and restores from backup if migration fails (verified in test)
 5. macOS build passes notarization; Windows build is OV-signed and installs cleanly past SmartScreen reputation seed
 
+### Phase 9: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA — fetch design file + README, apply to product UI, integrate logo; landing page out of scope)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 9 to break down)
+
 ---
 
 ## Notes for Planners

@@ -39,6 +39,11 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 Run `/gsd-verify-work 2` to validate Phase 2 against its 5 success criteria.
 
+## Accumulated Context
+
+### Roadmap Evolution
+- Phase 9 added: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA) — fetch design + README, apply to product UI, integrate logo; landing page out of scope
+
 ## Workflow Config
 
 - Mode: YOLO (auto-approve)
