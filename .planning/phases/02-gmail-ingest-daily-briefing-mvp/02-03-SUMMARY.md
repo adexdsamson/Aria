@@ -182,6 +182,10 @@ No new surface beyond what the plan's `<threat_model>` already enumerates:
 
 ## Self-Check: PASSED
 
+## Post-UAT Correction
+
+UAT Test 2 surfaced an order-of-operations bug: the onboarding flow runs `loading → show → confirm → news-picker → password → sealing`, but the SQLCipher DB is only opened inside `onboardingSeal`. The picker was calling `window.aria.newsSetBundle(...)` directly, which routes to `registerNewsHandlers` where `dbHolder.db` is still null, so the handler returned `{ ok: false }` and the renderer rendered the generic "Could not save news sources." error before the user could even reach the password step. Fix (option B — buffered persistence): `CountrySectorPicker` is now a pure "collect + report up" step (`onSelected({country, sectors})`); `OnboardingWizard` buffers the selection in state and calls `newsSetBundle` AFTER `onboardingSeal` returns success. If the post-seal save fails it logs to the console and continues — onboarding is not blocked by news-source persistence (user can re-pick via Settings → News Sources). Tests updated: `CountrySectorPicker.spec.tsx` now asserts the picker does NOT call `newsSetBundle` and adds a Case 6 covering the non-blocking failure path (suite 194/195, baseline flake unchanged). Settings → News Sources picker (`NewsSourcesSection.tsx`) is untouched — it lives post-seal where the DB is open. Commit: see git log for `fix(onboarding): buffer news-picker selection until after seal`.
+
 ## Open Issues to Forward (Plan 02-04)
 
 - **Migration 005** must add the `briefing` and `briefing_item_dismissed` tables; follow the same `EMBEDDED_MIGRATIONS` append pattern and bump `tests/unit/main/db/migrations.spec.ts` to `[1, 2, 3, 4, 5]` / `user_version === 5`.

@@ -21,6 +21,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
   const [positions, setPositions] = useState<number[]>([]);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [newsSelection, setNewsSelection] = useState<{ country: string; sectors: string[] } | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +50,23 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
       passphrase: password,
     } as never)) as { ok?: true; error?: string };
     if (res.ok) {
+      // Post-UAT correction: DB is only open after seal succeeds. Persist
+      // the buffered news selection here; non-blocking on failure — user
+      // can re-pick via Settings → News Sources.
+      if (newsSelection) {
+        try {
+          const newsRes = (await window.aria.newsSetBundle(newsSelection)) as
+            | { ok: boolean }
+            | { error: string };
+          if ('error' in newsRes || ('ok' in newsRes && !newsRes.ok)) {
+            // eslint-disable-next-line no-console
+            console.warn('newsSetBundle failed post-seal; user can re-pick in Settings', newsRes);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('newsSetBundle threw post-seal; user can re-pick in Settings', err);
+        }
+      }
       setStep('done');
       onComplete();
     } else {
@@ -77,7 +97,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
     );
   }
   if (step === 'news-picker') {
-    return <CountrySectorPicker onSubmitted={() => setStep('password')} />;
+    return (
+      <CountrySectorPicker
+        onSelected={(sel) => {
+          setNewsSelection(sel);
+          setStep('password');
+        }}
+      />
+    );
   }
   if (step === 'password' || step === 'sealing') {
     return (

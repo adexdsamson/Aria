@@ -1,15 +1,20 @@
 /**
  * Plan 02-03 Task 2 — CountrySectorPicker (H5) tests.
  *
+ * Post-UAT correction: The picker no longer calls `newsSetBundle` directly
+ * (DB is not open until after seal). Instead it reports the selection via
+ * `onSelected` and the wizard buffers it, persisting post-seal.
+ *
  * Covers:
- *   1. After MnemonicConfirm completes, the wizard advances to the picker
- *      (not directly to password / completion).
- *   2. Picker renders a country select (default 'NG') + 4 sector checkboxes.
- *   3. Submit calls `window.aria.newsSetBundle({country, sectors})` exactly
- *      once with the exact args.
- *   4. Selecting a non-NG country shows the "more countries coming soon" hint
- *      AND Submit still works (fires the IPC; backend would seed zero rows).
- *   5. Submit advances the wizard to the password (next) step.
+ *   1. After MnemonicConfirm completes, the wizard advances to the picker.
+ *   2. Picker renders country select (default 'NG') + 4 sector checkboxes.
+ *   3. Submit calls `onSelected({country, sectors})` exactly once and does
+ *      NOT call `newsSetBundle` from the picker itself.
+ *   4. Selecting a non-NG country shows the "more countries coming soon"
+ *      hint AND Submit still fires onSelected with that country.
+ *   5. Submit advances the wizard to the password step; after seal succeeds
+ *      the wizard calls `newsSetBundle` with the buffered selection.
+ *   6. A failing `newsSetBundle` post-seal does NOT block `onComplete`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -66,6 +71,14 @@ async function advanceThroughMnemonic(): Promise<void> {
   });
 }
 
+async function fillPasswordAndSubmit(): Promise<void> {
+  const input = await screen.findByTestId('password-input');
+  fireEvent.change(input, { target: { value: 'correcthorse' } });
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('password-submit'));
+  });
+}
+
 describe('CountrySectorPicker (H5)', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -85,7 +98,7 @@ describe('CountrySectorPicker (H5)', () => {
   });
 
   it('Case 2 — picker renders country select (default NG) + 4 sector checkboxes', async () => {
-    render(<CountrySectorPicker onSubmitted={() => undefined} />);
+    render(<CountrySectorPicker onSelected={() => undefined} />);
     const select = await screen.findByTestId('news-country-select');
     expect((select as HTMLSelectElement).value).toBe('NG');
     for (const id of ['gov', 'finance', 'tech', 'energy']) {
@@ -93,29 +106,29 @@ describe('CountrySectorPicker (H5)', () => {
     }
   });
 
-  it('Case 3 — submit fires newsSetBundle({country:"NG", sectors:["gov","finance"]}) exactly once', async () => {
+  it('Case 3 — submit calls onSelected({country:"NG", sectors:["gov","finance"]}) and does NOT call newsSetBundle', async () => {
     const stub = installAria();
-    const onSubmitted = vi.fn();
-    render(<CountrySectorPicker onSubmitted={onSubmitted} />);
+    const onSelected = vi.fn();
+    render(<CountrySectorPicker onSelected={onSelected} />);
 
     // Defaults already select gov + finance. Click Submit.
     await act(async () => {
       fireEvent.click(screen.getByTestId('news-picker-submit'));
     });
 
-    await waitFor(() => {
-      expect(stub.newsSetBundle).toHaveBeenCalledTimes(1);
-    });
-    expect(stub.newsSetBundle).toHaveBeenCalledWith({
+    await waitFor(() => expect(onSelected).toHaveBeenCalledTimes(1));
+    expect(onSelected).toHaveBeenCalledWith({
       country: 'NG',
       sectors: ['gov', 'finance'],
     });
-    await waitFor(() => expect(onSubmitted).toHaveBeenCalledTimes(1));
+    // Critical: picker must NOT touch the DB itself — it isn't open yet.
+    expect(stub.newsSetBundle).not.toHaveBeenCalled();
   });
 
-  it('Case 4 — selecting US shows "more countries coming soon" hint AND Submit still fires the IPC', async () => {
+  it('Case 4 — selecting US shows hint AND Submit fires onSelected with US', async () => {
     const stub = installAria();
-    render(<CountrySectorPicker onSubmitted={() => undefined} />);
+    const onSelected = vi.fn();
+    render(<CountrySectorPicker onSelected={onSelected} />);
     const select = await screen.findByTestId('news-country-select');
     fireEvent.change(select, { target: { value: 'US' } });
 
@@ -127,16 +140,18 @@ describe('CountrySectorPicker (H5)', () => {
       fireEvent.click(screen.getByTestId('news-picker-submit'));
     });
 
-    await waitFor(() => expect(stub.newsSetBundle).toHaveBeenCalledTimes(1));
-    expect(stub.newsSetBundle).toHaveBeenCalledWith({
+    await waitFor(() => expect(onSelected).toHaveBeenCalledTimes(1));
+    expect(onSelected).toHaveBeenCalledWith({
       country: 'US',
       sectors: ['gov', 'finance'],
     });
+    expect(stub.newsSetBundle).not.toHaveBeenCalled();
   });
 
-  it('Case 5 — submit advances the wizard to the password step', async () => {
-    installAria();
-    render(<OnboardingWizard onComplete={() => undefined} />);
+  it('Case 5 — submit advances wizard to password step; newsSetBundle fires post-seal with buffered selection', async () => {
+    const stub = installAria();
+    const onComplete = vi.fn();
+    render(<OnboardingWizard onComplete={onComplete} />);
     await advanceThroughMnemonic();
 
     // Picker visible
@@ -147,5 +162,33 @@ describe('CountrySectorPicker (H5)', () => {
     });
 
     expect(await screen.findByTestId('onboarding-password')).toBeTruthy();
+    // newsSetBundle MUST NOT have been called yet — DB isn't open.
+    expect(stub.newsSetBundle).not.toHaveBeenCalled();
+
+    await fillPasswordAndSubmit();
+
+    await waitFor(() => expect(stub.onboardingSeal).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(stub.newsSetBundle).toHaveBeenCalledTimes(1));
+    expect(stub.newsSetBundle).toHaveBeenCalledWith({
+      country: 'NG',
+      sectors: ['gov', 'finance'],
+    });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+  });
+
+  it('Case 6 — failing newsSetBundle post-seal does NOT block onComplete', async () => {
+    const stub = installAria();
+    stub.newsSetBundle.mockResolvedValueOnce({ ok: false });
+    const onComplete = vi.fn();
+    render(<OnboardingWizard onComplete={onComplete} />);
+    await advanceThroughMnemonic();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('news-picker-submit'));
+    });
+    await fillPasswordAndSubmit();
+
+    await waitFor(() => expect(stub.newsSetBundle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
 });

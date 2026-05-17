@@ -3,9 +3,14 @@
  *
  * Renders after MnemonicConfirm during fresh-install onboarding. The user
  * picks a home country (NG default; other countries show a "more coming
- * soon" hint and seed zero bundle rows) and 1–4 sectors of interest. Submit
- * fires `NEWS_SET_BUNDLE({country, sectors})` exactly once and advances
- * the wizard.
+ * soon" hint and seed zero bundle rows) and 1–4 sectors of interest.
+ *
+ * Post-UAT correction: The DB is not opened until after `onboardingSeal`
+ * runs in the password step. Calling `newsSetBundle` from inside this
+ * picker therefore fails with `{ ok: false }` because `dbHolder.db` is
+ * still null. The picker is now a pure "collect + report up" step — it
+ * reports the selection via `onSelected` and the wizard buffers it,
+ * persisting via `newsSetBundle` AFTER the seal succeeds.
  */
 import { useState } from 'react';
 
@@ -27,14 +32,12 @@ export const SECTORS: ReadonlyArray<{ id: string; label: string }> = [
 export const MORE_COUNTRIES_HINT = 'More countries coming soon — selecting now seeds zero feeds.';
 
 export interface CountrySectorPickerProps {
-  onSubmitted: () => void;
+  onSelected: (selection: { country: string; sectors: string[] }) => void;
 }
 
-export function CountrySectorPicker({ onSubmitted }: CountrySectorPickerProps): JSX.Element {
+export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): JSX.Element {
   const [country, setCountry] = useState<string>('NG');
   const [sectors, setSectors] = useState<string[]>(['gov', 'finance']);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country);
 
@@ -42,23 +45,8 @@ export function CountrySectorPicker({ onSubmitted }: CountrySectorPickerProps): 
     setSectors((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
-  async function submit(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = (await window.aria.newsSetBundle({ country, sectors })) as
-        | { ok: boolean }
-        | { error: string };
-      if ('error' in res || ('ok' in res && !res.ok)) {
-        setError('error' in res ? res.error : 'Could not save news sources.');
-        setBusy(false);
-        return;
-      }
-      onSubmitted();
-    } catch (err) {
-      setError((err as Error).message || 'Could not save news sources.');
-      setBusy(false);
-    }
+  function submit(): void {
+    onSelected({ country, sectors });
   }
 
   return (
@@ -110,19 +98,12 @@ export function CountrySectorPicker({ onSubmitted }: CountrySectorPickerProps): 
         ))}
       </fieldset>
 
-      {error && (
-        <p data-testid="news-picker-error" style={{ color: 'crimson', marginTop: 12 }}>
-          {error}
-        </p>
-      )}
-
       <button
         data-testid="news-picker-submit"
-        disabled={busy}
         onClick={submit}
         style={{ marginTop: 16, padding: '8px 16px' }}
       >
-        {busy ? 'Saving…' : 'Continue'}
+        Continue
       </button>
     </section>
   );
