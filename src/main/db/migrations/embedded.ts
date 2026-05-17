@@ -211,4 +211,32 @@ CREATE TABLE email_triage (
 CREATE INDEX idx_email_triage_priority ON email_triage(priority, ts DESC);
 `,
   },
+  {
+    version: 9,
+    file: '009_voice_match_drafting.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS voice_match_holdout (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (id) REFERENCES gmail_message(id)
+);
+
+ALTER TABLE approval ADD COLUMN beta_voice INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS send_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  approval_id TEXT NOT NULL,
+  ts TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_msg_id TEXT,
+  recipients_json TEXT NOT NULL,
+  subject TEXT,
+  ok INTEGER NOT NULL CHECK (ok IN (0,1)),
+  error TEXT,
+  FOREIGN KEY (approval_id) REFERENCES approval(id)
+);
+CREATE INDEX IF NOT EXISTS idx_send_log_ts ON send_log(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_send_log_approval ON send_log(approval_id);
+`,
+  },
 ];
