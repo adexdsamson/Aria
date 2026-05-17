@@ -7,7 +7,7 @@ source:
   - 02-03-SUMMARY.md
   - 02-04-SUMMARY.md
 started: 2026-05-17T05:30:00.000Z
-updated: 2026-05-17T07:15:00.000Z
+updated: 2026-05-17T07:50:00.000Z
 mode: mvp
 user_story: "As a busy SMB executive, I want to connect Gmail and Google Calendar to Aria and have it ingest mail and events locally on a schedule, so that I can read a daily briefing without giving Aria send or write permissions yet."
 ---
@@ -63,14 +63,27 @@ expected: |
   scoped to `gmail.readonly` only. After approval the window closes; the
   Gmail row in IntegrationsSection flips to connected with the account
   email displayed.
-result: [pending]
+result: issue
+notes: |
+  Gmail click was deferred during this UAT pass — the user went to Test 4
+  (Calendar) first. The CSP-leakage bug surfaced in Gap 4 is shared across
+  both Gmail and Calendar connect flows (same defaultSession-scoped CSP
+  injection, same OAuth BrowserWindow path), so Gmail will hit the same
+  ERR_BLOCKED_BY_CSP failure mode until the Gap 4 fix is verified.
 
 ### 4. Connect Google Calendar (read-only)
 expected: |
   Settings → Integrations → "Connect Calendar" reuses the same Google
   account, scoped to `calendar.readonly`. Calendar row flips to connected;
   no second account picker required.
-result: [pending]
+result: issue
+notes: |
+  Clicking "Connect Calendar" opens the Google OAuth BrowserWindow but the
+  granular-consent UI never completes successfully. UI surfaced a red
+  banner on the Calendar row: "Could not connect: Insufficient Permission.
+  Check the dev terminal for details." Dev terminal repeatedly logged:
+  `electron: Failed to load URL: https://accounts.youtube.com/accounts/CheckConnection?pmpo=https://accounts.google.com&v=...`
+  `with error: ERR_BLOCKED_BY_CSP` (multiple occurrences). See Gap 4.
 
 ### 5. Gmail Ingest Visible in StatusPanel
 expected: |
@@ -178,8 +191,8 @@ result: [pending]
 
 total: 13 user-flow + 4 technical
 passed: 0
-issues: 0
-pending: 17
+issues: 2
+pending: 15
 skipped: 0
 blocked: 0
 
@@ -325,6 +338,63 @@ note: |
   Test 3 result stays `issue` for the record. User re-runs the
   Connect Gmail flow and confirms the OAuth browser window opens
   before flipping to passed.
+
+### Gap 4
+test: 3 + 4 (Connect Gmail / Connect Calendar — shared OAuth flow)
+symptom: |
+  After Gap 3's env-loader fix (commit 76aa1f5), clicking "Connect Calendar"
+  in Settings → Integrations DOES now open the Google OAuth BrowserWindow,
+  but the consent UI fails to complete. UI: red banner on the Calendar row
+  reading "Could not connect: Insufficient Permission. Check the dev
+  terminal for details." Dev terminal repeats:
+  `electron: Failed to load URL: https://accounts.youtube.com/accounts/CheckConnection?pmpo=https://accounts.google.com&v=...`
+  `with error: ERR_BLOCKED_BY_CSP` (multiple times). The downstream
+  "Insufficient Permission" Google API error is a symptom — the broken
+  cross-domain session-state probe (and likely the granular-consent
+  checkboxes) prevented the user from properly granting `calendar.readonly`,
+  so the returned token lacked the scope, and `calendar.events.list`
+  returned 403.
+root_cause: |
+  CSP leakage into third-party origins via defaultSession header injection.
+  `src/main/index.ts` `applyCsp()` registered an unconditional
+  `session.defaultSession.webRequest.onHeadersReceived` callback that
+  overwrote `Content-Security-Policy` on EVERY response routed through
+  `defaultSession`. The Google OAuth BrowserWindow (created in
+  `src/main/integrations/google/auth.ts` `defaultDeps.openAuthWindow`)
+  doesn't pass a `partition` option, so it inherits `defaultSession` and
+  every Google OAuth page response got Aria's strict
+  `default-src 'self'; connect-src 'self' http://127.0.0.1:11434 https://api.anthropic.com ...`
+  slapped on top. Google's cross-domain `accounts.youtube.com/CheckConnection`
+  probe (and presumably granular-consent assets) is blocked by that
+  `connect-src` allowlist. Same family as Gap 1 (dev-vs-prod CSP) but on a
+  different axis: prod-vs-third-party origin.
+fix: |
+  Scope CSP injection to Aria's renderer origin only. Added
+  `computeRendererOrigin()` (dev: `ELECTRON_RENDERER_URL` host;
+  prod: `file://`) and `isAriaRendererUrl(url, origin)` predicate (true
+  iff `url.startsWith(rendererOrigin)`; defensively false for
+  `devtools://`). `applyCsp()` now branches on `isAriaRendererUrl`: Aria
+  renderer responses still get the dev/prod CSP header; all other URLs
+  (Google OAuth pages, future legitimate third-party loads) pass through
+  with their origin's own CSP unchanged. Added one-line pino info log
+  `{ scope: 'csp', renderer_origin }` at startup for observability.
+  Auth BrowserWindow left on defaultSession (no partition) — the URL
+  scoping fixes the bug regardless of session, and adding a partition
+  would add complexity (separate cookie jar lifecycle) without benefit.
+artifacts:
+  - src/main/index.ts (computeRendererOrigin + isAriaRendererUrl helpers; applyCsp URL-aware branching; csp scope log)
+verification:
+  - pnpm tsc --noEmit (both tsconfigs): clean
+  - pnpm vitest run: 195/195 pass (no regression from Gap 3 baseline)
+  - pnpm run build: clean
+  - grep -n "isAriaRendererUrl" src/main/index.ts → 1 definition + 1 usage
+  - prod CSP path unchanged (still emits strict prodCspHeader for `file://` responses)
+debug_session: ""
+note: |
+  Tests 3 and 4 both stay `issue`. User re-runs Connect Calendar (and then
+  Connect Gmail to clear Test 3) and confirms the OAuth window completes
+  consent and the integration rows flip to connected before flipping to
+  passed.
 
 ## Known Caveats Going In
 

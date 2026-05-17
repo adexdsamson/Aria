@@ -128,22 +128,71 @@ export const ELECTRON_FUSES_CONFIG = {
   [FuseV1Options.OnlyLoadAppFromAsar]: true,
 } as const;
 
+/**
+ * Compute the renderer origin once at startup so we can scope CSP injection
+ * to Aria's own pages only. UAT Gap 4 (Test 3/4): the unconditional CSP
+ * injection was leaking into the Google OAuth BrowserWindow, which inherits
+ * `defaultSession`. Google's cross-domain session-state probes
+ * (`accounts.youtube.com/CheckConnection`) and granular-consent UI hit
+ * `ERR_BLOCKED_BY_CSP` against Aria's `connect-src` allowlist, so the user
+ * couldn't grant `calendar.readonly` and the post-connect probe failed with
+ * "Insufficient Permission".
+ *
+ * Returns the URL prefix that identifies Aria's renderer:
+ *   - dev:  `http://localhost:5173` (stripped from ELECTRON_RENDERER_URL)
+ *   - prod: `file://` (loadFile uses the file protocol)
+ */
+function computeRendererOrigin(): string {
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  if (devUrl) {
+    try {
+      const u = new URL(devUrl);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return devUrl;
+    }
+  }
+  return 'file://';
+}
+
+/**
+ * Returns true if `url` belongs to Aria's renderer (so we should inject CSP)
+ * and false for any third-party origin loaded into the same defaultSession —
+ * e.g. the Google OAuth window. DevTools URLs (`devtools://`) are session-
+ * internal and don't typically traverse onHeadersReceived, but defensively
+ * skipped so future DevTools assets aren't broken.
+ */
+function isAriaRendererUrl(url: string, rendererOrigin: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('devtools://')) return false;
+  return url.startsWith(rendererOrigin);
+}
+
 function applyCsp(): void {
   const isDev = Boolean(process.env['ELECTRON_RENDERER_URL']);
   const header = isDev ? devCspHeader() : prodCspHeader();
+  const rendererOrigin = computeRendererOrigin();
   if (isDev) {
     getLogger().info(
       { scope: 'csp', mode: 'dev' },
       "dev CSP active — script-src includes 'unsafe-inline'; do NOT ship to users"
     );
   }
+  getLogger().info(
+    { scope: 'csp', renderer_origin: rendererOrigin },
+    'CSP scoped to renderer origin only'
+  );
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [header],
-      },
-    });
+    if (isAriaRendererUrl(details.url, rendererOrigin)) {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [header],
+        },
+      });
+    } else {
+      callback({ responseHeaders: details.responseHeaders });
+    }
   });
 }
 
