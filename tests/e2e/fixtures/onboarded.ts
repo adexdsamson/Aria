@@ -103,7 +103,24 @@ export async function runOnboarding(
     await window.getByTestId(`confirm-input-${i}`).fill(e2eData.words[positions[i]!]!);
   }
   await window.getByTestId('confirm-submit').click();
-  await window.getByTestId('onboarding-password').waitFor({ timeout: 10_000 });
+
+  // Plan 02-03 inserted a CountrySectorPicker step between MnemonicConfirm and
+  // the password screen. The picker is shown ONLY on fresh-profile flows; for
+  // returning users it's skipped entirely. Race the picker vs the password
+  // screen — whichever renders first decides the path. UAT Gap 2 restructured
+  // the picker as collect-and-report-up, so the selection is buffered on the
+  // wizard and persisted post-seal (non-blocking) — the e2e doesn't need to
+  // change any selections; the default Nigeria + 4 pre-checked sectors is fine.
+  const picker = window.getByTestId('onboarding-news-picker');
+  const password = window.getByTestId('onboarding-password');
+  const which = await Promise.race([
+    picker.waitFor({ timeout: 10_000, state: 'visible' }).then(() => 'picker' as const),
+    password.waitFor({ timeout: 10_000, state: 'visible' }).then(() => 'password' as const),
+  ]);
+  if (which === 'picker') {
+    await window.getByTestId('news-picker-submit').click();
+    await password.waitFor({ timeout: 10_000 });
+  }
 
   await window.getByTestId('password-input').fill(dailyPassword);
   await window.getByTestId('password-submit').click();

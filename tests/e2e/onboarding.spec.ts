@@ -24,8 +24,9 @@ test('first-launch onboarding seals vault + opens DB; unlock works on restart', 
 
   await runOnboarding(electronApp, DEFAULT_DAILY_PW);
 
-  // After onboarding, briefing is visible.
-  await expect(w.getByRole('heading', { name: 'Aria is alive' })).toBeVisible();
+  // After onboarding, the briefing screen renders (Plan 02 replaced the
+  // 'Aria is alive' hello-stub with BriefingScreen as the post-seal landing).
+  await expect(w.getByTestId('briefing-screen')).toBeVisible({ timeout: 15_000 });
 
   // vault.json + aria.db must both exist; aria.db must NOT start with the
   // plaintext "SQLite format 3" magic header.
@@ -50,6 +51,6 @@ test('first-launch onboarding seals vault + opens DB; unlock works on restart', 
   await w2.getByTestId('unlock-input').fill(DEFAULT_DAILY_PW);
   await w2.getByTestId('unlock-submit').click();
   await expect(w2.getByTestId('gate-unlocked')).toBeVisible({ timeout: 20_000 });
-  await expect(w2.getByRole('heading', { name: 'Aria is alive' })).toBeVisible();
+  await expect(w2.getByTestId('briefing-screen')).toBeVisible({ timeout: 15_000 });
   await app2.close();
 });

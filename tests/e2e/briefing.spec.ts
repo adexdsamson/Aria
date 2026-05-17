@@ -49,23 +49,11 @@ test('briefing walking skeleton: generate-now → 3 sections → dismiss news �
     const w = await electronApp.firstWindow();
     await w.waitForLoadState('domcontentloaded');
 
-    // NOTE (e2e caveat — documented in SUMMARY): the onboarded fixture in
-    // tests/e2e/fixtures/onboarded.ts predates Plan 02-03's
-    // CountrySectorPicker step inserted between MnemonicConfirm and the
-    // password screen. Updating the fixture (and seeding NEWS_SET_BUNDLE via
-    // the test-only hook) is out of scope for this terminal plan. If
-    // onboarding wedges, skip cleanly — the underlying briefing flow is
-    // fully covered by 11 + 7 + 9 + 5 unit tests against real SQLCipher.
-    try {
-      await runOnboarding(electronApp, DEFAULT_DAILY_PW);
-    } catch (err) {
-      test.skip(
-        true,
-        `ONBOARDING_FIXTURE_STALE: ${(err as Error).message}. ` +
-          `Fixture needs CountrySectorPicker step (Plan 02-03 follow-up).`,
-      );
-      return;
-    }
+    // Plan 02-03 inserted CountrySectorPicker between MnemonicConfirm and the
+    // password step; the runOnboarding helper now advances through it
+    // automatically (default Nigeria + 4 sectors, persisted post-seal as a
+    // non-blocking call per UAT Gap 2 fix).
+    await runOnboarding(electronApp, DEFAULT_DAILY_PW);
 
     // Default landing route should be /briefing.
     await w.getByTestId('briefing-screen').waitFor({ timeout: 15_000 });
