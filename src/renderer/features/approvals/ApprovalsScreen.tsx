@@ -74,7 +74,21 @@ export function ApprovalsScreen(): JSX.Element {
     edited?: { body?: string; subject?: string },
   ): Promise<void> => {
     const res = await window.aria.approvalsApprove({ id, edited });
-    if (isErr(res)) setActionError(res.error);
+    if (isErr(res)) {
+      setActionError(res.error);
+      await load();
+      return;
+    }
+    // Plan 03-04 Task 5 — for email_send approvals, chain into the Gmail
+    // send adapter so the approve click drives the full approved -> sent
+    // transition. The gmail-send IPC is the SINGLE call site for Gmail
+    // sends; bypass attempts (non-approved rows, forced-explicit gaps) are
+    // rejected by assertApproved inside the adapter (APPR-01 / APPR-07).
+    const row = rows.find((r) => r.id === id);
+    if (row && row.kind === 'email_send') {
+      const sendRes = await window.aria.gmailSendApproved({ approvalId: id });
+      if (isErr(sendRes)) setActionError(sendRes.error);
+    }
     await load();
   };
 

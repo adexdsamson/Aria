@@ -26,9 +26,22 @@ const api = buildApi();
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.
 if (process.env['ARIA_E2E'] === '1') {
-  (api as unknown as Record<string, AnyFn>)['__e2eInsertGenerating'] = (
-    req: unknown,
-  ) => ipcRenderer.invoke('aria:approvals:__e2e_insert_generating__', req);
+  const bag = api as unknown as Record<string, AnyFn>;
+  bag['__e2eInsertGenerating'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:approvals:__e2e_insert_generating__', req);
+  // Plan 03-04 Task 5 — approve-and-send e2e harness hooks.
+  bag['__e2eSeedReady'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:approvals:__e2e_seed_ready__', req);
+  bag['__e2eReadApproval'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:approvals:__e2e_read_row__', req);
+  bag['__e2eReadSendLog'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:approvals:__e2e_read_send_log__', req);
+  bag['__e2eSetGmailMock'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:gmail:__e2e_set_mock__', req);
+  bag['__e2eGetGmailCalls'] = () =>
+    ipcRenderer.invoke('aria:gmail:__e2e_get_calls__');
+  bag['__e2eClearGmailCalls'] = () =>
+    ipcRenderer.invoke('aria:gmail:__e2e_clear_calls__');
 }
 
 contextBridge.exposeInMainWorld('aria', api);

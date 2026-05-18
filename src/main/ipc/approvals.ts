@@ -17,6 +17,7 @@ import {
   listApprovals,
   transitionTo,
   getApproval,
+  insertApproval,
 } from '../approvals/persist';
 
 export interface ApprovalsDeps {
@@ -43,6 +44,9 @@ function asDto(row: unknown): ApprovalRowDto {
 }
 
 const ARIA_E2E_INSERT_GENERATING = 'aria:approvals:__e2e_insert_generating__';
+const ARIA_E2E_SEED_READY = 'aria:approvals:__e2e_seed_ready__';
+const ARIA_E2E_READ_ROW = 'aria:approvals:__e2e_read_row__';
+const ARIA_E2E_READ_SEND_LOG = 'aria:approvals:__e2e_read_send_log__';
 
 export function registerApprovalsHandlers(
   ipcMain: IpcMain,
@@ -66,6 +70,74 @@ export function registerApprovalsHandlers(
          VALUES (?, 'email_send', 'generating', ?, ?, 'explicit', ?)`,
       ).run(id, now, now, r.subject ?? 'E2E pending draft');
       return { id };
+    });
+
+    // Plan 03-04 Task 5 — seed an approval row in 'ready' state with
+    // classifier columns populated, then run the approve+send e2e flow.
+    // Optional overrides expose severity / approval_path / state shortcuts
+    // for the bypass-attempt and forced-explicit sub-tests.
+    ipcMain.handle(ARIA_E2E_SEED_READY, async (_e, req: unknown) => {
+      const db = dbHolder.db;
+      if (!db) return notReady();
+      const r = (req ?? {}) as {
+        recipients?: string[];
+        subject?: string;
+        body?: string;
+        sourceMessageId?: string;
+        severity?: 'low' | 'med' | 'high';
+        categories?: string[];
+        finalState?: 'ready' | 'approved';
+        approvalPath?: 'explicit' | 'silent';
+      };
+      try {
+        const id = insertApproval(db, {
+          kind: 'email_send',
+          source_message_id: r.sourceMessageId ?? 'incoming-msg-e2e',
+          recipients_json: JSON.stringify(r.recipients ?? ['alice@example.com']),
+          subject: r.subject ?? 'Re: Project sync',
+          severity: r.severity ?? 'low',
+          categories_json: JSON.stringify(r.categories ?? ['none']),
+          classifier_version: 'e2e-v1',
+          classifier_rationale: 'seeded by e2e harness',
+          confidence: 0.9,
+          routed: 'local',
+          approval_path: r.approvalPath ?? 'explicit',
+        });
+        transitionTo(db, id, 'generating');
+        transitionTo(db, id, 'ready', {
+          body_original: r.body ?? 'Tuesday works for me.',
+        });
+        if (r.finalState === 'approved') {
+          transitionTo(db, id, 'approved', {
+            approval_path: r.approvalPath ?? 'explicit',
+          });
+        }
+        return { id };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    });
+
+    ipcMain.handle(ARIA_E2E_READ_ROW, async (_e, req: unknown) => {
+      const db = dbHolder.db;
+      if (!db) return notReady();
+      const r = (req ?? {}) as { id?: string };
+      if (!r.id) return { error: 'ID_REQUIRED' };
+      const row = getApproval(db, r.id);
+      return { row };
+    });
+
+    ipcMain.handle(ARIA_E2E_READ_SEND_LOG, async (_e, req: unknown) => {
+      const db = dbHolder.db;
+      if (!db) return notReady();
+      const r = (req ?? {}) as { approvalId?: string };
+      if (!r.approvalId) return { error: 'APPROVAL_ID_REQUIRED' };
+      const rows = db
+        .prepare(
+          `SELECT * FROM send_log WHERE approval_id = ? ORDER BY ts DESC`,
+        )
+        .all(r.approvalId);
+      return { rows };
     });
   }
 
