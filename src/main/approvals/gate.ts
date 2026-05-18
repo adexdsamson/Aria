@@ -63,20 +63,38 @@ export function assertApproved(db: Db, approvalId: string): void {
     );
   }
   let cats: string[] = [];
+  let parseFailed = false;
   if (row.categories_json) {
     try {
       const parsed = JSON.parse(row.categories_json);
-      if (Array.isArray(parsed)) cats = parsed.map(String);
+      if (Array.isArray(parsed)) {
+        cats = parsed.map(String);
+      } else {
+        // CR-01: non-array JSON (e.g. '"hr"', '{}') is malformed for our schema.
+        parseFailed = true;
+      }
     } catch {
-      // tolerate malformed JSON — treat as no categories.
+      // CR-01: fail CLOSED on malformed JSON rather than silently downgrading
+      // to non-forced. The gate is the last line of defense.
+      parseFailed = true;
     }
   }
+  // CR-01: row.severity === null treats unclassified rows as forced — they
+  // must not ride the silent path. parseFailed likewise forces explicit.
   const isForced =
-    row.severity === 'high' || cats.some((c) => FORCED_CATEGORIES.has(c));
+    parseFailed ||
+    row.severity === null ||
+    row.severity === 'high' ||
+    cats.some((c) => FORCED_CATEGORIES.has(c));
   if (isForced && row.approval_path !== 'explicit') {
+    const reason = parseFailed
+      ? '; reason=malformed-categories_json'
+      : row.severity === null
+        ? '; reason=null-severity'
+        : '';
     throw new ApprovalGateError(
       'forced-explicit-missing',
-      `severity=high or forced-category requires explicit approval; got path=${row.approval_path}`,
+      `severity=high or forced-category requires explicit approval; got path=${row.approval_path}${reason}`,
     );
   }
 }
