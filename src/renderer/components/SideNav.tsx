@@ -12,6 +12,7 @@ import { NavLink } from 'react-router-dom';
 const ITEMS: ReadonlyArray<{ to: string; label: string; testid: string }> = [
   { to: '/briefing', label: 'Briefing', testid: 'sidenav-briefing' },
   { to: '/approvals', label: 'Approvals', testid: 'sidenav-approvals' },
+  { to: '/scheduling', label: 'Scheduling', testid: 'sidenav-scheduling' },
   { to: '/settings', label: 'Settings', testid: 'sidenav-settings' },
 ];
 

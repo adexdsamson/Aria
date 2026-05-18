@@ -3,6 +3,7 @@ import { BriefingScreen } from '../features/briefing/BriefingScreen';
 import { ApprovalsScreen } from '../features/approvals/ApprovalsScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { RoutingLogScreen } from '../features/diagnostics/RoutingLogScreen';
+import { SchedulingChat } from '../features/scheduling/SchedulingChat';
 
 export function AppRoutes(): JSX.Element {
   return (
@@ -10,6 +11,7 @@ export function AppRoutes(): JSX.Element {
       <Route path="/" element={<Navigate to="/briefing" replace />} />
       <Route path="/briefing" element={<BriefingScreen />} />
       <Route path="/approvals" element={<ApprovalsScreen />} />
+      <Route path="/scheduling" element={<SchedulingChat />} />
       <Route path="/routing-log" element={<RoutingLogScreen />} />
       <Route path="/settings/*" element={<SettingsScreen />} />
       <Route path="*" element={<Navigate to="/briefing" replace />} />

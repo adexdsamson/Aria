@@ -23,7 +23,15 @@ export interface ApprovalCardProps {
   selectable: boolean;
   selected: boolean;
   onSelect(id: string, selected: boolean): void;
-  onApprove(id: string, edited?: { body?: string; subject?: string }): Promise<void>;
+  onApprove(
+    id: string,
+    edited?: { body?: string; subject?: string },
+    calendarOverrides?: {
+      scope?: 'this' | 'future' | 'all';
+      overrideReasons?: string[];
+      afterJson?: string;
+    },
+  ): Promise<void>;
   onReject(id: string, reason?: string): Promise<void>;
   onSnooze(id: string, until: string): Promise<void>;
 }
@@ -50,6 +58,9 @@ function parseCategories(json: string | null): string[] {
 
 export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
   const { row } = props;
+  if (row.kind === 'calendar_change') {
+    return <CalendarApprovalCard {...props} />;
+  }
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState<string>(row.body_edited ?? row.body_original ?? '');
   const [rejecting, setRejecting] = useState(false);
@@ -477,4 +488,330 @@ function preStyle(bg: string): React.CSSProperties {
     borderRadius: 4,
     border: '1px solid #e5e7eb',
   };
+}
+
+// ─── Plan 04-03 — calendar_change variant ──────────────────────────────────
+
+interface BeforeJson {
+  summary?: string;
+  startUtc?: string;
+  endUtc?: string;
+  recurrence?: string[];
+  isRecurring?: boolean;
+  attendees?: Array<{ email?: string | null; self?: boolean | null }>;
+  organizer?: { email?: string | null; self?: boolean | null };
+}
+interface AfterJson {
+  startUtc?: string;
+  endUtc?: string;
+}
+interface ConflictJson {
+  type: string;
+  severity: 'hard' | 'soft';
+  windowStartUtc: string;
+  windowEndUtc: string;
+  label?: string;
+}
+interface AlternativeJson {
+  startUtc: string;
+  endUtc: string;
+  score: number;
+  primeTimeMatched: boolean;
+  bufferPenalty: number;
+}
+
+function safeParseJson<T>(s: string | null | undefined): T | null {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
+}
+
+function fmtTime(iso: string | undefined, tz: string): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
+  const { row } = props;
+  const before = safeParseJson<BeforeJson>(row.before_json) ?? {};
+  const initialAfter = safeParseJson<AfterJson>(row.after_json) ?? {};
+  const conflicts = safeParseJson<ConflictJson[]>(row.conflicts_json) ?? [];
+  const alternatives = safeParseJson<AlternativeJson[]>(row.alternatives_json) ?? [];
+  const isRecurring = Boolean(before.isRecurring) || (before.recurrence ?? []).length > 0;
+
+  const [after, setAfter] = useState<AfterJson>(initialAfter);
+  const [scope, setScope] = useState<'this' | 'future' | 'all'>(
+    (row.recurring_scope as 'this' | 'future' | 'all' | null) ?? 'this',
+  );
+  const [busy, setBusy] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [showOverride, setShowOverride] = useState(false);
+
+  const tz = 'UTC';
+  const isReady = row.state === 'ready';
+  const hardConflicts = conflicts.filter((c) => c.severity === 'hard');
+
+  const attendeeEmails = (before.attendees ?? [])
+    .map((a) => a.email)
+    .filter((e): e is string => !!e);
+  const selfOnly = attendeeEmails.length === 0;
+
+  async function handleApprove(): Promise<void> {
+    setBusy(true);
+    try {
+      const overrides: {
+        scope: 'this' | 'future' | 'all';
+        overrideReasons?: string[];
+        afterJson?: string;
+      } = { scope };
+      if (
+        after.startUtc !== initialAfter.startUtc ||
+        after.endUtc !== initialAfter.endUtc
+      ) {
+        overrides.afterJson = JSON.stringify(after);
+      }
+      if (overrideReason.trim()) {
+        overrides.overrideReasons = [overrideReason.trim()];
+      }
+      await props.onApprove(row.id, undefined, overrides);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article
+      data-testid={`approval-card-${row.id}`}
+      data-kind="calendar_change"
+      data-state={row.state}
+      style={{
+        border: '1px solid #d1d5db',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 12,
+        background: '#fff',
+        opacity: busy ? 0.6 : 1,
+      }}
+    >
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        {props.selectable && (
+          <input
+            type="checkbox"
+            data-testid={`approval-select-${row.id}`}
+            checked={props.selected}
+            disabled={!isReady}
+            onChange={(e) => props.onSelect(row.id, e.target.checked)}
+          />
+        )}
+        <strong style={{ flex: '1 1 auto' }}>
+          📅 {before.summary ?? row.calendar_action ?? 'Calendar change'}
+        </strong>
+        <span
+          data-testid={`approval-state-${row.id}`}
+          style={{
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 4,
+            background: '#0d9488',
+            color: '#fff',
+          }}
+        >
+          {row.state}
+        </span>
+      </header>
+
+      <div
+        data-testid={`calendar-before-after-${row.id}`}
+        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>From</div>
+          <div data-testid={`calendar-before-${row.id}`}>{fmtTime(before.startUtc, tz)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>To</div>
+          <div data-testid={`calendar-after-${row.id}`}>{fmtTime(after.startUtc, tz)}</div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12, fontSize: 13 }}>
+        <strong>Attendees:</strong>{' '}
+        {selfOnly ? (
+          <span
+            data-testid={`calendar-self-only-${row.id}`}
+            style={{ ...chipStyle(), background: '#dcfce7', color: '#166534' }}
+          >
+            self-only
+          </span>
+        ) : (
+          attendeeEmails.join(', ')
+        )}
+      </div>
+
+      {conflicts.length > 0 && (
+        <div data-testid={`calendar-conflicts-${row.id}`} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Conflicts</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {conflicts.map((c, i) => (
+              <li
+                key={i}
+                data-testid={`calendar-conflict-${row.id}-${i}`}
+                data-severity={c.severity}
+                style={{
+                  fontSize: 12,
+                  padding: '4px 8px',
+                  marginBottom: 4,
+                  borderRadius: 4,
+                  background: c.severity === 'hard' ? '#fee2e2' : '#fef3c7',
+                  color: c.severity === 'hard' ? '#991b1b' : '#92400e',
+                }}
+              >
+                {c.severity}: {c.type}
+                {c.label ? ` — ${c.label}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {alternatives.length > 0 && (
+        <div data-testid={`calendar-alternatives-${row.id}`} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+            Alternative slots
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {alternatives.map((a, i) => {
+              const selected = after.startUtc === a.startUtc;
+              return (
+                <button
+                  key={a.startUtc}
+                  type="button"
+                  data-testid={`calendar-alt-${row.id}-${i}`}
+                  data-selected={selected}
+                  onClick={() =>
+                    setAfter({ startUtc: a.startUtc, endUtc: a.endUtc })
+                  }
+                  style={{
+                    padding: '4px 8px',
+                    border: selected ? '2px solid #2563eb' : '1px solid #d1d5db',
+                    borderRadius: 4,
+                    background: selected ? '#dbeafe' : '#fff',
+                    fontSize: 12,
+                  }}
+                >
+                  {fmtTime(a.startUtc, tz)}
+                  {a.primeTimeMatched ? ' ⭐' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isRecurring && (
+        <fieldset
+          data-testid={`calendar-recurring-scope-${row.id}`}
+          style={{
+            border: '1px solid #d1d5db',
+            borderRadius: 6,
+            padding: 8,
+            marginBottom: 12,
+          }}
+        >
+          <legend style={{ fontSize: 12, color: '#6b7280' }}>This is a recurring event</legend>
+          {(['this', 'future', 'all'] as const).map((s) => (
+            <label key={s} style={{ marginRight: 12, fontSize: 13 }}>
+              <input
+                type="radio"
+                name={`scope-${row.id}`}
+                data-testid={`calendar-scope-${row.id}-${s}`}
+                value={s}
+                checked={scope === s}
+                onChange={() => setScope(s)}
+              />{' '}
+              {s === 'this' ? 'this instance' : s === 'future' ? 'this & future' : 'all'}
+            </label>
+          ))}
+        </fieldset>
+      )}
+
+      {hardConflicts.length > 0 && (
+        <div
+          data-testid={`calendar-override-section-${row.id}`}
+          style={{ marginBottom: 12 }}
+        >
+          {!showOverride ? (
+            <button
+              type="button"
+              data-testid={`calendar-override-toggle-${row.id}`}
+              onClick={() => setShowOverride(true)}
+              style={{ fontSize: 12, color: '#991b1b' }}
+            >
+              Override hard conflict and schedule anyway
+            </button>
+          ) : (
+            <div>
+              <input
+                type="text"
+                data-testid={`calendar-override-reason-${row.id}`}
+                placeholder="Reason for override (required)"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                style={{ width: '100%', padding: 6, fontSize: 13 }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {isReady && (
+          <>
+            <button
+              type="button"
+              data-testid={`approval-approve-${row.id}`}
+              disabled={busy || (hardConflicts.length > 0 && (!showOverride || !overrideReason.trim()))}
+              onClick={() => void handleApprove()}
+            >
+              Approve & apply
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-reject-${row.id}`}
+              disabled={busy}
+              onClick={() => void props.onReject(row.id)}
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              data-testid={`approval-snooze-${row.id}`}
+              disabled={busy}
+              onClick={() => {
+                const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+                void props.onSnooze(row.id, until);
+              }}
+            >
+              Snooze 1h
+            </button>
+          </>
+        )}
+      </div>
+    </article>
+  );
 }
