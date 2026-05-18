@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-18T06:30:01.251Z"
+last_updated: "2026-05-18T08:10:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 3
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Phase
 
-**Phase 2 complete (pending verification)** — All 4 waves shipped: 02-01 Gmail, 02-02 Calendar, 02-03 News, 02-04 Briefing engine. 194/194 unit tests pass. Awaiting `/gsd-verify-work 2`.
+**Phase 4 in progress** — Wave 1 (04-01 calendar write-back chokepoint) and Wave 2 (04-02 scheduling rules + conflict detector) complete. Wave 3 (04-03 NL pipeline + UI) pending. 18 new scheduling unit tests green.
 
 ## Phase Status
 

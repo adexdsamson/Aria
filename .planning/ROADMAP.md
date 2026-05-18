@@ -11,7 +11,7 @@
 | 1 | 5/5 | Complete   | 2026-05-16 |
 | 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 4 |
 | 3 | 5/5 | Complete   | 2026-05-18 |
-| 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3 |
+| 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 2/3 in progress |
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
 | 6 | Meeting Capture + Todoist Push | Aria turns a pasted transcript into action items in Todoist | 3 |
 | 7 | RAG Q&A | Cited natural-language Q&A over user own data | 3 |
@@ -101,15 +101,15 @@ Pre-Phase-3 gate: recruit at least one real SMB-exec design partner per PROJECT.
 **Goal:** Aria reschedules a meeting from a natural-language command, with conflict detection and rules respected
 **Mode:** mvp
 **Requirements:** CAL-04, CAL-05, CAL-06, CAL-07, APPR-02
-**Plans:** 3 plans
+**Plans:** 2/3 plans complete
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Migration 010 + calendar.events OAuth + rrule.js + recurrence.ts (this/future/all) + write-event.ts APPR-02 chokepoint + static-grep ratchet (wave 1)
+- [x] 04-01-PLAN.md — Migration 010 + calendar.events OAuth + rrule.js + recurrence.ts (this/future/all) + write-event.ts APPR-02 chokepoint + static-grep ratchet (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — RulesSchema (shared zod) + Settings UI + pure-function conflict detector with top-3 alternatives + CAL-07 prime-time bonus (wave 2)
+- [x] 04-02-PLAN.md — RulesSchema (shared zod) + Settings UI + pure-function conflict detector with top-3 alternatives + CAL-07 prime-time bonus (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
