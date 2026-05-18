@@ -11,7 +11,7 @@
 | 1 | 5/5 | Complete   | 2026-05-16 |
 | 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 4 |
 | 3 | 5/5 | Complete   | 2026-05-18 |
-| 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 2/3 in progress |
+| 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3/3 complete |
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
 | 6 | Meeting Capture + Todoist Push | Aria turns a pasted transcript into action items in Todoist | 3 |
 | 7 | RAG Q&A | Cited natural-language Q&A over user own data | 3 |
@@ -101,7 +101,7 @@ Pre-Phase-3 gate: recruit at least one real SMB-exec design partner per PROJECT.
 **Goal:** Aria reschedules a meeting from a natural-language command, with conflict detection and rules respected
 **Mode:** mvp
 **Requirements:** CAL-04, CAL-05, CAL-06, CAL-07, APPR-02
-**Plans:** 2/3 plans complete
+**Plans:** 3/3 plans complete
 Plans:
 **Wave 1**
 
@@ -113,7 +113,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03-PLAN.md — End-to-end MVP slice: parseIntent + resolveTarget + assertSelfOnly + proposeCalendarChange + SchedulingChat + ApprovalCard calendar variant + e2e (wave 3)
+- [x] 04-03-PLAN.md — End-to-end MVP slice: parseIntent + resolveTarget + assertSelfOnly + proposeCalendarChange + SchedulingChat + ApprovalCard calendar variant + e2e (wave 3)
 
 **Plans (estimated):**
 

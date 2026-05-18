@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-18T08:10:00.000Z"
+last_updated: "2026-05-18T08:35:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 17
-  completed_plans: 14
-  percent: 33
+  completed_plans: 15
+  percent: 38
 ---
 
 # State
@@ -22,7 +22,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Current Phase
 
-**Phase 4 in progress** — Wave 1 (04-01 calendar write-back chokepoint) and Wave 2 (04-02 scheduling rules + conflict detector) complete. Wave 3 (04-03 NL pipeline + UI) pending. 18 new scheduling unit tests green.
+**Phase 4 complete (pending verification)** — All 3 waves landed. Wave 3 (04-03 NL pipeline + SchedulingChat + ApprovalCard calendar variant + APPR-02 dispatch) green: 43 scheduling unit tests + 2 skip-tolerant e2e specs. SC-1 demonstrable: "move my 3pm to Thursday" → ProposeResult with conflict check → approve → applyCalendarChange chokepoint.
 
 ## Phase Status
 
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 ## Next Action
 
-Run `/gsd-verify-work 2` to validate Phase 2 against its 5 success criteria.
+Run `/gsd-verify-work 4` to validate Phase 4 against its 4 success criteria (SC-1..SC-4). Phase 2 verification still pending.
 
 ## Accumulated Context
 

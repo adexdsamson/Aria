@@ -27,7 +27,7 @@
 ### Approval Queue (APPR)
 
 - [ ] **APPR-01**: All outbound communication (email sends) requires an explicit approval action before transmission
-- [ ] **APPR-02**: All material calendar changes (move, cancel, accept on user behalf) require explicit approval
+- [x] **APPR-02**: All material calendar changes (move, cancel, accept on user behalf) require explicit approval
 - [ ] **APPR-03**: Approval card shows recipients, subject, full body preview, and any diff vs the originating draft
 - [ ] **APPR-04**: User can approve, edit-then-approve, or reject each item; rejections recorded for learning
 - [ ] **APPR-05**: User can see a queue of pending approvals; approvals survive app restart
@@ -49,10 +49,10 @@
 - [ ] **CAL-01**: User can OAuth-connect Google Calendar; events synced bidirectionally with conflict handling
 - [ ] **CAL-02**: User can OAuth-connect Outlook/Microsoft Calendar via Graph; events synced
 - [ ] **CAL-03**: User sees a unified multi-calendar view spanning work and personal sources
-- [ ] **CAL-04**: User can issue natural-language scheduling commands ("move my 3pm to Thursday"); system proposes via Approval Queue
-- [ ] **CAL-05**: System detects scheduling conflicts before write and proposes alternative time slots
-- [ ] **CAL-06**: User can define scheduling rules (focus blocks, buffers, no-meeting windows, time-zone preferences); rules enforced when finding slots
-- [ ] **CAL-07**: System honors user-defined priority for prime-time scheduling
+- [x] **CAL-04**: User can issue natural-language scheduling commands ("move my 3pm to Thursday"); system proposes via Approval Queue
+- [x] **CAL-05**: System detects scheduling conflicts before write and proposes alternative time slots
+- [x] **CAL-06**: User can define scheduling rules (focus blocks, buffers, no-meeting windows, time-zone preferences); rules enforced when finding slots
+- [x] **CAL-07**: System honors user-defined priority for prime-time scheduling
 - [ ] **CAL-08**: System normalizes recurring events across providers correctly (Google and Microsoft semantics differ)
 
 ### Meeting Capture (MEET)
