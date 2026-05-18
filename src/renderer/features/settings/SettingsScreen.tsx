@@ -21,6 +21,7 @@ import { FrontierKeySection } from './FrontierKeySection';
 import { IntegrationsSection } from './IntegrationsSection';
 import { NewsSourcesSection } from './NewsSourcesSection';
 import { OllamaSection } from './OllamaSection';
+import { SchedulingRulesSection } from './SchedulingRulesSection';
 import { StatusPanel } from './StatusPanel';
 
 const TABS: ReadonlyArray<{ to: string; label: string }> = [
@@ -28,6 +29,7 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'frontier-key', label: 'Frontier key' },
   { to: 'ollama', label: 'Local model' },
   { to: 'integrations', label: 'Integrations' },
+  { to: 'scheduling-rules', label: 'Scheduling rules' },
   { to: 'news-sources', label: 'News sources' },
   { to: 'briefing', label: 'Briefing' },
   { to: 'onboarding', label: 'Backup & restore' },
@@ -69,6 +71,7 @@ export function SettingsScreen(): JSX.Element {
           <Route path="frontier-key" element={<FrontierKeySection />} />
           <Route path="ollama" element={<OllamaSection />} />
           <Route path="integrations" element={<IntegrationsSection />} />
+          <Route path="scheduling-rules" element={<SchedulingRulesSection />} />
           <Route
             path="news-sources"
             element={
