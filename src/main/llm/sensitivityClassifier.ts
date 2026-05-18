@@ -55,6 +55,50 @@ export interface ClassifyOptions {
 
 type PQueueLike = InstanceType<typeof PQueueImport>;
 
+/**
+ * CR-02 / T-03-02-04 compensating control: never let an LLM-emitted
+ * classification downgrade an obvious regex prefilter hit.
+ *
+ * The Plan 03-02 threat model claims regex matches feed the forced-local
+ * routing rule even if the LLM is gaslit into emitting `categories:['none']`.
+ * Without this merge that invariant only held on Stage-3 (regex-fallback).
+ *
+ * PII tokens in `classifier.matched` come from src/main/log/redact.ts
+ * patterns: email, ssn, phone, bearer, oauth-code (identity). `currency`
+ * is also emitted but is NOT identity — it indicates financial signal
+ * and is intentionally excluded from the PII-floor set; the LLM owns the
+ * 'financial' label.
+ */
+const REGEX_PII_TOKENS: ReadonlySet<string> = new Set([
+  'email',
+  'ssn',
+  'phone',
+  'bearer',
+  'oauth-code',
+]);
+
+function mergeRegexFloor(
+  parsed: SensitivityResult,
+  matched: string[],
+): SensitivityResult {
+  if (matched.length === 0) return parsed;
+  const piiHit = matched.some((t) => REGEX_PII_TOKENS.has(t));
+  if (!piiHit) return parsed;
+
+  // Build next category list: drop 'none' once we're adding real labels,
+  // then OR 'pii' in. Dedupe via Set.
+  const dropNone = parsed.categories.filter((c) => c !== 'none');
+  const merged = new Set<SensitivityCategory>([...dropNone, 'pii']);
+  let next = Array.from(merged) as SensitivityResult['categories'];
+  if (next.length === 0) next = ['pii'];
+
+  // Severity floor: low → med when a PII signal was added. Never downgrade.
+  const severity: SensitivityResult['severity'] =
+    parsed.severity === 'low' ? 'med' : parsed.severity;
+
+  return { ...parsed, categories: next, severity };
+}
+
 function buildClassifierPrompt(text: string, matched: string[]): string {
   const hints = matched.length > 0
     ? `Regex prefilter matched: ${matched.join(', ')}.`
@@ -96,7 +140,12 @@ export async function classify(
       });
       const out = (await queued) as SensitivityResult | undefined;
       if (out) {
-        return SensitivitySchema.parse(out);
+        // CR-02: OR regex.matched into final categories before returning.
+        // mergeRegexFloor is a no-op when prefilter saw nothing or only
+        // non-PII tokens (e.g. currency); SensitivitySchema.parse still
+        // validates the final shape.
+        const parsed = SensitivitySchema.parse(out);
+        return SensitivitySchema.parse(mergeRegexFloor(parsed, regex.matched));
       }
     } catch (err) {
       lastErr = err;
