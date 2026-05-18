@@ -53,6 +53,11 @@ export interface ProposeRefusal {
   refused: true;
   code: 'cancel-not-in-v1' | 'multi-attendee' | 'no-match' | 'parse-failed';
   message: string;
+  /** Dev-only — populated when ARIA_DEBUG=1. Helps diagnose model output / cache mismatch during UAT. */
+  debug?: {
+    intent?: unknown;
+    candidates?: Array<{ id: string; summary: string; startUtc: string | null }>;
+  };
 }
 
 export type ProposeOutcome = ProposeResult | ProposeClarification | ProposeRefusal;
@@ -78,8 +83,24 @@ export interface ProposeDeps {
 function refused(
   code: ProposeRefusal['code'],
   message: string,
+  debug?: ProposeRefusal['debug'],
 ): ProposeRefusal {
-  return { refused: true, code, message };
+  const r: ProposeRefusal = { refused: true, code, message };
+  if (process.env.ARIA_DEBUG === '1' && debug) r.debug = debug;
+  return r;
+}
+
+function snapshotCandidates(db: Db, limit = 20): Array<{ id: string; summary: string; startUtc: string | null }> {
+  try {
+    const rows = db
+      .prepare(
+        'SELECT id, summary, start_at_utc FROM calendar_event ORDER BY start_at_utc DESC LIMIT ?',
+      )
+      .all(limit) as Array<{ id: string; summary: string; start_at_utc: string | null }>;
+    return rows.map((r) => ({ id: r.id, summary: r.summary, startUtc: r.start_at_utc }));
+  } catch {
+    return [];
+  }
 }
 
 export async function proposeCalendarChange(
@@ -123,6 +144,7 @@ export async function proposeCalendarChange(
         return refused(
           'no-match',
           `I couldn't find an event matching "${intent.target?.eventRef ?? ''}".`,
+          { intent, candidates: snapshotCandidates(deps.db) },
         );
       }
       return { needsClarification: true, candidates: err.candidates };
