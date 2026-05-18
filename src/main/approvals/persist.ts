@@ -19,7 +19,9 @@ import {
 
 type Db = Database.Database;
 
-export type ApprovalKind = 'email_send';
+export type ApprovalKind = 'email_send' | 'calendar_change';
+export type CalendarAction = 'move' | 'create' | 'find-time';
+export type RecurringScope = 'this' | 'future' | 'all';
 export type ApprovalPath = 'explicit' | 'silent';
 export type Severity = 'low' | 'med' | 'high';
 export type Routed = 'local' | 'frontier' | 'hybrid';
@@ -48,6 +50,15 @@ export interface ApprovalRow {
   snooze_until: string | null;
   sent_at: string | null;
   send_log_id: number | null;
+  // Plan 04-01 — calendar_change payload (NULL when kind='email_send').
+  calendar_event_id: string | null;
+  calendar_action: CalendarAction | null;
+  recurring_scope: RecurringScope | null;
+  before_json: string | null;
+  after_json: string | null;
+  conflicts_json: string | null;
+  alternatives_json: string | null;
+  rule_overrides_json: string | null;
 }
 
 export interface NewApprovalInput {
@@ -67,18 +78,31 @@ export interface NewApprovalInput {
   triage_signals_json?: string | null;
   triage_summary?: string | null;
   approval_path?: ApprovalPath;
+  // Plan 04-01 — calendar_change payload.
+  calendar_event_id?: string | null;
+  calendar_action?: CalendarAction | null;
+  recurring_scope?: RecurringScope | null;
+  before_json?: string | null;
+  after_json?: string | null;
+  conflicts_json?: string | null;
+  alternatives_json?: string | null;
+  rule_overrides_json?: string | null;
 }
 
 const INSERT_SQL = `INSERT INTO approval (
   id, kind, state, created_at, updated_at, approval_path,
   source_message_id, recipients_json, subject, body_original, body_edited,
   classifier_version, categories_json, severity, confidence,
-  classifier_rationale, routed, triage_signals_json, triage_summary
+  classifier_rationale, routed, triage_signals_json, triage_summary,
+  calendar_event_id, calendar_action, recurring_scope,
+  before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json
 ) VALUES (
   @id, @kind, @state, @created_at, @updated_at, @approval_path,
   @source_message_id, @recipients_json, @subject, @body_original, @body_edited,
   @classifier_version, @categories_json, @severity, @confidence,
-  @classifier_rationale, @routed, @triage_signals_json, @triage_summary
+  @classifier_rationale, @routed, @triage_signals_json, @triage_summary,
+  @calendar_event_id, @calendar_action, @recurring_scope,
+  @before_json, @after_json, @conflicts_json, @alternatives_json, @rule_overrides_json
 )`;
 
 export function insertApproval(db: Db, input: NewApprovalInput): string {
@@ -104,6 +128,14 @@ export function insertApproval(db: Db, input: NewApprovalInput): string {
     routed: input.routed ?? null,
     triage_signals_json: input.triage_signals_json ?? null,
     triage_summary: input.triage_summary ?? null,
+    calendar_event_id: input.calendar_event_id ?? null,
+    calendar_action: input.calendar_action ?? null,
+    recurring_scope: input.recurring_scope ?? null,
+    before_json: input.before_json ?? null,
+    after_json: input.after_json ?? null,
+    conflicts_json: input.conflicts_json ?? null,
+    alternatives_json: input.alternatives_json ?? null,
+    rule_overrides_json: input.rule_overrides_json ?? null,
   };
   const tx = db.transaction(() => {
     db.prepare(INSERT_SQL).run(row);
@@ -131,6 +163,14 @@ const ALLOWED_PATCH_COLS = new Set<keyof ApprovalRow>([
   'snooze_until',
   'sent_at',
   'send_log_id',
+  'calendar_event_id',
+  'calendar_action',
+  'recurring_scope',
+  'before_json',
+  'after_json',
+  'conflicts_json',
+  'alternatives_json',
+  'rule_overrides_json',
 ]);
 
 export function getApprovalState(db: Db, id: string): ApprovalState | null {

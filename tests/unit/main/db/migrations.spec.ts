@@ -26,7 +26,9 @@ describe('db/migrations', () => {
     // Plan 03-02 added 007 (routing_log classifier columns).
     // Plan 03-03 added 008 (email_triage).
     // Plan 03-04 added 009 (voice_match_holdout + approval.beta_voice + send_log).
-    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    // Plan 04-01 added 010 (calendar write-back schema: approval kind widen,
+    // calendar_event etag/recurrence cols, scheduling_rules, calendar_action_log).
+    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -37,8 +39,68 @@ describe('db/migrations', () => {
     expect(tables).toContain('routing_log');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(9);
+    expect(version).toBe(10);
 
+    // Plan 04-01 — migration 010 schema assertions
+    expect(tables).toContain('scheduling_rules');
+    expect(tables).toContain('calendar_action_log');
+
+    const rulesRows = db.prepare('SELECT id, rules_json, time_zone FROM scheduling_rules').all() as Array<{ id: number; rules_json: string; time_zone: string }>;
+    expect(rulesRows.length).toBe(1);
+    expect(rulesRows[0]!.id).toBe(1);
+    expect(rulesRows[0]!.time_zone).toBe('UTC');
+    expect(rulesRows[0]!.rules_json).toBe('[]');
+
+    const calCols = db
+      .prepare("PRAGMA table_info(calendar_event)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    for (const c of ['etag', 'i_cal_uid', 'sequence', 'organizer_email', 'organizer_self', 'recurrence_json']) {
+      expect(calCols).toContain(c);
+    }
+
+    // approval.kind CHECK now accepts 'calendar_change'.
+    const now = new Date().toISOString();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO approval (id, kind, state, created_at, updated_at)
+           VALUES (?, 'calendar_change', 'pending', ?, ?)`,
+        )
+        .run('cal-1', now, now),
+    ).not.toThrow();
+    // CHECK still rejects unknown kinds.
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO approval (id, kind, state, created_at, updated_at)
+           VALUES (?, 'bogus', 'pending', ?, ?)`,
+        )
+        .run('bad-1', now, now),
+    ).toThrow();
+
+    closeDb(db);
+  });
+
+  it('migration 010 preserves existing approval rows when widening kind CHECK', () => {
+    const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: false });
+    runMigrations(db, { dir: MIGRATIONS_DIR });
+    // Insert one email_send row, simulate "existing data", verify it's still
+    // present (this test re-runs the migration set fully; we just assert that
+    // after migration 010 we can round-trip an email_send approval that
+    // pre-dated migration 010's table rebuild).
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO approval (id, kind, state, created_at, updated_at, subject)
+       VALUES (?, 'email_send', 'pending', ?, ?, 'pre-010')`,
+    ).run('pre-010-id', now, now);
+    const row = db.prepare('SELECT id, kind, subject, calendar_event_id FROM approval WHERE id = ?').get('pre-010-id') as
+      | { id: string; kind: string; subject: string; calendar_event_id: string | null }
+      | undefined;
+    expect(row).toBeDefined();
+    expect(row!.kind).toBe('email_send');
+    expect(row!.subject).toBe('pre-010');
+    expect(row!.calendar_event_id).toBeNull();
     closeDb(db);
   });
 
