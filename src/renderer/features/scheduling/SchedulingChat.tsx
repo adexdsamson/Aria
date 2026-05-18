@@ -123,7 +123,7 @@ export function SchedulingChat(): JSX.Element {
                 fontSize: 13,
               }}
             >
-              {REFUSAL_COPY[result.code] ?? result.message}
+              {result.message || REFUSAL_COPY[result.code]}
             </p>
           )}
           {isClarification(result) && (
