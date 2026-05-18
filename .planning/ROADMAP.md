@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 1 | 5/5 | Complete   | 2026-05-16 |
 | 2 | Gmail + Daily Briefing MVP | First useful slice - Gmail inbound, today calendar, briefing generated and displayed | 4 |
-| 3 | 3/4 | In Progress|  |
+| 3 | 4/4 | Complete   | 2026-05-18 |
 | 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3 |
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
 | 6 | Meeting Capture + Todoist Push | Aria turns a pasted transcript into action items in Todoist | 3 |
