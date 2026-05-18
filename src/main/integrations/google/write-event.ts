@@ -106,14 +106,20 @@ export async function applyCalendarChange(
     throw new Error('apply-calendar-change: approval.calendar_event_id is required');
   }
 
-  // Pitfall 3 — scope='this' must target an instance id (contains '_').
-  if (scope === 'this' && !eventId.includes('_')) {
+  const before = parseBefore(row);
+
+  // Pitfall 3 — scope='this' must target an instance id (contains '_') ONLY for
+  // recurring events. A non-recurring event has no parentId and no RRULE; its
+  // eventId is the event itself and scope is meaningless. The original guard
+  // mis-fired for every single-event move and produced a silent write failure
+  // (UAT Test 6 SC-2).
+  const isRecurring =
+    Boolean(before.parentId) || (Array.isArray(before.recurrence) && before.recurrence.length > 0);
+  if (scope === 'this' && isRecurring && !eventId.includes('_')) {
     throw new InvalidInstanceIdError(
       `scope='this' requires an instance event id (containing '_'); got ${eventId}`,
     );
   }
-
-  const before = parseBefore(row);
   const change = row.after_json ? (JSON.parse(row.after_json) as Record<string, unknown>) : {};
 
   let plan: RecurringWritePlan;
