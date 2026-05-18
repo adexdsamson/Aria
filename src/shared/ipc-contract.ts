@@ -63,6 +63,9 @@ export const CHANNELS = {
   // Plan 03-04 drafting + Gmail send
   DRAFTING_REPLY_TO_MESSAGE: 'aria:drafting:reply-to-message',
   GMAIL_SEND_APPROVED: 'aria:gmail:send-approved',
+  // Plan 04-02 scheduling rules CRUD
+  SCHEDULING_RULES_GET: 'aria:scheduling:rules-get',
+  SCHEDULING_RULES_SET: 'aria:scheduling:rules-set',
 } as const;
 
 // Plan 03-03 triage DTOs ----------------------------------------------------
@@ -490,7 +493,30 @@ export interface AriaApi {
   gmailSendApproved(
     req: SendApprovedRequest,
   ): Promise<SendApprovedResult | IpcError>;
+
+  // Plan 04-02
+  schedulingRulesGet(): Promise<SchedulingRulesGetResponse | IpcError>;
+  schedulingRulesSet(
+    req: SchedulingRulesSetRequest,
+  ): Promise<SchedulingRulesSetResponse | IpcError>;
 }
+
+// Plan 04-02 — scheduling rules DTOs ---------------------------------------
+
+export interface SchedulingRulesGetResponse {
+  rules: unknown; // shape mirrors RulesSchema; renderer re-parses
+  timeZone: string;
+  updatedAt: string | null;
+}
+
+export interface SchedulingRulesSetRequest {
+  rules: unknown; // validated server-side via RulesSchema.safeParse
+}
+
+export type SchedulingRulesSetResponse =
+  | { ok: true }
+  | { error: 'INVALID_RULES'; issues: unknown }
+  | { error: string };
 
 /**
  * Plan 03-02 — DTOs exposed across the renderer/main boundary.
@@ -572,4 +598,6 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   TRIAGE_GET_FOR_MESSAGE: 'triageGetForMessage',
   DRAFTING_REPLY_TO_MESSAGE: 'draftingReplyToMessage',
   GMAIL_SEND_APPROVED: 'gmailSendApproved',
+  SCHEDULING_RULES_GET: 'schedulingRulesGet',
+  SCHEDULING_RULES_SET: 'schedulingRulesSet',
 } as const;

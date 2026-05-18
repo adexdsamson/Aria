@@ -38,6 +38,7 @@ import { registerClassifyHandlers } from './classify';
 import { registerTriageHandlers } from './triage';
 import { registerDraftingHandlers } from './drafting';
 import { registerGmailSendHandlers } from './gmail-send';
+import { registerSchedulingHandlers } from './scheduling';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -225,6 +226,15 @@ export function registerHandlers(
   if (!gmailSendChannels.every((c) => skip.has(c))) {
     registerGmailSendHandlers(ipcMain, { logger, dbHolder });
     gmailSendChannels.forEach((c) => skip.add(c));
+  }
+
+  const schedulingChannels = [
+    CHANNELS.SCHEDULING_RULES_GET,
+    CHANNELS.SCHEDULING_RULES_SET,
+  ];
+  if (!schedulingChannels.every((c) => skip.has(c))) {
+    registerSchedulingHandlers(ipcMain, { logger, dbHolder });
+    schedulingChannels.forEach((c) => skip.add(c));
   }
 }
 
