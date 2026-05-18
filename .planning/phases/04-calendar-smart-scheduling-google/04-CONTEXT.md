@@ -56,7 +56,7 @@ Aria reschedules meetings from natural-language commands on Google Calendar, wit
   - Buffer violation (less than configured buffer between meetings) — **soft** (warn + propose anyway)
   - No-meeting window / OOO / outside working hours — **hard**, override needed
 - **Alternatives:** Top-3 ranked by proximity to requested time. (Rule-fitness scoring deferred to v1.x — proximity is the v1 ranking.)
-- **Working hours:** Use Google Calendar's native working-hours setting as the hard boundary for slot search. Single source of truth — Aria does NOT maintain a separate working-hours config in v1.
+- **Working hours:** Use Google Calendar's native working-hours setting as the hard boundary for slot search when available. **AMENDED 2026-05-18 (per RESEARCH Q1 RESOLVED):** Google Calendar v3 API does not reliably expose working-hours start/end. When `CalendarClient.getCalendarSettings()` returns `workingHours=undefined`, the authoritative fallback is an optional `workingHours: { start: "HH:mm", end: "HH:mm", weekdays: number[] }` field on `scheduling_rules.rules_json` (RulesSchema in Plan 04-02). Google remains the canonical source when available; the rules-JSON field is a strict fallback only.
 - **Slot scorer inputs (v1):** proximity to requested time; buffer adherence (penalty if soft-conflict); prime-time bonus for high-value events only.
 
 ### Rules engine design

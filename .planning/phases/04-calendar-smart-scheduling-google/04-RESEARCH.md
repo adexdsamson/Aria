@@ -545,31 +545,28 @@ export async function applyCalendarChange(db: Db, client: CalendarClient, approv
 | A5 | Audit-log table belongs separate from Phase 3's routing_log (different concerns: routing decisions vs side-effecting writes) | Architectural Responsibility Map | If folded into routing_log, schema mismatch — recommend separate table |
 | A6 | Phase 2's calendar_event is missing etag/i_cal_uid/sequence (no `etag` column in 003_calendar.sql) | Migration 010 | VERIFIED by reading 003_calendar.sql; not actually an assumption — confirmed |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Google working-hours API surface**
    - What we know: feature exists in Web UI; users.settings (Gmail) has separate working-hours; Calendar events use `eventType='workingLocation'` for *location* not hours.
    - What's unclear: where the *hours* (start/end-of-day) live in the Calendar v3 API.
-   - Recommendation: Plan-checker spike — call `calendar.settings.list` and `events.list({eventTypes:['workingLocation']})` against a real test calendar with working hours set. If neither yields hours, fall back to a `workingHours` field in our `scheduling_rules.rules_json` with first-launch prompt during Phase 4.
+   - **RESOLVED:** Calendar v3 API does NOT reliably expose working-hours start/end (only working-*location* via `eventType='workingLocation'`). `CalendarClient.getCalendarSettings()` returns `workingHours=undefined` when Google does not expose them. The authoritative fallback is the optional `workingHours: { start: 'HH:mm', end: 'HH:mm', weekdays: number[] }` field in `scheduling_rules.rules_json` (added to RulesSchema in Plan 04-02). `conflict.ts` uses `rules.workingHours` when `workingHoursPerDay` from Google is undefined. CONTEXT.md amended accordingly.
 
 2. **Self-only check: cheapest implementation**
    - What we know: organizer.self + attendees emptiness or self-only.
-   - What's unclear: whether all-day "personal events" set `organizer.self=true`.
-   - Recommendation: store both `organizer_email` and `organizer_self` and implement a single `isSelfOnly(event, userEmail)` helper with explicit unit tests covering: solo event, self+self-only attendee, self+1 external, undefined attendees array.
+   - What's unclear: whether all-day 'personal events' set `organizer.self=true`.
+   - **RESOLVED:** Use `attendees.filter(a => !a.self).length > 0` then refuse. Implement `isSelfOnly(event, userEmail)` helper that stores both `organizer_email` and `organizer_self` (migration 010 columns) and treats undefined attendees as self-only; explicit unit tests in self-only-gate.test.ts cover: solo event, self+self-only attendee, self+1 external, undefined attendees array.
 
 3. **Conflict-check pre-cache window**
    - What we know: top-3 alternative search walks forward up to 14 days at 15-min increments = 1344 windows.
-   - What's unclear: whether a single `freebusy.query({timeMin: now, timeMax: now+14d})` returns enough granularity to score in-memory.
-   - Recommendation: Yes — freebusy returns merged busy intervals; we walk them in JS, not query per window. Single call.
+   - **RESOLVED:** Query freebusy.query on demand per propose call — no pre-cache in v1. Single `freebusy.query({timeMin: now, timeMax: now+14d})` returns merged busy intervals; we walk them in JS, not query per window. One network call per proposal.
 
 4. **Audit-log table shape — extend `routing_log` or new `calendar_action_log`?**
-   - What we know: routing_log (Phase 3) is for LLM-routing decisions; calendar action log is for side-effecting writes.
-   - Recommendation: separate table (see Pattern 2 migration 010). Different keys, different lifecycle, different downstream consumers (Phase 8 weekly recap will read calendar_action_log for "What Aria did this week").
+   - **RESOLVED:** Separate `calendar_action_log` table per migration 010. Different keys, different lifecycle, different downstream consumers (Phase 8 weekly recap will read calendar_action_log for 'What Aria did this week').
 
-5. **Recurring "all future" rollback semantics**
+5. **Recurring 'all future' rollback semantics**
    - What we know: two-step (patch parent UNTIL, then insert new series).
-   - What's unclear: if insert fails after patch succeeded, the user's series is truncated.
-   - Recommendation: If insert fails, **restore the parent's RRULE** (remove the UNTIL we set). Document in `recurrence.ts`. Audit-log both phases.
+   - **RESOLVED:** `recurrence.ts` wraps split-insert in a compensating action. On insert failure, restore the parent's original RRULE (remove the UNTIL we set) before raising. Audit-log both phases (pre_write + failed). `computeRecurringWrite` returns a `rollback` function for the 'future' scope; `write-event.ts` invokes it best-effort on insert failure.
 
 ## Environment Availability
 
@@ -714,3 +711,4 @@ export async function applyCalendarChange(db: Db, client: CalendarClient, approv
 
 **Research date:** 2026-05-18
 **Valid until:** 2026-06-17 (30 days — Google Calendar v3 is stable; AI SDK 6 is recent but stable; rrule.js is stable)
+
