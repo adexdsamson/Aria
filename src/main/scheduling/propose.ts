@@ -57,6 +57,12 @@ export interface ProposeRefusal {
   debug?: {
     intent?: unknown;
     candidates?: Array<{ id: string; summary: string; startUtc: string | null }>;
+    gate?: {
+      code: string;
+      userEmail: string;
+      organizer: unknown;
+      attendees: unknown;
+    };
   };
 }
 
@@ -162,6 +168,22 @@ export async function proposeCalendarChange(
         err.code === 'multi-attendee'
           ? 'Multi-attendee calendar changes are coming in v1.x — please do this one in Google Calendar.'
           : 'This event has no organizer Aria can verify; please edit it in Google Calendar.',
+        {
+          intent,
+          candidates: [
+            {
+              id: target.event.id,
+              summary: target.event.summary ?? '(no title)',
+              startUtc: target.event.startUtc,
+            },
+          ],
+          gate: {
+            code: err.code,
+            userEmail: deps.userEmail,
+            organizer: target.event.organizer ?? null,
+            attendees: target.event.attendees ?? null,
+          },
+        } as ProposeRefusal['debug'] & { gate?: unknown },
       );
     }
     throw err;

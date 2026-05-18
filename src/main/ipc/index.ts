@@ -236,7 +236,18 @@ export function registerHandlers(
     CHANNELS.SCHEDULING_OVERRIDE,
   ];
   if (!schedulingChannels.every((c) => skip.has(c))) {
-    registerSchedulingHandlers(ipcMain, { logger, dbHolder });
+    registerSchedulingHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      getUserEmail: async (): Promise<string> => {
+        const db = dbHolder.db;
+        if (!db) return 'user@local';
+        const row = db
+          .prepare('SELECT email FROM calendar_account WHERE id = 1')
+          .get() as { email?: string } | undefined;
+        return row?.email ?? 'user@local';
+      },
+    });
     schedulingChannels.forEach((c) => skip.add(c));
   }
 }
