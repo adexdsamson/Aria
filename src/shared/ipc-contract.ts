@@ -66,6 +66,10 @@ export const CHANNELS = {
   // Plan 04-02 scheduling rules CRUD
   SCHEDULING_RULES_GET: 'aria:scheduling:rules-get',
   SCHEDULING_RULES_SET: 'aria:scheduling:rules-set',
+  // Plan 04-03 NL scheduling pipeline
+  SCHEDULING_PROPOSE: 'aria:scheduling:propose',
+  SCHEDULING_CONFIRM_TARGET: 'aria:scheduling:confirm-target',
+  SCHEDULING_OVERRIDE: 'aria:scheduling:override',
 } as const;
 
 // Plan 03-03 triage DTOs ----------------------------------------------------
@@ -356,7 +360,7 @@ export type ApprovalUiState =
 
 export interface ApprovalRowDto {
   id: string;
-  kind: 'email_send';
+  kind: 'email_send' | 'calendar_change';
   state: ApprovalUiState;
   created_at: string;
   updated_at: string;
@@ -382,6 +386,65 @@ export interface ApprovalRowDto {
    *  selected `few-shot-beta`; default 0 under the locked Task 2 decision
    *  (`few-shot-production`). When 1, the ApprovalCard renders a beta badge. */
   beta_voice: 0 | 1;
+  // Plan 04-01 / 04-03 — calendar_change payload (NULL when kind='email_send').
+  calendar_event_id?: string | null;
+  calendar_action?: 'move' | 'create' | 'find-time' | null;
+  recurring_scope?: 'this' | 'future' | 'all' | null;
+  before_json?: string | null;
+  after_json?: string | null;
+  conflicts_json?: string | null;
+  alternatives_json?: string | null;
+  rule_overrides_json?: string | null;
+}
+
+// Plan 04-03 — scheduling propose DTOs ------------------------------------
+
+export interface ProposeConflictDto {
+  type: 'busy' | 'focus-block' | 'buffer' | 'no-meeting-window' | 'outside-working-hours';
+  severity: 'hard' | 'soft';
+  windowStartUtc: string;
+  windowEndUtc: string;
+  label?: string;
+}
+export interface ProposeAlternativeDto {
+  startUtc: string;
+  endUtc: string;
+  score: number;
+  primeTimeMatched: boolean;
+  bufferPenalty: number;
+}
+export interface ProposeResultDto {
+  approvalId: string;
+  primaryFeasible: boolean;
+  conflicts: ProposeConflictDto[];
+  alternatives: ProposeAlternativeDto[];
+  warnings: string[];
+}
+export interface ProposeClarificationDto {
+  needsClarification: true;
+  candidates: Array<{ eventId: string; summary: string; startUtc: string }>;
+}
+export interface ProposeRefusalDto {
+  refused: true;
+  code: 'cancel-not-in-v1' | 'multi-attendee' | 'no-match' | 'parse-failed';
+  message: string;
+}
+export type ProposeResponse =
+  | ProposeResultDto
+  | ProposeClarificationDto
+  | ProposeRefusalDto
+  | IpcError;
+
+export interface SchedulingProposeRequest {
+  nl: string;
+}
+export interface SchedulingConfirmTargetRequest {
+  nl: string;
+  eventId: string;
+}
+export interface SchedulingOverrideRequest {
+  approvalId: string;
+  reason: string;
 }
 
 // Plan 03-04 — drafting + send DTOs ----------------------------------------
@@ -499,6 +562,11 @@ export interface AriaApi {
   schedulingRulesSet(
     req: SchedulingRulesSetRequest,
   ): Promise<SchedulingRulesSetResponse | IpcError>;
+
+  // Plan 04-03
+  schedulingPropose(req: SchedulingProposeRequest): Promise<ProposeResponse>;
+  schedulingConfirmTarget(req: SchedulingConfirmTargetRequest): Promise<ProposeResponse>;
+  schedulingOverride(req: SchedulingOverrideRequest): Promise<{ ok: true } | IpcError>;
 }
 
 // Plan 04-02 — scheduling rules DTOs ---------------------------------------
@@ -600,4 +668,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   GMAIL_SEND_APPROVED: 'gmailSendApproved',
   SCHEDULING_RULES_GET: 'schedulingRulesGet',
   SCHEDULING_RULES_SET: 'schedulingRulesSet',
+  SCHEDULING_PROPOSE: 'schedulingPropose',
+  SCHEDULING_CONFIRM_TARGET: 'schedulingConfirmTarget',
+  SCHEDULING_OVERRIDE: 'schedulingOverride',
 } as const;
