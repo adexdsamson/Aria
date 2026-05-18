@@ -40,6 +40,11 @@ export const EMAIL_07_REVOKED_COPY =
 export const PRE_OAUTH_DISCLOSURE =
   "Google will show a warning that Aria hasn't been verified. This is expected while Aria is in private testing — your data stays on your machine. Continue?";
 
+// Plan 03-04 — surfaced when a recent send hit an unverified-app error
+// (RESEARCH §Pitfall 9). Persistent until the next successful send clears it.
+export const GMAIL_VERIFICATION_PENDING_COPY =
+  "Aria is awaiting Google verification (CASA Tier 2 in progress). Sending may fail until verification clears.";
+
 // Calendar banner copy (Plan 02-02). Symmetric phrasing — "Gmail and other
 // integrations are unaffected" proves SC3 mechanic across both halves.
 export const CALENDAR_EMAIL_07_EXPIRED_COPY =
@@ -186,6 +191,12 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
           </p>
         )}
 
+        {status?.verificationPending && (
+          <div role="alert" data-testid="gmail-verification-pending-banner" style={bannerStyle()}>
+            <p style={{ margin: 0 }}>{GMAIL_VERIFICATION_PENDING_COPY}</p>
+          </div>
+        )}
+
         <div style={actionsStyle()}>
           {!status?.connected && (
             <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-connect-btn">
@@ -199,6 +210,9 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
               </button>
               <button type="button" onClick={onDisconnect} disabled={busy} data-testid="gmail-disconnect-btn">
                 Disconnect
+              </button>
+              <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-reconnect-btn">
+                Re-connect Gmail
               </button>
             </>
           )}

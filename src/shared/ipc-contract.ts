@@ -210,6 +210,11 @@ export interface GmailIntegrationStatus {
   lastError?: string;
   tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
   queueDepth: number;
+  /** Plan 03-04 — set true when a recent Gmail send was rejected with an
+   *  unverified-app error (RESEARCH §Pitfall 9). Clears on the first
+   *  successful send. The IntegrationsSection surfaces a persistent banner
+   *  while this is true. */
+  verificationPending?: boolean;
 }
 
 /**

@@ -31,6 +31,7 @@ import {
 } from '../integrations/google/auth';
 import { clearGoogleTokens, getGoogleTokens } from '../secrets/safeStorage';
 import { createGmailClient, type GmailClient } from '../integrations/google/gmail';
+import { isVerificationPending } from '../integrations/google/sendLog';
 import { GmailSync, createGmailSync } from '../integrations/google/sync-gmail';
 
 export interface GmailHandlerDeps {
@@ -196,6 +197,7 @@ export function registerGmailHandlers(ipcMain: IpcMain, deps: GmailHandlerDeps):
       lastError: row.last_error ?? undefined,
       tokenStatus,
       queueDepth,
+      verificationPending: isVerificationPending(),
     };
   });
 

@@ -40,7 +40,13 @@ import { OAuth2Client, type CodeChallengeMethod } from 'google-auth-library';
 import { setGoogleTokens, getGoogleTokens, type GoogleTokenKind } from '../../secrets/safeStorage';
 
 export const SCOPES: Record<GoogleTokenKind, readonly string[]> = {
-  gmail: ['https://www.googleapis.com/auth/gmail.readonly'],
+  // Plan 03-04 — Gmail scope extends to gmail.send (incremental consent,
+  // RESEARCH §Pattern 5 Shape A). Existing Phase 2 users see Settings →
+  // Integrations banner prompting re-connect; new tokens replace old.
+  gmail: [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+  ],
   calendar: ['https://www.googleapis.com/auth/calendar.readonly'],
 } as const;
 

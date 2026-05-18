@@ -2,11 +2,10 @@
  * Plan 03-01 — APPR-01 static grep enforcer.
  *
  * The Gmail Node SDK send is `gmail.users.messages.send(...)`. Aria MUST have
- * exactly ZERO or ONE call site for this method, and when present that file
- * MUST be `src/main/integrations/google/send.ts` (created in Plan 03-04). At
- * Plan 03-01 commit time, the file does not yet exist — zero matches is the
- * expected pass condition. The static-grep watcher is the safety belt that
- * stops future plans from sneaking in a bypass.
+ * exactly ONE call site for this method, and that file MUST be
+ * `src/main/integrations/google/send.ts`. The static-grep watcher is the
+ * safety belt that stops future plans from sneaking in a bypass. Updated
+ * by Plan 03-04 (Task 4) — was ≤1 prior to send.ts landing.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -52,6 +51,7 @@ describe('APPR-01 single send call-site enforcer', () => {
     expect(
       matches.length,
       `unexpected match count: ${matches.length}; matches=${matches.join(', ')}`,
-    ).toBeLessThanOrEqual(1);
+    ).toBe(1);
+    expect(matches[0]).toBe(ALLOWED);
   });
 });
