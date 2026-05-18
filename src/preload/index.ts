@@ -42,6 +42,17 @@ if (process.env['ARIA_E2E'] === '1') {
     ipcRenderer.invoke('aria:gmail:__e2e_get_calls__');
   bag['__e2eClearGmailCalls'] = () =>
     ipcRenderer.invoke('aria:gmail:__e2e_clear_calls__');
+  // Plan 04-03 calendar e2e bridges.
+  bag['__e2eSeedCalEvent'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:scheduling:__e2e_seed_event__', req);
+  bag['__e2eSetCalMock'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:scheduling:__e2e_set_mock__', req);
+  bag['__e2eGetCalCalls'] = () =>
+    ipcRenderer.invoke('aria:scheduling:__e2e_get_calls__');
+  bag['__e2eClearCalCalls'] = () =>
+    ipcRenderer.invoke('aria:scheduling:__e2e_clear_calls__');
+  bag['__e2eReadCalAudit'] = (req: unknown) =>
+    ipcRenderer.invoke('aria:scheduling:__e2e_read_audit__', req);
 }
 
 contextBridge.exposeInMainWorld('aria', api);

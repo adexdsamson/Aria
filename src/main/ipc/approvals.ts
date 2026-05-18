@@ -194,7 +194,17 @@ export function registerApprovalsHandlers(
       const row = getApproval(db, r.id);
       if (row && row.kind === 'calendar_change') {
         try {
-          await applyCalendarChange(db, r.id, deps.applyCalendarChangeDeps ?? {});
+          const applyDeps = deps.applyCalendarChangeDeps ?? {};
+          // E2E harness: reuse the in-memory CalendarClient mock from
+          // src/main/ipc/scheduling.ts so a single mock surface drives both
+          // freebusyQuery (propose) and patchEvent/insertEvent (apply).
+          if (process.env.ARIA_E2E === '1' && !applyDeps.buildCalendarClient) {
+            const sched = await import('./scheduling');
+            // buildE2eCalendarClient is not exported; we rely on the same
+            // module-level state via a small public accessor.
+            applyDeps.buildCalendarClient = sched.buildE2eCalendarClientForApproveDispatch;
+          }
+          await applyCalendarChange(db, r.id, applyDeps);
         } catch (err) {
           logger.warn({
             event: 'approvals.calendar-apply.failed',

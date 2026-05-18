@@ -40,11 +40,118 @@ function notReady(): { error: string } {
   return { error: 'DB_NOT_OPEN' };
 }
 
+// ─── Plan 04-03 e2e harness state ──────────────────────────────────────────
+interface E2eCalendarMock {
+  /** Recorded patchEvent / insertEvent calls. */
+  calls: Array<{ kind: 'patch' | 'insert'; args: unknown }>;
+  /** patchEvent / insertEvent return value. */
+  ok: boolean;
+  /** Optional canned busy list for freebusyQuery. */
+  busy: Array<{ start: string; end: string }>;
+}
+const e2eCal: E2eCalendarMock = { calls: [], ok: true, busy: [] };
+
+const ARIA_E2E_SEED_CAL_EVENT = 'aria:scheduling:__e2e_seed_event__';
+const ARIA_E2E_SET_CAL_MOCK = 'aria:scheduling:__e2e_set_mock__';
+const ARIA_E2E_GET_CAL_CALLS = 'aria:scheduling:__e2e_get_calls__';
+const ARIA_E2E_CLEAR_CAL_CALLS = 'aria:scheduling:__e2e_clear_calls__';
+const ARIA_E2E_READ_AUDIT = 'aria:scheduling:__e2e_read_audit__';
+
+export async function buildE2eCalendarClientForApproveDispatch(): Promise<CalendarClient> {
+  return buildE2eCalendarClient();
+}
+
+function buildE2eCalendarClient(): CalendarClient {
+  return {
+    listEvents: async () => ({ items: [] }),
+    listEventsWindow: async () => ({ items: [] }),
+    getCalendarMetadata: async () => ({ email: 'e2e@example.com' }),
+    patchEvent: async (args) => {
+      e2eCal.calls.push({ kind: 'patch', args });
+      if (!e2eCal.ok) throw new Error('e2e-mocked-failure');
+      return { id: args.eventId, etag: 'etag-new' };
+    },
+    insertEvent: async (args) => {
+      e2eCal.calls.push({ kind: 'insert', args });
+      if (!e2eCal.ok) throw new Error('e2e-mocked-failure');
+      return { id: 'new-event-id', etag: 'etag-new' };
+    },
+    eventsInstances: async () => [],
+    freebusyQuery: async () => ({
+      calendars: { primary: { busy: e2eCal.busy.slice() } },
+    }),
+    getCalendarSettings: async () => ({ timeZone: 'UTC' }),
+  } as unknown as CalendarClient;
+}
+
 export function registerSchedulingHandlers(
   ipcMain: IpcMain,
   deps: SchedulingDeps,
 ): void {
   const { logger, dbHolder } = deps;
+
+  // E2E harness gated by env var so production never exposes it.
+  if (process.env.ARIA_E2E === '1') {
+    ipcMain.handle(ARIA_E2E_SEED_CAL_EVENT, async (_e, req: unknown) => {
+      const db = dbHolder.db;
+      if (!db) return { error: 'DB_NOT_OPEN' };
+      const r = (req ?? {}) as {
+        id?: string;
+        summary?: string;
+        startUtc?: string;
+        endUtc?: string;
+        attendees?: Array<{ email: string }>;
+        organizerEmail?: string;
+        organizerSelf?: 0 | 1;
+      };
+      const id = r.id ?? `e2e-evt-${Date.now()}`;
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT OR REPLACE INTO calendar_event
+         (id, calendar_id, summary, location, start_at_utc, end_at_utc, start_date, end_date,
+          start_timezone, attendees, status, recurring_id, updated_at, fetched_at,
+          etag, organizer_email, organizer_self)
+         VALUES (?, 'primary', ?, NULL, ?, ?, NULL, NULL,
+                 'UTC', ?, 'confirmed', NULL, ?, ?, 'etag-1', ?, ?)`,
+      ).run(
+        id,
+        r.summary ?? '3pm sync',
+        r.startUtc ?? '2026-05-18T15:00:00.000Z',
+        r.endUtc ?? '2026-05-18T16:00:00.000Z',
+        JSON.stringify(r.attendees ?? []),
+        now,
+        now,
+        r.organizerEmail ?? 'me@example.com',
+        r.organizerSelf ?? 1,
+      );
+      return { id };
+    });
+    ipcMain.handle(ARIA_E2E_SET_CAL_MOCK, async (_e, req: unknown) => {
+      const r = (req ?? {}) as Partial<E2eCalendarMock>;
+      e2eCal.ok = r.ok ?? true;
+      e2eCal.busy = r.busy ?? [];
+      e2eCal.calls = [];
+      return { ok: true };
+    });
+    ipcMain.handle(ARIA_E2E_GET_CAL_CALLS, async () => ({ calls: e2eCal.calls.slice() }));
+    ipcMain.handle(ARIA_E2E_CLEAR_CAL_CALLS, async () => {
+      e2eCal.calls = [];
+      return { ok: true };
+    });
+    ipcMain.handle(ARIA_E2E_READ_AUDIT, async (_e, req: unknown) => {
+      const db = dbHolder.db;
+      if (!db) return { error: 'DB_NOT_OPEN' };
+      const r = (req ?? {}) as { approvalId?: string };
+      if (!r.approvalId) return { error: 'APPROVAL_ID_REQUIRED' };
+      const rows = db
+        .prepare(
+          `SELECT phase, event_id, recurring_scope FROM calendar_action_log
+           WHERE approval_id = ? ORDER BY id ASC`,
+        )
+        .all(r.approvalId);
+      return { rows };
+    });
+  }
 
   ipcMain.handle(CHANNELS.SCHEDULING_RULES_GET, async () => {
     const db = dbHolder.db;
@@ -67,6 +174,7 @@ export function registerSchedulingHandlers(
 
   // ─── Plan 04-03 propose pipeline ──────────────────────────────────────
   async function buildClient(): Promise<CalendarClient> {
+    if (process.env.ARIA_E2E === '1') return buildE2eCalendarClient();
     if (deps.buildCalendarClient) return deps.buildCalendarClient();
     const auth = getOAuth2Client('calendar');
     if (!auth) throw new Error('calendar-not-connected');
