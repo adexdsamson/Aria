@@ -61,10 +61,19 @@ Per CONTEXT decision rule:
 
 ### Chosen approach
 
-- **Approach:** _(few-shot-production | few-shot-beta | fine-tune-production)_
-- **Ship label:** _(production voice | beta voice)_
-- **Rationale:** _TBD — to be filled in after Run #1 (and Run #2 if a
-  fine-tune Modelfile exists)._
+- **Approach:** **few-shot-production**
+- **Ship label:** **production voice**
+- **Rationale:** Operator decision at the Plan 03-04 Task 2 checkpoint:
+  proceed on the few-shot path with the production voice label (no beta
+  badge). This is the CONTEXT-locked preferred outcome (clause 1: simpler,
+  no model artifact) and is the operative choice for this plan regardless
+  of whether Run #1 has been dispatched against real LLM endpoints yet —
+  the harness landed in Task 1, the dry-run validated the wiring, and the
+  operator has elected to ship the drafting agent on the few-shot path.
+  The `beta_voice` column declared by migration 009 stays UNCONDITIONALLY
+  in the schema with default `0`; the drafting agent NEVER sets it to
+  `1` under this decision, and the ApprovalCard therefore never renders
+  the beta-voice badge.
 
 ### Migration columns honored
 

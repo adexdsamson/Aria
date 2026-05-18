@@ -60,6 +60,9 @@ export const CHANNELS = {
   // Plan 03-03 email triage + on-demand thread summary
   TRIAGE_SUMMARIZE_THREAD: 'aria:triage:summarize-thread',
   TRIAGE_GET_FOR_MESSAGE: 'aria:triage:get-for-message',
+  // Plan 03-04 drafting + Gmail send
+  DRAFTING_REPLY_TO_MESSAGE: 'aria:drafting:reply-to-message',
+  GMAIL_SEND_APPROVED: 'aria:gmail:send-approved',
 } as const;
 
 // Plan 03-03 triage DTOs ----------------------------------------------------
@@ -361,6 +364,27 @@ export interface ApprovalRowDto {
   snooze_until: string | null;
   sent_at: string | null;
   send_log_id: number | null;
+  /** Plan 03-04 migration 009 — set to 1 only when the Task 2 checkpoint
+   *  selected `few-shot-beta`; default 0 under the locked Task 2 decision
+   *  (`few-shot-production`). When 1, the ApprovalCard renders a beta badge. */
+  beta_voice: 0 | 1;
+}
+
+// Plan 03-04 — drafting + send DTOs ----------------------------------------
+
+export interface DraftReplyRequest {
+  messageId: string;
+}
+export interface DraftReplyResponse {
+  approvalId: string;
+}
+
+export interface SendApprovedRequest {
+  approvalId: string;
+}
+export interface SendApprovedResult {
+  ok: true;
+  providerMsgId: string;
 }
 
 /**
@@ -447,6 +471,14 @@ export interface AriaApi {
   triageGetForMessage(
     req: GetTriageForMessageRequest,
   ): Promise<TriageResultDto | null | IpcError>;
+
+  // Plan 03-04
+  draftingReplyToMessage(
+    req: DraftReplyRequest,
+  ): Promise<DraftReplyResponse | IpcError>;
+  gmailSendApproved(
+    req: SendApprovedRequest,
+  ): Promise<SendApprovedResult | IpcError>;
 }
 
 /**
@@ -527,4 +559,6 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   ROUTING_LOG_QUERY: 'routingLogQuery',
   TRIAGE_SUMMARIZE_THREAD: 'triageSummarizeThread',
   TRIAGE_GET_FOR_MESSAGE: 'triageGetForMessage',
+  DRAFTING_REPLY_TO_MESSAGE: 'draftingReplyToMessage',
+  GMAIL_SEND_APPROVED: 'gmailSendApproved',
 } as const;

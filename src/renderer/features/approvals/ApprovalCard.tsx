@@ -155,9 +155,20 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
           <button
             type="button"
             data-testid={`approval-regenerate-${row.id}`}
-            disabled
-            title="Regeneration lands in Plan 03-04"
+            disabled={busy || !row.source_message_id}
+            title={row.source_message_id ? 'Regenerate draft' : 'No source message to regenerate from'}
             style={{ marginLeft: 8 }}
+            onClick={async () => {
+              if (!row.source_message_id) return;
+              setBusy(true);
+              try {
+                await window.aria.draftingReplyToMessage({
+                  messageId: row.source_message_id,
+                });
+              } finally {
+                setBusy(false);
+              }
+            }}
           >
             Regenerate
           </button>
@@ -197,6 +208,15 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
               {c}
             </span>
           ))}
+          {row.beta_voice === 1 && (
+            <span
+              data-testid={`approval-beta-voice-${row.id}`}
+              style={{ ...chipStyle(), background: '#fef3c7', color: '#92400e' }}
+              title="Voice model passed neither bar of the held-out eval; ship label is 'beta voice'"
+            >
+              beta voice
+            </span>
+          )}
           {forceExplicit && (
             <span
               data-testid={`approval-forced-explicit-${row.id}`}

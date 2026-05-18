@@ -36,6 +36,7 @@ import { registerBriefingHandlers } from './briefing';
 import { registerApprovalsHandlers } from './approvals';
 import { registerClassifyHandlers } from './classify';
 import { registerTriageHandlers } from './triage';
+import { registerDraftingHandlers } from './drafting';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 
 export interface IpcDeps {
@@ -207,6 +208,16 @@ export function registerHandlers(
       scheduler: getScheduler(),
     });
     triageChannels.forEach((c) => skip.add(c));
+  }
+
+  const draftingChannels = [CHANNELS.DRAFTING_REPLY_TO_MESSAGE];
+  if (!draftingChannels.every((c) => skip.has(c))) {
+    registerDraftingHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      scheduler: getScheduler(),
+    });
+    draftingChannels.forEach((c) => skip.add(c));
   }
 }
 
