@@ -89,6 +89,12 @@ interface EventRow {
   recurring_id: string | null;
   updated_at: string;
   fetched_at: string;
+  etag: string | null;
+  i_cal_uid: string | null;
+  sequence: number | null;
+  organizer_email: string | null;
+  organizer_self: number | null;
+  recurrence_json: string | null;
 }
 
 /**
@@ -144,6 +150,12 @@ export function toEventRow(raw: CalendarEventRaw, fetchedAtIso: string): EventRo
     recurring_id: raw.recurringEventId ?? null,
     updated_at: raw.updated ?? fetchedAtIso,
     fetched_at: fetchedAtIso,
+    etag: raw.etag ?? null,
+    i_cal_uid: raw.iCalUID ?? null,
+    sequence: typeof raw.sequence === 'number' ? raw.sequence : null,
+    organizer_email: raw.organizer?.email ?? null,
+    organizer_self: raw.organizer?.self === true ? 1 : raw.organizer ? 0 : null,
+    recurrence_json: raw.recurrence && raw.recurrence.length > 0 ? JSON.stringify(raw.recurrence) : null,
   };
 }
 
@@ -399,10 +411,12 @@ export class CalendarSync {
         const stmt = this.db.prepare(
           `INSERT OR REPLACE INTO calendar_event
            (id, calendar_id, summary, location, start_at_utc, end_at_utc, start_date, end_date,
-            start_timezone, attendees, status, recurring_id, updated_at, fetched_at)
+            start_timezone, attendees, status, recurring_id, updated_at, fetched_at,
+            etag, i_cal_uid, sequence, organizer_email, organizer_self, recurrence_json)
            VALUES (@id, @calendar_id, @summary, @location, @start_at_utc, @end_at_utc,
                    @start_date, @end_date, @start_timezone, @attendees, @status,
-                   @recurring_id, @updated_at, @fetched_at)`,
+                   @recurring_id, @updated_at, @fetched_at,
+                   @etag, @i_cal_uid, @sequence, @organizer_email, @organizer_self, @recurrence_json)`,
         );
         for (const r of upserts) stmt.run(r);
       }

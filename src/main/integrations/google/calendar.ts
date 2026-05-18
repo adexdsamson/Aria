@@ -64,9 +64,14 @@ export interface CalendarEventRaw {
   location?: string;
   start?: { dateTime?: string; date?: string; timeZone?: string };
   end?: { dateTime?: string; date?: string; timeZone?: string };
-  attendees?: Array<{ email?: string; responseStatus?: string; displayName?: string }>;
+  attendees?: Array<{ email?: string; responseStatus?: string; displayName?: string; self?: boolean }>;
   recurringEventId?: string;
   updated?: string;
+  etag?: string;
+  iCalUID?: string;
+  sequence?: number;
+  organizer?: { email?: string; self?: boolean; displayName?: string };
+  recurrence?: string[];
 }
 
 export interface ListEventsOpts {
