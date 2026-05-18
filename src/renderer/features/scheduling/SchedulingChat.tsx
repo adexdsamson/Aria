@@ -46,6 +46,7 @@ export function SchedulingChat(): JSX.Element {
   async function submit(): Promise<void> {
     if (!nl.trim() || pending) return;
     setPending(true);
+    setResult(null);
     setLastNl(nl);
     try {
       const res = await window.aria.schedulingPropose({ nl });
