@@ -121,9 +121,52 @@ describe('approvals/gate assertApproved', () => {
     },
   );
 
-  it('tolerates malformed categories_json', () => {
-    const id = bring(db, { approvalPath: 'silent' });
+  it('fails closed when categories_json is invalid JSON', () => {
+    // CR-01: malformed categories_json on a non-explicit path must throw
+    // forced-explicit-missing. Previously this silently treated cats=[] and
+    // allowed the row to pass the gate (fail-OPEN); APPR-07 requires fail-CLOSED.
+    const id = bring(db, { severity: 'low', approvalPath: 'silent' });
     db.prepare(`UPDATE approval SET categories_json='{not-json' WHERE id=?`).run(id);
+    try {
+      assertApproved(db, id);
+      throw new Error('expected throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApprovalGateError);
+      expect((e as ApprovalGateError).code).toBe('forced-explicit-missing');
+    }
+  });
+
+  it('fails closed when categories_json is non-array JSON', () => {
+    const id = bring(db, { severity: 'low', approvalPath: 'silent' });
+    db.prepare(`UPDATE approval SET categories_json='"hr"' WHERE id=?`).run(id);
+    try {
+      assertApproved(db, id);
+      throw new Error('expected throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApprovalGateError);
+      expect((e as ApprovalGateError).code).toBe('forced-explicit-missing');
+    }
+  });
+
+  it('fails closed when severity is NULL on silent path', () => {
+    // categories_json=null + severity=null + silent path: unclassified row
+    // must not ride the silent path. (bring() defaults categories=undefined →
+    // categories_json=null; severity defaults to null when not passed.)
+    const id = bring(db, { approvalPath: 'silent' });
+    // Defensive: explicitly NULL the severity in case state-machine patched it.
+    db.prepare(`UPDATE approval SET severity=NULL WHERE id=?`).run(id);
+    try {
+      assertApproved(db, id);
+      throw new Error('expected throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApprovalGateError);
+      expect((e as ApprovalGateError).code).toBe('forced-explicit-missing');
+    }
+  });
+
+  it('permits NULL severity through explicit path', () => {
+    const id = bring(db, { approvalPath: 'explicit' });
+    db.prepare(`UPDATE approval SET severity=NULL WHERE id=?`).run(id);
     expect(() => assertApproved(db, id)).not.toThrow();
   });
 });
