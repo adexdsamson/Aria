@@ -133,11 +133,12 @@ Plans:
 **Goal:** Aria works for an Outlook/M365 exec the same as a Google one
 **Mode:** mvp
 **Requirements:** EMAIL-02, CAL-02, CAL-03, CAL-08
-**Plans (estimated):**
+**Plans:** 3 plans
+Plans:
 
-1. MSAL-node + Microsoft Graph adapter for Outlook mail (read + send) with PKCE auth-code flow
-2. Microsoft Graph adapter for calendar (read + write); recurring event normalization across providers
-3. Unified multi-calendar view across Google + Outlook; provider-agnostic UI; integration testing on a real M365 tenant
+- [ ] 05-01-PLAN.md — Microsoft adapter alongside Google: MSAL PKCE + Graph mail/calendar delta sync + RFC5545 boundary conversion + migrations 011/012 + per-provider keyring + per-(provider,account) p-queue isolation; identity-set self-only gate (wave 1, autonomous: false — M365 dev tenant + Azure AD app registration checkpoint)
+- [ ] 05-02-PLAN.md — Generalize via Provider interface: src/shared/provider.ts + ProviderRegistry + SyncOrchestrator; lift chokepoints to src/main/integrations/{write-event,send}.ts with L-04-05 transition-after-write fix; static-grep ratchets for calendar AND mail; AddAccountModal w/ provider picker (wave 2, depends on 05-01, autonomous: false — live Outlook send + calendar move smoke)
+- [ ] 05-03-PLAN.md — Unified surfaces (CAL-03): UnifiedCalendarScreen w/ per-account color + visibility toggle; AccountChip across briefing/approvals/calendar; ProviderStatusTray; ApprovalCard L-04-03 + L-04-10 fixes; migration 013 legacy singleton views + googleTokens drop; 05-UAT.md (wave 3, depends on 05-02, autonomous: false — Phase 5 UAT execution)
 
 **Success Criteria:**
 
