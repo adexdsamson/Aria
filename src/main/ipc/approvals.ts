@@ -19,10 +19,13 @@ import {
   getApproval,
   insertApproval,
 } from '../approvals/persist';
+import { applyCalendarChange, type ApplyCalendarChangeDeps } from '../integrations/google/write-event';
 
 export interface ApprovalsDeps {
   logger: Logger;
   dbHolder: DbHolder;
+  /** Override calendar-write deps for tests / E2E. */
+  applyCalendarChangeDeps?: ApplyCalendarChangeDeps;
 }
 
 const DEFAULT_LIST_STATES: ApprovalUiState[] = [
@@ -153,14 +156,56 @@ export function registerApprovalsHandlers(
   ipcMain.handle(CHANNELS.APPROVALS_APPROVE, async (_e, req: unknown) => {
     const db = dbHolder.db;
     if (!db) return notReady();
-    const r = req as { id?: string; edited?: { body?: string; subject?: string } };
+    const r = req as {
+      id?: string;
+      edited?: { body?: string; subject?: string };
+      calendarOverrides?: {
+        scope?: 'this' | 'future' | 'all';
+        overrideReasons?: string[];
+        afterJson?: string;
+      };
+    };
     if (!r?.id) return { error: 'ID_REQUIRED' };
     try {
       const patch: Record<string, unknown> = { approval_path: 'explicit' };
       if (r.edited?.body !== undefined) patch.body_edited = r.edited.body;
       if (r.edited?.subject !== undefined) patch.subject = r.edited.subject;
+      if (r.calendarOverrides?.scope) {
+        patch.recurring_scope = r.calendarOverrides.scope;
+      }
+      if (r.calendarOverrides?.afterJson) {
+        patch.after_json = r.calendarOverrides.afterJson;
+      }
+      if (r.calendarOverrides?.overrideReasons && r.calendarOverrides.overrideReasons.length) {
+        patch.rule_overrides_json = JSON.stringify(
+          r.calendarOverrides.overrideReasons.map((reason) => ({
+            reason,
+            ts: new Date().toISOString(),
+          })),
+        );
+      }
       transitionTo(db, r.id, 'approved', patch);
       logger.info({ event: 'approvals.approve', id: r.id, edited: Boolean(r.edited) });
+
+      // Plan 04-03 — dispatch to applyCalendarChange chokepoint when this is
+      // a calendar_change row. Mirrors the email_send → sendApprovedEmail
+      // dispatch in ApprovalsScreen.runApprove but main-side so the renderer
+      // doesn't need a second IPC roundtrip.
+      const row = getApproval(db, r.id);
+      if (row && row.kind === 'calendar_change') {
+        try {
+          await applyCalendarChange(db, r.id, deps.applyCalendarChangeDeps ?? {});
+        } catch (err) {
+          logger.warn({
+            event: 'approvals.calendar-apply.failed',
+            id: r.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return {
+            error: `calendar-apply:${err instanceof Error ? err.message : String(err)}`,
+          };
+        }
+      }
       return { ok: true };
     } catch (err) {
       logger.warn({

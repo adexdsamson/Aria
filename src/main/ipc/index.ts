@@ -231,6 +231,9 @@ export function registerHandlers(
   const schedulingChannels = [
     CHANNELS.SCHEDULING_RULES_GET,
     CHANNELS.SCHEDULING_RULES_SET,
+    CHANNELS.SCHEDULING_PROPOSE,
+    CHANNELS.SCHEDULING_CONFIRM_TARGET,
+    CHANNELS.SCHEDULING_OVERRIDE,
   ];
   if (!schedulingChannels.every((c) => skip.has(c))) {
     registerSchedulingHandlers(ipcMain, { logger, dbHolder });
