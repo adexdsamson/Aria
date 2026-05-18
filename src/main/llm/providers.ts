@@ -24,7 +24,7 @@ export const DEFAULT_LOCAL_MODEL = 'llama3.1:8b-instruct-q4_K_M';
 export const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5';
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
-export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
+export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434/api';
 
 export class OllamaUnavailableError extends Error {
   override readonly name = 'OllamaUnavailableError';
