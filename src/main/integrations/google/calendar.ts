@@ -34,6 +34,29 @@ export class IncompatibleEventsListParamsError extends Error {
   override readonly name = 'IncompatibleEventsListParamsError';
 }
 
+/**
+ * Plan 04-01 — Google returns 412 Precondition Failed when an If-Match
+ * (etag) header does not match the current event. patchEvent translates
+ * this to an EtagMismatchError so the chokepoint (write-event.ts) can
+ * write a `failed` audit row and surface a refresh prompt to the user.
+ */
+export class EtagMismatchError extends Error {
+  override readonly name = 'EtagMismatchError';
+  readonly code: 'etag-mismatch' = 'etag-mismatch';
+}
+
+/**
+ * Plan 04-01 — thrown by the chokepoint when a caller asks to patch a
+ * single instance (scope='this') but the event id does not look like an
+ * instance id (instance ids contain an underscore separator). Defended
+ * here as a wrapper-level guard against Pitfall 3 ("this instance" patch
+ * hits parent series).
+ */
+export class InvalidInstanceIdError extends Error {
+  override readonly name = 'InvalidInstanceIdError';
+  readonly code: 'invalid-instance-id' = 'invalid-instance-id';
+}
+
 export interface CalendarEventRaw {
   id: string;
   status?: string;
@@ -66,10 +89,56 @@ export interface ListEventsResult {
   nextSyncToken?: string;
 }
 
+// Plan 04-01 — minimal write-side type surface. We don't depend on
+// calendar_v3.Schema$Event directly so unit tests with hand-rolled fakes
+// don't have to import googleapis types.
+export interface PatchEventArgs {
+  eventId: string;
+  requestBody: Record<string, unknown>;
+  /** Etag for optimistic-concurrency If-Match header. */
+  ifMatch?: string;
+  /** Default 'none' at the chokepoint. */
+  sendUpdates?: 'none' | 'externalOnly' | 'all';
+}
+
+export interface InsertEventArgs {
+  requestBody: Record<string, unknown>;
+  sendUpdates?: 'none' | 'externalOnly' | 'all';
+}
+
+export interface EventsInstancesArgs {
+  eventId: string;
+  timeMin: string;
+  timeMax: string;
+}
+
+export interface FreebusyQueryArgs {
+  timeMin: string;
+  timeMax: string;
+  calendarIds: string[];
+}
+export interface FreeBusyResult {
+  calendars: Record<string, { busy: Array<{ start: string; end: string }> }>;
+}
+
+export interface CalendarSettings {
+  timeZone: string;
+  /** Best-effort — Google does not expose working hours on the settings
+   *  endpoint as of v3. Undefined by default; populated only if a future
+   *  API surface adds it (Open Q 1 in 04-RESEARCH). */
+  workingHours?: undefined;
+}
+
 export interface CalendarClient {
   listEvents(opts: ListEventsOpts): Promise<ListEventsResult>;
   listEventsWindow(opts: ListEventsWindowOpts): Promise<ListEventsResult>;
   getCalendarMetadata(): Promise<{ email: string }>;
+  // Plan 04-01 write-side
+  patchEvent(args: PatchEventArgs): Promise<{ id: string; etag?: string }>;
+  insertEvent(args: InsertEventArgs): Promise<{ id: string; etag?: string }>;
+  eventsInstances(args: EventsInstancesArgs): Promise<CalendarEventRaw[]>;
+  freebusyQuery(args: FreebusyQueryArgs): Promise<FreeBusyResult>;
+  getCalendarSettings(): Promise<CalendarSettings>;
 }
 
 interface GoogleErrorShape {
@@ -186,6 +255,102 @@ export function createCalendarClient(oauth2Client: OAuth2Client): CalendarClient
         const res = await calendar.calendarList.get({ calendarId: 'primary' });
         const summary = res.data.summary ?? res.data.id ?? '';
         return { email: summary };
+      } catch (err) {
+        maybeThrowTokenInvalid(err);
+        throw err;
+      }
+    },
+
+    async patchEvent(args: PatchEventArgs) {
+      const params: Record<string, unknown> = {
+        calendarId: 'primary',
+        eventId: args.eventId,
+        requestBody: args.requestBody,
+        sendUpdates: args.sendUpdates ?? 'none',
+      };
+      // googleapis exposes If-Match via the `ifMatch` option (Calendar v3
+      // optimistic concurrency); pass alongside a manual header for
+      // belt-and-braces support across googleapis versions.
+      if (args.ifMatch) {
+        (params as { headers?: Record<string, string> }).headers = { 'If-Match': args.ifMatch };
+        (params as { ifMatch?: string }).ifMatch = args.ifMatch;
+      }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await calendar.events.patch(params as any);
+        return { id: String(res.data.id ?? args.eventId), etag: res.data.etag ?? undefined };
+      } catch (err) {
+        const e = err as GoogleErrorShape;
+        const code = e.code ?? e.response?.status;
+        if (code === 412) {
+          throw new EtagMismatchError(
+            `events.patch returned 412: etag mismatch for event ${args.eventId}`,
+          );
+        }
+        maybeThrowTokenInvalid(err);
+        throw err;
+      }
+    },
+
+    async insertEvent(args: InsertEventArgs) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await calendar.events.insert({
+          calendarId: 'primary',
+          requestBody: args.requestBody,
+          sendUpdates: args.sendUpdates ?? 'none',
+        } as any);
+        return { id: String(res.data.id ?? ''), etag: res.data.etag ?? undefined };
+      } catch (err) {
+        maybeThrowTokenInvalid(err);
+        throw err;
+      }
+    },
+
+    async eventsInstances(args: EventsInstancesArgs) {
+      try {
+        const res = await calendar.events.instances({
+          calendarId: 'primary',
+          eventId: args.eventId,
+          timeMin: args.timeMin,
+          timeMax: args.timeMax,
+        });
+        return (res.data.items ?? []) as CalendarEventRaw[];
+      } catch (err) {
+        maybeThrowTokenInvalid(err);
+        throw err;
+      }
+    },
+
+    async freebusyQuery(args: FreebusyQueryArgs) {
+      try {
+        const res = await calendar.freebusy.query({
+          requestBody: {
+            timeMin: args.timeMin,
+            timeMax: args.timeMax,
+            items: args.calendarIds.map((id) => ({ id })),
+          },
+        });
+        const out: FreeBusyResult = { calendars: {} };
+        const cals = res.data.calendars ?? {};
+        for (const [id, info] of Object.entries(cals)) {
+          const busy = (info?.busy ?? [])
+            .map((b) => ({ start: String(b.start ?? ''), end: String(b.end ?? '') }))
+            .filter((b) => b.start && b.end);
+          out.calendars[id] = { busy };
+        }
+        return out;
+      } catch (err) {
+        maybeThrowTokenInvalid(err);
+        throw err;
+      }
+    },
+
+    async getCalendarSettings() {
+      try {
+        const res = await calendar.calendarList.get({ calendarId: 'primary' });
+        const tz = res.data.timeZone ?? 'UTC';
+        return { timeZone: tz };
       } catch (err) {
         maybeThrowTokenInvalid(err);
         throw err;

@@ -228,6 +228,12 @@ export interface CalendarIntegrationStatus {
   lastError?: string;
   tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
   queueDepth: number;
+  /**
+   * Plan 04-01 — true when the user previously connected Calendar under the
+   * Phase 2 readonly-only scope set and has NOT yet granted the new
+   * calendar.events write scope. Renderer shows a re-consent banner.
+   */
+  writeScopeMissing?: boolean;
 }
 
 /**

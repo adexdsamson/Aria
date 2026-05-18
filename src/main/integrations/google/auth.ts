@@ -47,7 +47,13 @@ export const SCOPES: Record<GoogleTokenKind, readonly string[]> = {
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send',
   ],
-  calendar: ['https://www.googleapis.com/auth/calendar.readonly'],
+  // Plan 04-01 — calendar scope extends to calendar.events (incremental
+  // consent, narrowest write scope per T-04-01-05). Existing Phase 2 users
+  // see a Settings → Integrations re-consent banner prompting reconnect.
+  calendar: [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events',
+  ],
 } as const;
 
 export class OAuthConfigMissingError extends Error {

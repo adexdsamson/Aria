@@ -1,0 +1,40 @@
+{
+  "single": {
+    "id": "evt-single-1",
+    "etag": "\"3000000000000000\"",
+    "summary": "One-off meeting",
+    "start": { "dateTime": "2026-05-20T10:00:00.000Z" },
+    "end": { "dateTime": "2026-05-20T10:30:00.000Z" }
+  },
+  "weeklyParent": {
+    "id": "evt-weekly-parent-1",
+    "etag": "\"3000000000000001\"",
+    "summary": "Weekly standup",
+    "start": { "dateTime": "2026-05-19T15:00:00.000Z" },
+    "end": { "dateTime": "2026-05-19T15:30:00.000Z" },
+    "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=TU"]
+  },
+  "weeklyInstance": {
+    "id": "evt-weekly-parent-1_20260526T150000Z",
+    "etag": "\"3000000000000002\"",
+    "summary": "Weekly standup",
+    "start": { "dateTime": "2026-05-26T15:00:00.000Z" },
+    "end": { "dateTime": "2026-05-26T15:30:00.000Z" },
+    "recurringEventId": "evt-weekly-parent-1"
+  },
+  "weeklyParentWithMovedException": {
+    "id": "evt-weekly-parent-2",
+    "etag": "\"3000000000000003\"",
+    "summary": "Weekly 1:1",
+    "start": { "dateTime": "2026-06-02T16:00:00.000Z" },
+    "end": { "dateTime": "2026-06-02T16:30:00.000Z" },
+    "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=TU"],
+    "movedException": {
+      "id": "evt-weekly-parent-2-modified-exception-id",
+      "etag": "\"3000000000000004\"",
+      "originalStartTime": { "dateTime": "2026-06-09T16:00:00.000Z" },
+      "start": { "dateTime": "2026-06-09T17:00:00.000Z" },
+      "end": { "dateTime": "2026-06-09T17:30:00.000Z" }
+    }
+  }
+}

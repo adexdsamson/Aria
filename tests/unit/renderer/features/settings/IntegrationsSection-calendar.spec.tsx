@@ -171,4 +171,37 @@ describe('IntegrationsSection (Calendar row)', () => {
     await user.click(await screen.findByTestId('calendar-pre-oauth-continue'));
     await waitFor(() => expect(stub.calendarConnect).toHaveBeenCalledTimes(1));
   });
+
+  it('Plan 04-01 — writeScopeMissing: renders write-scope re-consent banner with locked copy', async () => {
+    const { CALENDAR_WRITE_SCOPE_MISSING_COPY } = await import(
+      '../../../../../src/renderer/features/settings/IntegrationsSection'
+    );
+    installAria({
+      calendar: {
+        connected: true,
+        email: 'cal@bar.com',
+        tokenStatus: 'ok',
+        queueDepth: 0,
+        writeScopeMissing: true,
+      },
+    });
+    render(<IntegrationsSection />);
+    const banner = await screen.findByTestId('calendar-write-scope-banner');
+    expect(banner.textContent).toContain(CALENDAR_WRITE_SCOPE_MISSING_COPY);
+    expect(screen.getByTestId('calendar-write-scope-reconnect')).toBeTruthy();
+  });
+
+  it('Plan 04-01 — writeScopeMissing absent: no write-scope banner', async () => {
+    installAria({
+      calendar: {
+        connected: true,
+        email: 'cal@bar.com',
+        tokenStatus: 'ok',
+        queueDepth: 0,
+      },
+    });
+    render(<IntegrationsSection />);
+    await screen.findByTestId('calendar-email');
+    expect(screen.queryByTestId('calendar-write-scope-banner')).toBeNull();
+  });
 });

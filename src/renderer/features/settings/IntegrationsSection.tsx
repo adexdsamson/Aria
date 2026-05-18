@@ -54,6 +54,12 @@ export const CALENDAR_EMAIL_07_REVOKED_COPY =
 export const CALENDAR_PRE_OAUTH_DISCLOSURE =
   "Aria will read your calendar only — never create, modify, or send events. Calendar write capability arrives in a later release.";
 
+// Plan 04-01 — re-consent banner when the user previously connected Calendar
+// under the readonly-only scope set and has NOT yet granted calendar.events
+// write scope. Mirrors the Plan 03-04 gmail.send re-consent precedent.
+export const CALENDAR_WRITE_SCOPE_MISSING_COPY =
+  "Aria needs permission to make changes to your calendar. Reconnect Google Calendar.";
+
 function isErr(v: unknown): v is IpcError {
   return !!v && typeof v === 'object' && 'error' in (v as object);
 }
@@ -330,6 +336,15 @@ function CalendarRow(): JSX.Element {
           <p data-testid="calendar-sync-error" style={{ color: 'red', fontSize: 12, margin: '4px 0 0 0' }}>
             Last sync: {status.lastError}. See Status panel for history.
           </p>
+        )}
+
+        {status?.connected && status.tokenStatus === 'ok' && status.writeScopeMissing && (
+          <div role="alert" data-testid="calendar-write-scope-banner" style={bannerStyle()}>
+            <p style={{ margin: 0 }}>{CALENDAR_WRITE_SCOPE_MISSING_COPY}</p>
+            <button type="button" onClick={onConnectClick} disabled={busy} data-testid="calendar-write-scope-reconnect">
+              Reconnect Google Calendar
+            </button>
+          </div>
         )}
 
         <div style={actionsStyle()}>
