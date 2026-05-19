@@ -1,26 +1,76 @@
 {
   "people": [
-    { "id": "p:sarah@example.com", "email": "sarah@example.com", "display": "Sarah Doe" },
-    { "id": "p:alex@example.com", "email": "alex@example.com", "display": "Alex Kim" },
-    { "id": "p:rita@example.com", "email": "rita@example.com", "display": "Rita Banerjee" },
-    { "id": "p:mike@example.com", "email": "mike@example.com", "display": "Mike Chen" },
-    { "id": "p:tara@example.com", "email": "tara@example.com", "display": "Tara Singh" },
-    { "id": "p:jay@example.com", "email": "jay@example.com", "display": "Jay" },
-    { "id": "p:lin@example.com", "email": "lin@example.com", "display": "Lin Park" },
-    { "id": "p:alex2@example.com", "email": "alex.morrison@example.com", "display": "Alex Morrison" },
-    { "id": "p:alex3@example.com", "email": "alex.lee@example.com", "display": "Alex Lee" },
-    { "id": "p:alex4@example.com", "email": "alex.wright@example.com", "display": "Alex Wright" }
+    {
+      "id": "p:sarah@example.com",
+      "canonicalEmail": "sarah@example.com",
+      "displayName": "Sarah Doe",
+      "aliases": ["Sarah", "Doe"]
+    },
+    {
+      "id": "p:alex@example.com",
+      "canonicalEmail": "alex@example.com",
+      "displayName": "Alex Kim",
+      "aliases": ["Kim", "Alex"]
+    },
+    {
+      "id": "p:rita@example.com",
+      "canonicalEmail": "rita@example.com",
+      "displayName": "Rita Banerjee",
+      "aliases": ["Rita", "Banerjee"]
+    },
+    {
+      "id": "p:mike@example.com",
+      "canonicalEmail": "mike@example.com",
+      "displayName": "Mike Chen",
+      "aliases": ["Mike", "Chen"]
+    },
+    {
+      "id": "p:tara@example.com",
+      "canonicalEmail": "tara@example.com",
+      "displayName": "Tara Singh",
+      "aliases": ["Tara", "Singh"]
+    },
+    {
+      "id": "p:jay@example.com",
+      "canonicalEmail": "jay@example.com",
+      "displayName": "Jay Patel",
+      "aliases": ["Jay", "Patel"]
+    },
+    {
+      "id": "p:lin@example.com",
+      "canonicalEmail": "lin@example.com",
+      "displayName": "Lin Park",
+      "aliases": ["Lin", "Park"]
+    },
+    {
+      "id": "p:alex2@example.com",
+      "canonicalEmail": "alex.morrison@example.com",
+      "displayName": "Alex Morrison",
+      "aliases": ["Morrison", "Alex"]
+    },
+    {
+      "id": "p:alex3@example.com",
+      "canonicalEmail": "alex.lee@example.com",
+      "displayName": "Alex Lee",
+      "aliases": ["Lee"]
+    },
+    {
+      "id": "p:alex4@example.com",
+      "canonicalEmail": "alex.wright@example.com",
+      "displayName": "Alex Wright",
+      "aliases": ["Wright"]
+    }
   ],
-  "questions": [
-    { "mention": "Sarah Doe", "expected": "p:sarah@example.com", "ambiguous": false },
-    { "mention": "Rita", "expected": "p:rita@example.com", "ambiguous": false },
-    { "mention": "Mike Chen", "expected": "p:mike@example.com", "ambiguous": false },
-    { "mention": "Tara Singh", "expected": "p:tara@example.com", "ambiguous": false },
-    { "mention": "Lin Park", "expected": "p:lin@example.com", "ambiguous": false },
-    { "mention": "Jay", "expected": "p:jay@example.com", "ambiguous": false },
-    { "mention": "sarah@example.com", "expected": "p:sarah@example.com", "ambiguous": false },
-    { "mention": "Alex", "expected": null, "ambiguous": true },
-    { "mention": "Alex Morrison", "expected": "p:alex2@example.com", "ambiguous": false },
-    { "mention": "Alex Kim", "expected": "p:alex@example.com", "ambiguous": false }
+  "cases": [
+    { "question": "What did Sarah promise about budget?", "expectedPersonId": "p:sarah@example.com" },
+    { "question": "Did Rita send the file?", "expectedPersonId": "p:rita@example.com" },
+    { "question": "What did Mike say in standup?", "expectedPersonId": "p:mike@example.com" },
+    { "question": "Tara asked about budget", "expectedPersonId": "p:tara@example.com" },
+    { "question": "Lin signed off on it", "expectedPersonId": "p:lin@example.com" },
+    { "question": "Jay agreed yesterday", "expectedPersonId": "p:jay@example.com" },
+    { "question": "Did Morrison reply?", "expectedPersonId": "p:alex2@example.com" },
+    { "question": "Kim sent the spec", "expectedPersonId": "p:alex@example.com" },
+    { "question": "Lee on the design call", "expectedPersonId": "p:alex3@example.com" },
+    { "question": "Did Alex agree?", "expectedPersonId": "p:alex@example.com", "ambiguous": true }
   ]
 }
