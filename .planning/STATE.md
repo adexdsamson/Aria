@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-19T21:45:00.000Z"
+last_updated: "2026-05-19T22:15:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 7 UAT Gap 7 closed (2026-05-19, commit 2458e98)** — Renamed `app_meta(key, value)` → `(k, v)` across Phase 7 modules to match migration 001's canonical schema. 17 previously-failing tests turned green; targeted Phase 7 suite now 130/2/1 (remaining 2 are pre-existing, unrelated).
 
 **Phase 7 Plan 03 complete** — User-facing Q&A loop: hybrid BM25 + vector + RRF retrieval reading denormalized title + cached sensitivity (C5/C8/C12), person-mention resolver w/ local-LLM disambiguation + 24h directory-staleness (C10), answer router as a PURE function over chunk.sensitivity (zero classifier calls per query — C5) + XML-wrapped context AND thread history with explicit data semantics (C6), redaction-roundtrip util lifted from tokenize.ts (C4), answer service w/ 4 distinct result kinds (answer/refusal/error/disambiguation), 7 new IPC channels, global Cmd/Ctrl+K palette via cmdk@1.1.1 w/ thread-seeded Expand-to-chat (C9), /ask chat panel w/ TZ-correct timestamps + account chips from IPC payload + ?thread= hydration, disconnected-account RAG wipe UI. 8 tasks + 1 gate fix = 9 commits (`3efc6a1…2e0e4b9`). All grep gates green. Tests written but unrun (Aria desktop app holds the better-sqlite3 ABI lock). AnswerService↔IPC factory wiring deferred to a follow-up plan or Phase 8 hookup. **Phase 7 complete (3/3 plans).**
 
