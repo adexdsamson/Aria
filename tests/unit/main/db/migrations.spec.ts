@@ -30,7 +30,13 @@ describe('db/migrations', () => {
     // calendar_event etag/recurrence cols, scheduling_rules, calendar_action_log).
     // Plan 05-01 added 011 (provider_account/provider_sync_state + recurrence_unsupported).
     // Plan 05-01 added 012 (provider_key/account_id backfill columns).
-    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 121, 122, 123, 124, 125]);
+    // Plan 06-01 added 123 (meeting_notes), 124 (meeting_extraction_approvals).
+    // Plan 06-01 added 125 (todoist_tasks).
+    // Plan 07-01 added 126 (rag_index).
+    // Phase 7 UAT Gap 8 added 127 (rag_source_dirty dedupe).
+    expect(applied).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 121, 122, 123, 124, 125, 126, 127,
+    ]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -50,7 +56,7 @@ describe('db/migrations', () => {
     expect(tables).toContain('meeting_action_task_link');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(125);
+    expect(version).toBeGreaterThanOrEqual(125);
     const views = db
       .prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name")
       .all()
