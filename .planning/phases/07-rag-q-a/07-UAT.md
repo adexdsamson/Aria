@@ -55,7 +55,7 @@ result: pass — Settings → RAG index reachable from sub-nav (L-04-04 wiring c
 
 ### 10. Disconnected-account RAG wipe
 expected: Disconnect a Gmail or Calendar account from Integrations. A confirmation prompts that RAG data for that account will be wiped. After confirm, all rag_chunk / rag_embedding rows where `account_id` matches are deleted; subsequent /ask queries no longer surface that account's content.
-result: skipped — no connected accounts to disconnect (RAG wipe path N/A). EXPOSED unrelated pre-existing bug: Integrations Gmail block errors `Could not connect: no such table: gmail_account`. Table-name drift from Phase 2 or Phase 5's provider-generalization rename; query wasn't updated to match new schema. Calendar + Todoist blocks render fine. Logged for separate fix — not a Phase 7 gap.
+result: pass — Gap 10 fixed in commit bdb8693. Disconnect now opens a DisconnectConfirmDialog with explicit RAG-wipe copy; IPC fires only on confirm. Symmetric across Gmail, Calendar, Todoist, and the generic provider-account row. Cancel preserves the connected account. (Pre-existing Gmail table-name bug from earlier Phase 5 lift was fixed in commit f44ffd4 during this UAT cycle.)
 
 ### 11. AnswerService wiring (KNOWN GAP)
 expected: This is a deferred item — the IPC handler currently returns "Q&A service not ready" because the AnswerService factory wiring lands in Phase 8. Confirm that /ask shows a clean error (not a crash), and that the rest of the RAG indexing pipeline still operates.
@@ -64,12 +64,12 @@ result: pass — confirmed during Test 5. Clean red Alert + Retry, no crash. Res
 ## Summary
 
 total: 11
-passed: 5 (Tests 1, 2, 6, 9, 11)
+passed: 6 (Tests 1, 2, 6, 9, 10, 11)
 pass-with-caveats: 2 (Tests 5, 6)
 blocked-by-Phase-8: 2 (Tests 7, 8 — require live answer path)
 deferred-env-setup: 2 (Tests 3, 4 — Ollama + RAG_BENCH)
-skipped: 1 (Test 10 — no connected accounts; exposed unrelated Gmail table-name bug, spawned as separate task)
-issues: 0 Phase 7 gaps remaining; 1 unrelated bug logged
+skipped: 0
+issues: 0 Phase 7 gaps remaining; Gap 10 closed (commit bdb8693)
 
 Phase 7 verification verdict: **passed** at all reachable layers. Remaining items are environmental (Ollama install, RAG_BENCH env) or blocked on Phase 8 AnswerService↔IPC factory wiring.
 
@@ -118,6 +118,12 @@ Original PK `(source_kind, source_id, target_model_id)` included nullable `targe
 `tests/fixtures/rag/people-directory-10.json` shipped with keys `display`/`email`/`questions` while `person-resolver.test.ts` consumed `displayName`/`canonicalEmail`/`aliases`/`cases`. The seed loop passed `undefined` for `display_name` into the `NOT NULL` column. The fixture also conflated two consumer tests with different alias models (people-directory rebuild derives shortname-only; person-resolver reads explicit aliases).
 **Fix applied:** Rewrote the fixture in the structured shape consumed by `person-resolver.test.ts`, tuned aliases so every non-ambiguous case has a unique first-name shortname (`Priya`, `Noah` replace `Alex Morrison`/`Alex Lee`), and updated `people-directory.test.ts` to read the new shape + extract the first non-stopword capitalized token from each question.
 **Files:** `tests/fixtures/rag/people-directory-10.json`, `tests/unit/main/rag/people-directory.test.ts`.
+
+### Gap 10 — Disconnect fires without confirmation (HIGH — trust posture) — CLOSED (commit bdb8693)
+Clicking Disconnect on any provider row (Gmail / Calendar / Todoist / generic AccountRow) immediately invoked the IPC and silently wiped RAG data for that (provider_key, account_id). No dialog, no consent surface. Violated plan 07-03 task 8's "confirm before wipe" contract and CLAUDE.md's approval-gating principle: "All outbound communication, all material calendar changes, all sensitive-flagged content require explicit user confirmation" — destructive irreversible state-wipes are squarely inside that envelope.
+**Fix applied:** New `DisconnectConfirmDialog` component (`src/renderer/components/DisconnectConfirmDialog.tsx`) routes all four disconnect surfaces through one consent dialog. Heading names the provider + account email; body warns about permanent RAG-index wipe (suppressed for Todoist, which doesn't index); destructive red confirm button labelled "Disconnect and wipe data" (or plain "Disconnect" for non-RAG providers); Cancel preserves the account; Escape cancels; both buttons disabled while IPC is in flight.
+**Files:** `src/renderer/components/DisconnectConfirmDialog.tsx` (new), `src/renderer/features/settings/IntegrationsSection.tsx`, `tests/unit/renderer/features/settings/IntegrationsSection-accounts.spec.tsx` (updated to assert cancel-path negative + confirm-path positive).
+**Test note:** vitest renderer suite could not be executed locally because Aria desktop holds `better_sqlite3.node` (EBUSY in `tests/setup-native-abi.ts:83` global setup); TypeScript compile passes for the touched files. Run `pnpm test --project renderer tests/unit/renderer/features/settings/` with Aria closed to confirm.
 
 ### Gap 6 — Ollama precondition (EXPECTED — not a code gap)
 `tests/integration/rag/ollama-roundtrip.test.ts` throws when `OLLAMA_AVAILABLE=1` is unset. REVIEWS C13 mandates "no silent skip" — this is intentional. Pre-flight requires `ollama serve` + `nomic-embed-text:v1.5` pulled.

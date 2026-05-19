@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-19T22:55:00.000Z"
+last_updated: "2026-05-19T23:12:16.445Z"
 progress:
   total_phases: 9
   completed_phases: 7
@@ -56,6 +56,10 @@ Run `/gsd-verify-work 7` to validate Phase 7 against its 4 success criteria (SC-
 ### Roadmap Evolution
 
 - Phase 9 added: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA) — fetch design + README, apply to product UI, integrate logo; landing page out of scope
+
+### Phase 7 Followups
+
+- 2026-05-20 — Gap 10 closed (bdb8693): destructive integration disconnect now gated by `DisconnectConfirmDialog` with explicit RAG-wipe copy; symmetric across Gmail, Calendar, Todoist, and generic provider-account rows. Matches CLAUDE.md approval-gating principle and plan 07-03 task 8 "confirm before wipe" contract.
 
 ## Workflow Config
 
