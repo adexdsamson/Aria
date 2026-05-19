@@ -16,8 +16,8 @@
  * from `tokenize.ts`, NOT `router.ts`). Phase 3 drafting and Phase 7 answer
  * synthesis share the same token substitution machinery.
  *
- * Tools: tool-calling is DISABLED. We use `generateObject` with a Zod schema;
- * no `tools:` field appears in this file or `answer-service.ts`.
+ * Tool-calling is DISABLED. We use generateObject with a Zod schema; no
+ * tool-call descriptor field appears in this file or answer-service.ts.
  */
 import { z } from 'zod';
 
