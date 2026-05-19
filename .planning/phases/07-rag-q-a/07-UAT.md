@@ -3,7 +3,7 @@ status: testing
 phase: 07-rag-q-a
 source: [07-01-SUMMARY.md, 07-02-SUMMARY.md, 07-03-SUMMARY.md]
 started: 2026-05-19T00:00:00Z
-updated: 2026-05-19T22:15:00Z
+updated: 2026-05-19T22:55:00Z
 ---
 
 ## Current Test
@@ -19,7 +19,7 @@ awaiting: user response
 
 ### 1. Cold Start Smoke Test
 expected: Close Aria desktop. Run `npm test`. Vitest globalSetup completes; all Phase 7 suites green.
-result: pass-with-caveats — Gaps 1-5 closed (commits 0891d9b, f356322, d936ca8, e7c0bac, 4db35c3). Gap 7 closed (commit 2458e98). Phase 7 targeted suite now 130 pass / 2 fail / 1 skip (was 140/18/1 after Gaps 1-5, was 63/95/1 originally). Remaining 2 failures are pre-existing and unrelated to Gap 7: (a) `backfill > seedBackfill enqueues all gmail rows in batches; resumable` — `rag_source_dirty` PK includes nullable `target_model_id` so SQLite treats NULLs as distinct and `INSERT OR IGNORE` allows duplicates; (b) `person-resolver > SC-3 fixture eval` — NOT NULL constraint on `person.display_name` when a fixture row provides null display. The Ollama-precondition test (Gap 6) is now its own integration test gate, not counted here. No previously-green test turned red.
+result: pass — Gaps 1-5 closed (commits 0891d9b, f356322, d936ca8, e7c0bac, 4db35c3). Gap 7 closed (commit 2458e98). Gap 8 closed (commit 88e2736 + follow-up bd07779 — migration 127 rebuilds `rag_source_dirty` with COALESCE-based UNIQUE INDEX so NULL `target_model_id` rows dedupe correctly). Gap 9 closed (commit 3525079 — fixture rewritten to expected `displayName`/`canonicalEmail`/`aliases`/`cases` shape; people-directory.test.ts shape + mention-extraction updated). Phase 7 targeted suite now **153 pass / 0 fail / 0 skip** (was 130/2/1). Only Gap 6 Ollama precondition remains, intentionally — it is an integration-gate test, not a unit test. No previously-green test turned red.
 
 ### 2. Migration 126 applies cleanly
 expected: Launch the app fresh. SQLite `PRAGMA user_version` returns ≥126. Tables `rag_chunk`, `rag_embedding`, `rag_chunk_fts`, `rag_person`, `rag_person_alias`, `rag_thread`, `rag_message` exist with the C7 columns (sensitivity_class, account_id, etc.).
@@ -71,7 +71,7 @@ skipped: 0
 
 ## Gaps
 
-**Closure status (2026-05-19):** Gaps 1-5 CLOSED via commits 0891d9b, f356322, d936ca8, e7c0bac, 4db35c3. Gap 7 CLOSED via commit 2458e98. Targeted suite went from 63/95/1 → 140/18/1 (after Gaps 1-5) → 130/2/1 (after Gap 7; the Ollama integration test is now isolated to its own integration gate and not counted in the targeted unit set). Remaining 2 failures are pre-existing and unrelated to Gap 7 — see Test 1 result for detail. The Ollama precondition (Gap 6) is by design.
+**Closure status (2026-05-19):** Gaps 1-5 CLOSED via commits 0891d9b, f356322, d936ca8, e7c0bac, 4db35c3. Gap 7 CLOSED via commit 2458e98. Gap 8 CLOSED via commit 88e2736 (+ bd07779 follow-up updating migrations.spec). Gap 9 CLOSED via commit 3525079. Targeted suite progression: 63/95/1 → 140/18/1 (after Gaps 1-5) → 130/2/1 (after Gap 7) → **153/0/0 (after Gaps 8 + 9)**. Phase 7 unit surface is fully green. The Ollama precondition (Gap 6) is by design and lives in the integration tier.
 
 ### Gap 1 — better-sqlite3-multiple-ciphers ABI mismatch (HIGH) — CLOSED
 Native binding compiled for `NODE_MODULE_VERSION 137`, host Node requires `141`. Blast: ~70 main-process tests. The `setup-native-abi` swap is using a stale Node-ABI binary.
@@ -104,6 +104,16 @@ After Gaps 1-5 closed, 17 tests across `people-directory.test.ts`, `person-resol
 Root cause: migration `001_init.sql` ships `CREATE TABLE app_meta(k TEXT PRIMARY KEY, v TEXT NOT NULL)`, but Phase 7 modules (`src/main/rag/people-directory.ts`, etc.) wrote/read via `app_meta(key, value)`. The `CREATE TABLE IF NOT EXISTS app_meta(key …)` guard in those modules was a no-op against the already-migrated table.
 **Fix applied (option a):** Renamed `(key, value)` → `(k, v)` across `src/main/rag/{people-directory,person-resolver,hybrid-retrieval,backfill}.ts` and removed the redundant `CREATE TABLE IF NOT EXISTS app_meta` declarations (table is owned by migration 001). Updated 3 test files that hand-rolled shim tables. No schema changes.
 **Result:** 17 tests turned green. Targeted suite 130/2/1 (the 2 remaining are pre-existing, unrelated; see Test 1).
+
+### Gap 8 — `rag_source_dirty` PK + INSERT OR IGNORE dedupe (MEDIUM) — CLOSED (commit 88e2736 + bd07779)
+Original PK `(source_kind, source_id, target_model_id)` included nullable `target_model_id`. SQLite treats NULLs as distinct in PRIMARY KEY / UNIQUE constraints, so `INSERT OR IGNORE` against the default-enqueue path (`target_model_id IS NULL`) inserted duplicate rows on every enqueue. `seedBackfill` resumability failed because re-running seeded duplicates.
+**Fix applied (option A — migration):** Migration 127 rebuilds the table without a PK on the nullable column and adds `UNIQUE INDEX uniq_rag_source_dirty_dedupe ON rag_source_dirty (source_kind, source_id, COALESCE(target_model_id, ''))`. NULL semantics elsewhere (the `target_model_id IS NULL` discriminator in backfill / index-worker) are preserved — only uniqueness collapses NULLs. Follow-up bd07779 updated `migrations.spec.ts` to assert `user_version >= 125` and include 126 + 127 in the applied list.
+**Files:** `src/main/db/migrations/127_rag_source_dirty_dedupe.sql`, `src/main/db/migrations/embedded.ts`, `tests/unit/main/db/migrations-126-rag.spec.ts`, `tests/unit/main/db/migrations.spec.ts`.
+
+### Gap 9 — `person.display_name NOT NULL` violated by fixture (LOW) — CLOSED (commit 3525079)
+`tests/fixtures/rag/people-directory-10.json` shipped with keys `display`/`email`/`questions` while `person-resolver.test.ts` consumed `displayName`/`canonicalEmail`/`aliases`/`cases`. The seed loop passed `undefined` for `display_name` into the `NOT NULL` column. The fixture also conflated two consumer tests with different alias models (people-directory rebuild derives shortname-only; person-resolver reads explicit aliases).
+**Fix applied:** Rewrote the fixture in the structured shape consumed by `person-resolver.test.ts`, tuned aliases so every non-ambiguous case has a unique first-name shortname (`Priya`, `Noah` replace `Alex Morrison`/`Alex Lee`), and updated `people-directory.test.ts` to read the new shape + extract the first non-stopword capitalized token from each question.
+**Files:** `tests/fixtures/rag/people-directory-10.json`, `tests/unit/main/rag/people-directory.test.ts`.
 
 ### Gap 6 — Ollama precondition (EXPECTED — not a code gap)
 `tests/integration/rag/ollama-roundtrip.test.ts` throws when `OLLAMA_AVAILABLE=1` is unset. REVIEWS C13 mandates "no silent skip" — this is intentional. Pre-flight requires `ollama serve` + `nomic-embed-text:v1.5` pulled.

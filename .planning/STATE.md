@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-19T22:15:00.000Z"
+last_updated: "2026-05-19T22:55:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 7 UAT Gaps 8 + 9 closed (2026-05-19, commits 88e2736 + 3525079 + bd07779)** — Gap 8: migration 127 rebuilds `rag_source_dirty` with a COALESCE-based UNIQUE INDEX so NULL `target_model_id` no longer breaks `INSERT OR IGNORE` dedupe (backfill resumability restored). Gap 9: rewrote `people-directory-10.json` fixture into the structured shape consumed by `person-resolver.test.ts` (`displayName`/`canonicalEmail`/`aliases`/`cases`) and updated `people-directory.test.ts` to match. Targeted Phase 7 suite now **153/0/0** — fully green. Only Gap 6 (Ollama precondition) remains, and it lives in the integration tier by design.
 
 **Phase 7 UAT Gap 7 closed (2026-05-19, commit 2458e98)** — Renamed `app_meta(key, value)` → `(k, v)` across Phase 7 modules to match migration 001's canonical schema. 17 previously-failing tests turned green; targeted Phase 7 suite now 130/2/1 (remaining 2 are pre-existing, unrelated).
 
