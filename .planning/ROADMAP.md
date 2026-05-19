@@ -152,7 +152,14 @@ Plans:
 **Goal:** Aria turns a pasted transcript into structured action items pushed to Todoist
 **Mode:** mvp
 **Requirements:** MEET-01, MEET-02, MEET-03, MEET-04, MEET-05, MEET-06, TASK-01, TASK-02
-**Plans (estimated):**
+**Plans:** 3 plans
+Plans:
+
+- [x] 06-01-PLAN.md — Transcript/Note foundation: migration 123 meeting_note + segments; transcript normalization for paste/txt/vtt/srt/json; calendar-event linking heuristic; /meetings capture + NoteView shell; MEET-06 no-bot static guardrails (wave 1, autonomous: false)
+- [x] 06-02-PLAN.md — Cited extraction + review: migration 124 summary/action tables + task_batch approval kind; chunked generateObject extraction; citation validation; NoteReviewScreen with transcript highlighting; task-batch ApprovalCard (wave 2, depends on 06-01)
+- [x] 06-03-PLAN.md — Todoist + Tasks view: migration 125 task provider schema; Todoist token settings + adapter; approved action push; Todoist pull sync; /tasks unified dashboard; briefing Open Actions; 06-UAT.md (wave 3, depends on 06-02, autonomous: false — live Todoist token smoke deferred)
+
+**Plans (original estimate):**
 
 1. Transcript ingest (paste / file upload) with calendar event linking; canonical Note entity
 2. Action-item extraction with structured citations (transcript span); structured summary (decisions/actions/follow-ups); approval flow for created tasks
@@ -170,11 +177,11 @@ Plans:
 **Goal:** Cited natural-language Q&A over the user own data ("What did Sarah commit to on Q3?")
 **Mode:** mvp
 **Requirements:** RAG-01, RAG-02, RAG-03, RAG-04, RAG-05
-**Plans (estimated):**
+**Plans:**
 
-1. Chunking strategy spike on real Aria-stored mail/transcripts (per-message vs per-thread vs hybrid); decision recorded
-2. Embedding pipeline (nomic-embed-text via Ollama); sqlite-vec index colocated in SQLCipher DB; incremental re-index on edit/delete; model-id versioning
-3. RAG query agent (hybrid BM25 + vector retrieval with entity disambiguation); cited answer UI; integration with Q&A chat surface
+- [ ] 07-01-PLAN.md - Chunking strategy spike on Aria-stored mail/calendar/transcripts/actions; schema and decision record
+- [ ] 07-02-PLAN.md - Local embedding pipeline with Ollama, sqlite-vec/fallback index, incremental re-index, and model-id versioning
+- [ ] 07-03-PLAN.md - Hybrid RAG query agent, person disambiguation, cited answer UI, and Q&A chat surface
 
 **Success Criteria:**
 
