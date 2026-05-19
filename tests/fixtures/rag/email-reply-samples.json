@@ -1,0 +1,50 @@
+{
+  "_comment": "Plan 07-01 Task 2 — email reply-stripping fixtures (RESEARCH §8 6 cases). Synthetic.",
+  "cases": [
+    {
+      "id": "gmail-on-date-wrote",
+      "description": "Gmail-style `On <date> X wrote:` plus `>` quoted lines.",
+      "body": "Thanks — I'll get back to you with the revised numbers tomorrow.\n\nOn Mon, May 12, 2026 at 9:14 AM, Sarah Chen <sarah@example.com> wrote:\n> Can you send the Q3 forecast by EOW?\n> Thanks.",
+      "visible_contains": "I'll get back to you with the revised numbers tomorrow",
+      "visible_excludes": "Can you send the Q3 forecast by EOW?"
+    },
+    {
+      "id": "outlook-from-sent-subject",
+      "description": "Outlook-style From:/Sent:/Subject: block separator.",
+      "body": "Approved — please proceed.\n\nFrom: Sarah Chen <sarah@example.com>\nSent: Monday, May 12, 2026 9:14 AM\nTo: Alex <alex@example.com>\nSubject: Q3 forecast\n\nCan you send the Q3 forecast by EOW?",
+      "visible_contains": "Approved — please proceed",
+      "visible_excludes_optional": "Can you send the Q3 forecast by EOW?"
+    },
+    {
+      "id": "top-poster-no-separator",
+      "description": "Top-poster with no quoted reply markers — entire body is visible.",
+      "body": "Confirmed. Let's regroup Thursday at 2pm.",
+      "visible_contains": "Confirmed. Let's regroup Thursday at 2pm"
+    },
+    {
+      "id": "french-le-a-ecrit",
+      "description": "French quoted-reply prefix `Le ... a écrit :`.",
+      "body": "Très bien, je te confirme avant vendredi.\n\nLe lun. 12 mai 2026 à 09:14, Sarah Chen <sarah@example.com> a écrit :\n> Peux-tu envoyer la prévision Q3 avant la fin de la semaine ?",
+      "visible_contains": "Très bien, je te confirme avant vendredi",
+      "visible_excludes_optional": "Peux-tu envoyer la prévision Q3"
+    },
+    {
+      "id": "signature-stripped",
+      "description": "Signature delimited by `-- \\n` should be stripped.",
+      "body": "Got it, thanks.\n\n-- \nAlex Doe\nCEO, Example Co.\nalex@example.com\n+1 555 0100",
+      "visible_contains": "Got it, thanks",
+      "visible_excludes": "+1 555 0100"
+    },
+    {
+      "id": "inline-reply-preservation",
+      "description": "User interleaves replies inside the quoted block — those lines must survive (Pitfall 6).",
+      "body": "Thanks for the questions — answers inline:\n\n> Can we confirm Q3 headcount?\nYes, holding at 42 FTE.\n> What about the APAC office?\nFree seat goes in via side letter, no material change.\n> When does legal need a draft?\nFriday EOD.\n",
+      "visible_contains_all": [
+        "Thanks for the questions",
+        "Yes, holding at 42 FTE",
+        "Free seat goes in via side letter",
+        "Friday EOD"
+      ]
+    }
+  ]
+}
