@@ -306,9 +306,17 @@ export function registerHandlers(
       getUserEmail: async (): Promise<string> => {
         const db = dbHolder.db;
         if (!db) return 'user@local';
-        const row = db
-          .prepare('SELECT email FROM calendar_account WHERE id = 1')
-          .get() as { email?: string } | undefined;
+        // Migration 014 dropped the legacy calendar_account base table;
+        // calendar_account_view projects rows from provider_account where
+        // capabilities_json.calendar = 1.
+        let row: { email?: string } | undefined;
+        try {
+          row = db
+            .prepare('SELECT email FROM calendar_account_view LIMIT 1')
+            .get() as { email?: string } | undefined;
+        } catch {
+          row = undefined;
+        }
         return row?.email ?? 'user@local';
       },
     });

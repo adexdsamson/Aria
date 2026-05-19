@@ -113,12 +113,14 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
     },
   });
 
-  // ── Bootstrap: if calendar_account row exists, register cron now ───────────
+  // ── Bootstrap: if a Google provider_account with calendar capability
+  // exists, register cron now. Reads via the legacy `calendar_account_view`
+  // (migration 014) over provider_account.
   try {
     const db = dbHolder.db;
     if (db) {
       const row = db
-        .prepare('SELECT email FROM calendar_account WHERE id = 1')
+        .prepare('SELECT email FROM calendar_account_view LIMIT 1')
         .get() as { email: string } | undefined;
       if (row) ensureCron();
     }
@@ -136,10 +138,35 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
       const db = dbHolder.db;
       if (!db) return { ok: false, error: 'db-locked' };
       const nowIso = new Date().toISOString();
-      db.prepare(
-        `INSERT OR REPLACE INTO calendar_account (id, email, calendar_id, sync_token, last_synced_at, last_error, connected_at)
-         VALUES (1, @email, 'primary', NULL, NULL, NULL, @connected_at)`,
-      ).run({ email: result.email, connected_at: nowIso });
+      // Upsert into provider_account (migration 014 dropped the legacy
+      // calendar_account base table). Merges the `calendar:true` capability
+      // without clobbering any existing `mail:true` set by Gmail connect.
+      const tx = db.transaction(() => {
+        db.prepare(
+          `INSERT INTO provider_account (
+             account_id, provider_key, display_email, status,
+             last_synced_at, last_error, last_error_at, created_at, capabilities_json
+           ) VALUES (
+             @email, 'google', @email, 'ok',
+             NULL, NULL, NULL, @connected_at,
+             json_object('mail', json('false'), 'calendar', json('true'))
+           )
+           ON CONFLICT(provider_key, account_id) DO UPDATE SET
+             display_email = excluded.display_email,
+             status = 'ok',
+             last_error = NULL,
+             last_error_at = NULL,
+             capabilities_json = json_set(
+               provider_account.capabilities_json, '$.calendar', json('true')
+             )`,
+        ).run({ email: result.email, connected_at: nowIso });
+        db.prepare(
+          `INSERT OR REPLACE INTO provider_sync_state (
+             provider_key, account_id, resource, cursor, last_sync_at, last_error
+           ) VALUES ('google', @email, 'calendar', NULL, NULL, NULL)`,
+        ).run({ email: result.email });
+      });
+      tx();
       ensureCron();
       // Kick off bootstrap fullResyncWindow without awaiting.
       void runTick().catch(() => { /* runTick already logs */ });
@@ -167,8 +194,23 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
       | { email: string; sync_token: string | null; last_synced_at: string | null; last_error: string | null }
       | undefined;
     try {
+      // sync_token now lives in provider_sync_state.cursor (migration 014).
       row = db
-        .prepare('SELECT email, sync_token, last_synced_at, last_error FROM calendar_account WHERE id = 1')
+        .prepare(
+          `SELECT pa.account_id AS email,
+                  pss.cursor AS sync_token,
+                  pa.last_synced_at AS last_synced_at,
+                  pa.last_error AS last_error
+             FROM provider_account pa
+             LEFT JOIN provider_sync_state pss
+               ON pss.provider_key = pa.provider_key
+              AND pss.account_id = pa.account_id
+              AND pss.resource = 'calendar'
+            WHERE pa.provider_key = 'google'
+              AND json_extract(pa.capabilities_json, '$.calendar') = 1
+            ORDER BY pa.created_at ASC
+            LIMIT 1`,
+        )
         .get() as typeof row;
     } catch {
       row = undefined;
@@ -199,9 +241,28 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
     const db = dbHolder.db;
     if (db) {
       try {
+        // Disconnect = drop the `calendar` capability bit. Migration 014
+        // replaced the singleton calendar_account with a provider_account
+        // row; if the same Google account also has mail=true, we keep the
+        // row so Gmail stays connected (SC3 — per-kind disconnect scope).
         const tx = db.transaction(() => {
-          db.prepare('DELETE FROM calendar_account WHERE id = 1').run();
-          db.prepare('DELETE FROM calendar_event').run();
+          db.prepare(
+            `UPDATE provider_account
+                SET capabilities_json = json_set(capabilities_json, '$.calendar', json('false'))
+              WHERE provider_key = 'google'
+                AND json_extract(capabilities_json, '$.calendar') = 1`,
+          ).run();
+          db.prepare(
+            `DELETE FROM provider_account
+              WHERE provider_key = 'google'
+                AND json_extract(capabilities_json, '$.mail') = 0
+                AND json_extract(capabilities_json, '$.calendar') = 0`,
+          ).run();
+          db.prepare(
+            `DELETE FROM provider_sync_state
+              WHERE provider_key = 'google' AND resource = 'calendar'`,
+          ).run();
+          db.prepare(`DELETE FROM calendar_event WHERE provider_key = 'google' OR provider_key IS NULL`).run();
         });
         tx();
       } catch (err) {
