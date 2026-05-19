@@ -32,7 +32,7 @@ Cited natural-language Q&A over the user's own data ("What did Sarah commit to o
 
 **From earlier phases:**
 - All canonical entities (Message, Event, Note, Action) keyed on stable IDs and have char-offset spans available
-- sqlite-vec + SQLCipher already wired in Phase 1
+- sqlite-vec is NOT loaded in Phase 1 (see src/main/db/connect.ts:14). Phase 7 ships a `VectorStore` dual-impl: `SqliteVecStore` (when the runtime load probe succeeds) + `BruteForceStore` (fallback). Phase 7 plan 07-02 Task 1 owns the load probe and impl selection. (corrected 2026-05-19 per REVIEWS.md C1; original text was an inherited assumption from Phase 1 punt)
 </prior_decisions>
 
 <decisions>
