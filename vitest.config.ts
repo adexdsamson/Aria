@@ -50,7 +50,7 @@ export default defineConfig({
             'src/renderer/**/*.{test,spec}.{ts,tsx}',
             'tests/unit/renderer/**/*.{test,spec}.{ts,tsx}',
           ],
-          setupFiles: ['tests/setup.ts'],
+          setupFiles: ['tests/setup.ts', 'tests/setup-renderer.ts'],
         },
         resolve: {
           alias: {
