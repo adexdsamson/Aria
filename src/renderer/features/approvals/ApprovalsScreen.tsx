@@ -90,6 +90,10 @@ export function ApprovalsScreen(): JSX.Element {
       const sendRes = await window.aria.gmailSendApproved({ approvalId: id });
       if (isErr(sendRes)) setActionError(sendRes.error);
     }
+    if (row && row.kind === 'task_batch') {
+      const pushRes = await window.aria.todoistPushApprovedActions({ approvalId: id });
+      if (isErr(pushRes)) setActionError(pushRes.error);
+    }
     await load();
   };
 

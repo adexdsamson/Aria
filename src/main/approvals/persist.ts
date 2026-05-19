@@ -19,7 +19,7 @@ import {
 
 type Db = Database.Database;
 
-export type ApprovalKind = 'email_send' | 'calendar_change';
+export type ApprovalKind = 'email_send' | 'calendar_change' | 'task_batch';
 export type CalendarAction = 'move' | 'create' | 'find-time';
 export type RecurringScope = 'this' | 'future' | 'all';
 export type ApprovalPath = 'explicit' | 'silent';
@@ -63,6 +63,7 @@ export interface ApprovalRow {
   account_id: string | null;
   idempotency_key: string | null;
   last_error_message: string | null;
+  meeting_note_id: string | null;
 }
 
 export interface NewApprovalInput {
@@ -95,6 +96,7 @@ export interface NewApprovalInput {
   account_id?: string | null;
   idempotency_key?: string | null;
   last_error_message?: string | null;
+  meeting_note_id?: string | null;
 }
 
 function createIdempotencyKey(): string {
@@ -109,7 +111,7 @@ const INSERT_SQL = `INSERT INTO approval (
   calendar_event_id, calendar_action, recurring_scope,
   before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json,
   provider_key, account_id,
-  idempotency_key, last_error_message
+  idempotency_key, last_error_message, meeting_note_id
 ) VALUES (
   @id, @kind, @state, @created_at, @updated_at, @approval_path,
   @source_message_id, @recipients_json, @subject, @body_original, @body_edited,
@@ -118,7 +120,7 @@ const INSERT_SQL = `INSERT INTO approval (
   @calendar_event_id, @calendar_action, @recurring_scope,
   @before_json, @after_json, @conflicts_json, @alternatives_json, @rule_overrides_json,
   @provider_key, @account_id,
-  @idempotency_key, @last_error_message
+  @idempotency_key, @last_error_message, @meeting_note_id
 )`;
 
 export function insertApproval(db: Db, input: NewApprovalInput): string {
@@ -156,6 +158,7 @@ export function insertApproval(db: Db, input: NewApprovalInput): string {
     account_id: input.account_id ?? null,
     idempotency_key: input.idempotency_key ?? createIdempotencyKey(),
     last_error_message: input.last_error_message ?? null,
+    meeting_note_id: input.meeting_note_id ?? null,
   };
   const tx = db.transaction(() => {
     db.prepare(INSERT_SQL).run(row);
@@ -195,6 +198,7 @@ const ALLOWED_PATCH_COLS = new Set<keyof ApprovalRow>([
   'account_id',
   'idempotency_key',
   'last_error_message',
+  'meeting_note_id',
 ]);
 
 export function getApprovalState(db: Db, id: string): ApprovalState | null {

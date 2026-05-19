@@ -41,6 +41,12 @@ export const CHANNELS = {
   MICROSOFT_STATUS: 'aria:microsoft:status',
   MICROSOFT_DISCONNECT: 'aria:microsoft:disconnect',
   MICROSOFT_FORCE_SYNC: 'aria:microsoft:force-sync',
+  TODOIST_CONNECT_TOKEN: 'aria:todoist:connect-token',
+  TODOIST_STATUS: 'aria:todoist:status',
+  TODOIST_DISCONNECT: 'aria:todoist:disconnect',
+  TODOIST_FORCE_SYNC: 'aria:todoist:force-sync',
+  TODOIST_PUSH_APPROVED_ACTIONS: 'aria:todoist:push-approved-actions',
+  TASKS_LIST: 'aria:tasks:list',
   PROVIDER_ACCOUNTS_LIST: 'aria:provider-accounts:list',
   PROVIDER_ACCOUNT_UPDATE: 'aria:provider-accounts:update',
   PROVIDER_ACCOUNT_DISCONNECT: 'aria:provider-accounts:disconnect',
@@ -80,6 +86,11 @@ export const CHANNELS = {
   SCHEDULING_PROPOSE: 'aria:scheduling:propose',
   SCHEDULING_CONFIRM_TARGET: 'aria:scheduling:confirm-target',
   SCHEDULING_OVERRIDE: 'aria:scheduling:override',
+  TRANSCRIPT_INGEST: 'aria:transcripts:ingest',
+  TRANSCRIPT_GET_NOTE: 'aria:transcripts:get-note',
+  TRANSCRIPT_LIST_NOTES: 'aria:transcripts:list-notes',
+  TRANSCRIPT_LINK_EVENT: 'aria:transcripts:link-event',
+  TRANSCRIPT_GET_REVIEW: 'aria:transcripts:get-review',
 } as const;
 
 // Plan 03-03 triage DTOs ----------------------------------------------------
@@ -271,8 +282,16 @@ export interface MicrosoftIntegrationStatus {
   queueDepth: number;
 }
 
+export interface TodoistIntegrationStatus {
+  connected: boolean;
+  lastSyncedAt?: string;
+  lastError?: string;
+  tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
+  queueDepth: number;
+}
+
 export interface ProviderAccountDto {
-  providerKey: 'google' | 'microsoft';
+  providerKey: 'google' | 'microsoft' | 'todoist';
   accountId: string;
   displayEmail: string;
   displayLabel?: string | null;
@@ -281,6 +300,21 @@ export interface ProviderAccountDto {
   capabilitiesJson?: string | null;
   lastSyncedAt?: string | null;
   lastError?: string | null;
+}
+
+export interface TaskRowDto {
+  id: string;
+  remoteId: string | null;
+  content: string;
+  description: string | null;
+  projectName: string | null;
+  labels: string[];
+  dueIso: string | null;
+  priority: number;
+  isCompleted: boolean;
+  source: 'todoist' | 'aria';
+  noteId: string | null;
+  meetingActionId: string | null;
 }
 
 /**
@@ -360,6 +394,7 @@ export interface BriefingPayload {
   calendar: BriefingItem[];
   email: BriefingItem[];
   news: BriefingNewsItem[];
+  openActions?: BriefingItem[];
   errors: { calendar?: string; email?: string; news?: string };
   emailEmptyStateReason?: 'no-important-label';
   route: Route;
@@ -405,7 +440,7 @@ export type ApprovalUiState =
 
 export interface ApprovalRowDto {
   id: string;
-  kind: 'email_send' | 'calendar_change';
+  kind: 'email_send' | 'calendar_change' | 'task_batch';
   state: ApprovalUiState;
   created_at: string;
   updated_at: string;
@@ -444,6 +479,7 @@ export interface ApprovalRowDto {
   account_id?: string | null;
   idempotency_key?: string | null;
   last_error_message?: string | null;
+  meeting_note_id?: string | null;
 }
 
 export interface CalendarEventDto {
@@ -466,6 +502,65 @@ export interface CalendarEventDto {
   accountDisplayEmail: string;
   accountDisplayLabel?: string | null;
   accountDisplayColor?: string | null;
+}
+
+export type TranscriptSourceKind = 'paste' | 'txt' | 'vtt' | 'srt' | 'json';
+
+export interface TranscriptSegmentDto {
+  start: number;
+  end: number;
+  speaker?: string | null;
+  timestampSec?: number | null;
+}
+
+export interface TranscriptNoteDto {
+  id: string;
+  sourceKind: TranscriptSourceKind;
+  title: string;
+  normalizedText: string;
+  ingestedAt: string;
+  eventProviderKey: 'google' | 'microsoft' | null;
+  eventAccountId: string | null;
+  calendarEventId: string | null;
+  linkConfidence: number | null;
+  status: 'captured' | 'linked' | 'standalone';
+  segments: TranscriptSegmentDto[];
+}
+
+export interface TranscriptLinkCandidateDto {
+  providerKey: 'google' | 'microsoft';
+  accountId: string;
+  calendarEventId: string;
+  summary: string;
+  startUtc: string | null;
+  score: number;
+}
+
+export interface MeetingActionDto {
+  id: string;
+  noteId: string;
+  approvalId: string | null;
+  text: string;
+  owner: 'self' | 'follow-up' | 'unassigned';
+  followUpWith?: string | null;
+  dueIso?: string | null;
+  dueRaw?: string | null;
+  dueConfidence?: 'high' | 'med' | 'low' | null;
+  priorityHint?: 'p1' | 'p2' | 'p3' | 'p4' | null;
+  citationStart: number;
+  citationEnd: number;
+  confidence: number;
+  status: 'draft' | 'approved' | 'rejected' | 'pushed' | 'failed';
+  pushable: 0 | 1;
+}
+
+export interface MeetingSummaryItemDto {
+  id: string;
+  kind: 'topic' | 'decision' | 'follow_up' | 'open_question';
+  text: string;
+  citationStart: number;
+  citationEnd: number;
+  ordinal: number;
 }
 
 // Plan 04-03 — scheduling propose DTOs ------------------------------------
@@ -585,15 +680,22 @@ export interface AriaApi {
   microsoftForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
   providerAccountsList(): Promise<{ rows: ProviderAccountDto[] } | IpcError>;
   providerAccountUpdate(req: {
-    providerKey: 'google' | 'microsoft';
+    providerKey: 'google' | 'microsoft' | 'todoist';
     accountId: string;
     displayLabel?: string | null;
     displayColor?: string | null;
   }): Promise<{ ok: true } | IpcError>;
   providerAccountDisconnect(req: {
-    providerKey: 'google' | 'microsoft';
+    providerKey: 'google' | 'microsoft' | 'todoist';
     accountId: string;
   }): Promise<{ ok: true } | IpcError>;
+
+  todoistConnectToken(req: { token: string }): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+  todoistStatus(): Promise<TodoistIntegrationStatus | IpcError>;
+  todoistDisconnect(): Promise<{ ok: true } | IpcError>;
+  todoistForceSync(): Promise<{ ok: boolean; count?: number; error?: string } | IpcError>;
+  todoistPushApprovedActions(req: { approvalId: string }): Promise<{ ok: true; pushed: number; skipped: number } | IpcError>;
+  tasksList(req?: { source?: 'todoist' | 'aria' | 'all'; completed?: boolean }): Promise<{ rows: TaskRowDto[] } | IpcError>;
 
   newsListSources(): Promise<{ sources: NewsSourceRow[] } | IpcError>;
   newsAddRss(req: { url: string; title?: string }): Promise<{ ok: true; id: number } | { ok: false; error: string } | IpcError>;
@@ -660,6 +762,31 @@ export interface AriaApi {
   schedulingPropose(req: SchedulingProposeRequest): Promise<ProposeResponse>;
   schedulingConfirmTarget(req: SchedulingConfirmTargetRequest): Promise<ProposeResponse>;
   schedulingOverride(req: SchedulingOverrideRequest): Promise<{ ok: true } | IpcError>;
+
+  transcriptIngest(req: {
+    sourceKind: TranscriptSourceKind;
+    text: string;
+    title?: string;
+  }): Promise<{
+    noteId: string;
+    linkedEvent: TranscriptLinkCandidateDto | null;
+    candidates: TranscriptLinkCandidateDto[];
+    taskBatchApprovalId?: string | null;
+    actionCount?: number;
+  } | IpcError>;
+  transcriptGetNote(req: { noteId: string }): Promise<{ note: TranscriptNoteDto | null } | IpcError>;
+  transcriptListNotes(): Promise<{ rows: Array<Omit<TranscriptNoteDto, 'normalizedText' | 'segments'>> } | IpcError>;
+  transcriptLinkEvent(req: {
+    noteId: string;
+    providerKey: 'google' | 'microsoft';
+    accountId: string;
+    calendarEventId: string;
+  }): Promise<{ ok: true } | IpcError>;
+  transcriptGetReview(req: { noteId: string }): Promise<{
+    note: TranscriptNoteDto | null;
+    summaryItems: MeetingSummaryItemDto[];
+    actions: MeetingActionDto[];
+  } | IpcError>;
 }
 
 // Plan 04-02 — scheduling rules DTOs ---------------------------------------
@@ -742,6 +869,12 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   MICROSOFT_STATUS: 'microsoftStatus',
   MICROSOFT_DISCONNECT: 'microsoftDisconnect',
   MICROSOFT_FORCE_SYNC: 'microsoftForceSync',
+  TODOIST_CONNECT_TOKEN: 'todoistConnectToken',
+  TODOIST_STATUS: 'todoistStatus',
+  TODOIST_DISCONNECT: 'todoistDisconnect',
+  TODOIST_FORCE_SYNC: 'todoistForceSync',
+  TODOIST_PUSH_APPROVED_ACTIONS: 'todoistPushApprovedActions',
+  TASKS_LIST: 'tasksList',
   PROVIDER_ACCOUNTS_LIST: 'providerAccountsList',
   PROVIDER_ACCOUNT_UPDATE: 'providerAccountUpdate',
   PROVIDER_ACCOUNT_DISCONNECT: 'providerAccountDisconnect',
@@ -773,4 +906,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   SCHEDULING_PROPOSE: 'schedulingPropose',
   SCHEDULING_CONFIRM_TARGET: 'schedulingConfirmTarget',
   SCHEDULING_OVERRIDE: 'schedulingOverride',
+  TRANSCRIPT_INGEST: 'transcriptIngest',
+  TRANSCRIPT_GET_NOTE: 'transcriptGetNote',
+  TRANSCRIPT_LIST_NOTES: 'transcriptListNotes',
+  TRANSCRIPT_LINK_EVENT: 'transcriptLinkEvent',
+  TRANSCRIPT_GET_REVIEW: 'transcriptGetReview',
 } as const;

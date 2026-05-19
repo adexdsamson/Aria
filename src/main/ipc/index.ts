@@ -41,6 +41,9 @@ import { registerGmailSendHandlers } from './gmail-send';
 import { registerSchedulingHandlers } from './scheduling';
 import { registerMicrosoftHandlers } from './microsoft';
 import { registerProviderAccountHandlers } from './provider-accounts';
+import { registerTranscriptHandlers } from './transcripts';
+import { registerTodoistHandlers } from './todoist';
+import { registerTasksHandlers } from './tasks';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -195,6 +198,24 @@ export function registerHandlers(
     providerAccountChannels.forEach((c) => skip.add(c));
   }
 
+  const todoistChannels = [
+    CHANNELS.TODOIST_CONNECT_TOKEN,
+    CHANNELS.TODOIST_STATUS,
+    CHANNELS.TODOIST_DISCONNECT,
+    CHANNELS.TODOIST_FORCE_SYNC,
+    CHANNELS.TODOIST_PUSH_APPROVED_ACTIONS,
+  ];
+  if (!todoistChannels.every((c) => skip.has(c))) {
+    registerTodoistHandlers(ipcMain, { logger, dbHolder });
+    todoistChannels.forEach((c) => skip.add(c));
+  }
+
+  const tasksChannels = [CHANNELS.TASKS_LIST];
+  if (!tasksChannels.every((c) => skip.has(c))) {
+    registerTasksHandlers(ipcMain, { logger, dbHolder });
+    tasksChannels.forEach((c) => skip.add(c));
+  }
+
   const newsChannels = [
     CHANNELS.NEWS_LIST_SOURCES,
     CHANNELS.NEWS_ADD_RSS,
@@ -291,6 +312,18 @@ export function registerHandlers(
       },
     });
     schedulingChannels.forEach((c) => skip.add(c));
+  }
+
+  const transcriptChannels = [
+    CHANNELS.TRANSCRIPT_INGEST,
+    CHANNELS.TRANSCRIPT_GET_NOTE,
+    CHANNELS.TRANSCRIPT_LIST_NOTES,
+    CHANNELS.TRANSCRIPT_LINK_EVENT,
+    CHANNELS.TRANSCRIPT_GET_REVIEW,
+  ];
+  if (!transcriptChannels.every((c) => skip.has(c))) {
+    registerTranscriptHandlers(ipcMain, { logger, dbHolder });
+    transcriptChannels.forEach((c) => skip.add(c));
   }
 }
 

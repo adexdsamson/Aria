@@ -157,6 +157,18 @@ export function BriefingScreen(): JSX.Element {
       )}
 
       <InlineApprovalsPreview />
+      {payload.openActions && payload.openActions.length > 0 && (
+        <section data-testid="briefing-open-actions" style={{ marginBottom: 18 }}>
+          <h2 style={{ fontSize: 'var(--aria-type-xl)' }}>Open Actions</h2>
+          <ul>
+            {payload.openActions.map((item) => (
+              <li key={item.id}>
+                <strong>{item.title}</strong> — {item.why}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
       <SectionEmail
         items={payload.email}

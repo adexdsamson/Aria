@@ -104,7 +104,12 @@ if (!nodeOnly) {
 }
 
 // Step 3: build for Node ABI via node-gyp (uses current Node's headers).
-run('node-gyp rebuild', 'node-gyp', ['rebuild'], PKG_DIR);
+// Invoke the JS entrypoint directly so Windows shell resolution doesn't
+// interfere with the rebuild path.
+run('node-gyp rebuild', process.execPath, [
+  path.join(REPO, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'),
+  'rebuild',
+], PKG_DIR);
 
 // Step 4: stash Node binary.
 copy(ACTIVE, NODE_VARIANT);

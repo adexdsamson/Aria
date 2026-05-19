@@ -54,6 +54,12 @@ function readCursor(db: Db, account: ProviderAccountRow, resource: 'mail' | 'cal
   return row?.cursor ?? null;
 }
 
+function isMailCalendarAccount(
+  account: ProviderAccountRow,
+): account is ProviderAccountRow & { providerKey: 'google' | 'microsoft' } {
+  return account.providerKey === 'google' || account.providerKey === 'microsoft';
+}
+
 function runLater(fn: () => void, jitterMs: number): void {
   const delay = jitterMs > 0 ? Math.floor(Math.random() * jitterMs) : 0;
   setTimeout(fn, delay);
@@ -67,6 +73,7 @@ export function createSyncOrchestrator(deps: SyncOrchestratorDeps): SyncOrchestr
   const jitterMs = deps.jitterMs ?? DEFAULT_JITTER_MS;
 
   async function defaultTickAccount(account: ProviderAccountRow): Promise<void> {
+    if (!isMailCalendarAccount(account)) return;
     const provider = registry.get(account.providerKey, account.accountId);
     const syncedAt = (deps.now ?? (() => new Date()))().toISOString();
 
@@ -112,7 +119,7 @@ export function createSyncOrchestrator(deps: SyncOrchestratorDeps): SyncOrchestr
   const api: SyncOrchestrator = {
     start() {
       for (const account of listProviderAccounts(deps.db)) {
-        if (account.status === 'ok') {
+        if (account.status === 'ok' && isMailCalendarAccount(account)) {
           api.scheduleAccount(account);
         }
       }
@@ -127,6 +134,7 @@ export function createSyncOrchestrator(deps: SyncOrchestratorDeps): SyncOrchestr
     },
 
     scheduleAccount(account) {
+      if (!isMailCalendarAccount(account)) return;
       if (account.status !== 'ok') return;
       const key = accountCronKey(account);
       if (cronRegistry.has(key)) return;

@@ -34,6 +34,9 @@ export class ProviderRegistry {
   }
 
   get(providerKey: ProviderKey, accountId: string): Provider {
+    if (providerKey === 'todoist') {
+      throw new ProviderNotFoundError('todoist-provider-is-task-only');
+    }
     const key = providerKey + ':' + accountId;
     const cached = this.providers.get(key);
     if (cached) {
@@ -63,6 +66,9 @@ export class ProviderRegistry {
   private buildProvider(row: ProviderAccountRow): Provider {
     if (row.providerKey === 'google') {
       return (this.deps.createGoogleProvider ?? createGoogleProvider)(row);
+    }
+    if (row.providerKey === 'todoist') {
+      throw new ProviderNotFoundError('todoist-provider-is-task-only');
     }
     return (this.deps.createMicrosoftProvider ?? createMicrosoftProvider)(row);
   }

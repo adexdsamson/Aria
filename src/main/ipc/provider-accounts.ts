@@ -39,7 +39,7 @@ export function registerProviderAccountHandlers(ipcMain: IpcMain, deps: Provider
     const db = dbHolder.db;
     if (!db) return notReady();
     const r = req as {
-      providerKey?: 'google' | 'microsoft';
+      providerKey?: 'google' | 'microsoft' | 'todoist';
       accountId?: string;
       displayLabel?: string | null;
       displayColor?: string | null;
@@ -58,7 +58,7 @@ export function registerProviderAccountHandlers(ipcMain: IpcMain, deps: Provider
   ipcMain.handle(CHANNELS.PROVIDER_ACCOUNT_DISCONNECT, async (_e, req: unknown) => {
     const db = dbHolder.db;
     if (!db) return notReady();
-    const r = req as { providerKey?: 'google' | 'microsoft'; accountId?: string };
+    const r = req as { providerKey?: 'google' | 'microsoft' | 'todoist'; accountId?: string };
     if (!r.providerKey || !r.accountId) return { error: 'PROVIDER_AND_ACCOUNT_REQUIRED' };
     try {
       if (r.providerKey === 'google') {

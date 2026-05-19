@@ -62,6 +62,9 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
   if (row.kind === 'calendar_change') {
     return <CalendarApprovalCard {...props} />;
   }
+  if (row.kind === 'task_batch') {
+    return <TaskBatchApprovalCard {...props} />;
+  }
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState<string>(row.body_edited ?? row.body_original ?? '');
   const [rejecting, setRejecting] = useState(false);
@@ -875,6 +878,127 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
             </button>
           </>
         )}
+      </div>
+    </article>
+  );
+}
+
+interface TaskBatchAction {
+  id: string;
+  text: string;
+  owner: 'self' | 'follow-up' | 'unassigned';
+  followUpWith?: string | null;
+  dueIso?: string | null;
+  dueRaw?: string | null;
+  priorityHint?: 'p1' | 'p2' | 'p3' | 'p4' | null;
+  citationStart: number;
+  citationEnd: number;
+  status?: string;
+}
+
+export function TaskBatchApprovalCard(props: ApprovalCardProps): JSX.Element {
+  const { row } = props;
+  const actions = safeParseJson<TaskBatchAction[]>(row.body_original) ?? [];
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(actions.filter((action) => action.owner !== 'unassigned').map((action) => action.id)),
+  );
+  const [busy, setBusy] = useState(false);
+
+  async function approve(): Promise<void> {
+    setBusy(true);
+    try {
+      const approved = actions.filter((action) => selected.has(action.id));
+      await props.onApprove(row.id, { body: JSON.stringify(approved) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article
+      data-testid={`approval-card-${row.id}`}
+      data-kind="task_batch"
+      data-state={row.state}
+      style={{
+        border: '1px solid #d1d5db',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 12,
+        background: '#fff',
+        opacity: busy ? 0.6 : 1,
+      }}
+    >
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        {props.selectable && (
+          <input
+            type="checkbox"
+            data-testid={`approval-select-${row.id}`}
+            checked={props.selected}
+            onChange={(event) => props.onSelect(row.id, event.target.checked)}
+          />
+        )}
+        <strong style={{ flex: '1 1 auto' }}>{row.subject ?? 'Meeting actions'}</strong>
+        <span data-testid={`approval-state-${row.id}`} style={{ ...chipStyle(), background: '#dbeafe', color: '#1e40af' }}>
+          {row.state}
+        </span>
+      </header>
+      <BackendError row={row} />
+      <div data-testid={`task-batch-actions-${row.id}`}>
+        {actions.map((action) => {
+          const isPushable = action.owner !== 'unassigned';
+          return (
+            <label
+              key={action.id}
+              data-testid={`task-batch-action-${action.id}`}
+              style={{
+                display: 'block',
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                padding: 8,
+                marginBottom: 8,
+                opacity: isPushable ? 1 : 0.65,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(action.id)}
+                disabled={!isPushable}
+                onChange={(event) => {
+                  const next = new Set(selected);
+                  if (event.target.checked) next.add(action.id);
+                  else next.delete(action.id);
+                  setSelected(next);
+                }}
+              />{' '}
+              <strong>{action.text}</strong>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                owner: {action.owner}
+                {action.followUpWith ? ` (${action.followUpWith})` : ''}
+                {action.dueIso || action.dueRaw ? ` · due: ${action.dueIso ?? action.dueRaw}` : ''}
+                {action.priorityHint ? ` · ${action.priorityHint}` : ''}
+                {` · citation ${action.citationStart}-${action.citationEnd}`}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          data-testid={`approval-approve-${row.id}`}
+          disabled={busy || selected.size === 0 || row.state !== 'ready'}
+          onClick={() => void approve()}
+        >
+          Approve selected actions
+        </button>
+        <button
+          type="button"
+          data-testid={`approval-reject-${row.id}`}
+          disabled={busy || row.state !== 'ready'}
+          onClick={() => void props.onReject(row.id)}
+        >
+          Reject batch
+        </button>
       </div>
     </article>
   );

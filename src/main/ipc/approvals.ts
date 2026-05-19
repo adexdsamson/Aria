@@ -191,6 +191,10 @@ export function registerApprovalsHandlers(
         );
       }
       transitionTo(db, r.id, 'approved', patch);
+      const approvedRow = getApproval(db, r.id);
+      if (approvedRow?.kind === 'task_batch' && r.edited?.body !== undefined) {
+        applyTaskBatchSelection(db, r.id, r.edited.body);
+      }
       logger.info({ event: 'approvals.approve', id: r.id, edited: Boolean(r.edited) });
 
       // Plan 04-03 — dispatch to applyCalendarChange chokepoint when this is
@@ -317,4 +321,37 @@ export function registerApprovalsHandlers(
       return { error: err instanceof Error ? err.message : String(err) };
     }
   });
+}
+
+function applyTaskBatchSelection(db: NonNullable<DbHolder['db']>, approvalId: string, body: string): void {
+  let selectedIds: string[];
+  try {
+    const parsed = JSON.parse(body) as Array<{ id?: unknown }>;
+    selectedIds = parsed
+      .map((item) => item.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  } catch {
+    selectedIds = [];
+  }
+  const tx = db.transaction(() => {
+    db.prepare(
+      `UPDATE meeting_action
+          SET status = 'rejected',
+              pushable = 0,
+              updated_at = ?
+        WHERE approval_id = ?`,
+    ).run(new Date().toISOString(), approvalId);
+    const approveStmt = db.prepare(
+      `UPDATE meeting_action
+          SET status = 'approved',
+              pushable = 1,
+              updated_at = ?
+        WHERE approval_id = ?
+          AND id = ?`,
+    );
+    for (const id of selectedIds) {
+      approveStmt.run(new Date().toISOString(), approvalId, id);
+    }
+  });
+  tx();
 }

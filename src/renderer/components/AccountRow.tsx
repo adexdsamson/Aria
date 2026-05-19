@@ -21,7 +21,7 @@ export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowPro
           </span>
         </div>
         <div data-testid={`account-email-${account.accountId}`} style={{ color: '#64748b', fontSize: 13 }}>
-          {account.providerKey === 'microsoft' ? 'Outlook' : 'Google'} · {account.displayEmail}
+          {providerDisplayName(account.providerKey)} · {account.displayEmail}
         </div>
         {account.lastError && (
           <div role="alert" style={{ color: '#b91c1c', fontSize: 12 }}>{account.lastError}</div>
@@ -46,6 +46,12 @@ export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowPro
       </button>
     </article>
   );
+}
+
+function providerDisplayName(providerKey: ProviderAccountDto['providerKey']): string {
+  if (providerKey === 'microsoft') return 'Outlook';
+  if (providerKey === 'todoist') return 'Todoist';
+  return 'Google';
 }
 
 function colorFromAccount(accountId: string): string {

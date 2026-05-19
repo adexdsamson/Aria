@@ -28,6 +28,7 @@ import type {
   GmailIntegrationStatus,
   IpcError,
   ProviderAccountDto,
+  TodoistIntegrationStatus,
 } from '../../../shared/ipc-contract';
 import { AddAccountModal } from '../../components/AddAccountModal';
 import { AccountRow } from '../../components/AccountRow';
@@ -146,6 +147,7 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
       />
       <GmailRow initialModalOpen={initialModalOpen} />
       <CalendarRow />
+      <TodoistRow onProviderChanged={refreshAccounts} />
     </section>
   );
 }
@@ -430,6 +432,132 @@ function CalendarRow(): JSX.Element {
         </div>
       )}
     </>
+  );
+}
+
+function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<void> }): JSX.Element {
+  const [status, setStatus] = useState<TodoistIntegrationStatus | null>(null);
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const next = await window.aria.todoistStatus();
+    if (!isErr(next)) setStatus(next);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const id = setInterval(() => void refresh(), POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  const onConnect = useCallback(async () => {
+    setBusy(true);
+    setConnectError(null);
+    try {
+      const result = await window.aria.todoistConnectToken({ token });
+      if (hasErrorCode(result)) setConnectError(`Could not connect Todoist: ${result.error}`);
+      else setToken('');
+      await refresh();
+      await onProviderChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  }, [onProviderChanged, refresh, token]);
+
+  const onDisconnect = useCallback(async () => {
+    setBusy(true);
+    try {
+      await window.aria.todoistDisconnect();
+      await refresh();
+      await onProviderChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  }, [onProviderChanged, refresh]);
+
+  const onForceSync = useCallback(async () => {
+    setBusy(true);
+    setConnectError(null);
+    setSyncMessage(null);
+    try {
+      const result = await window.aria.todoistForceSync();
+      if (hasErrorCode(result)) {
+        setConnectError(`Todoist sync failed: ${result.error}`);
+      } else if ('ok' in result && result.ok) {
+        setSyncMessage(`Fetched ${result.count ?? 0} Todoist task${result.count === 1 ? '' : 's'}.`);
+      }
+      await refresh();
+      await onProviderChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  }, [onProviderChanged, refresh]);
+
+  return (
+    <article data-testid="integration-row-todoist" style={rowStyle()}>
+      <header style={headerStyle()}>
+        <h3 style={titleStyle()}>Todoist</h3>
+        {status?.connected && (
+          <span data-testid="todoist-connected" style={{ color: 'var(--aria-fg-muted)' }}>
+            Connected
+          </span>
+        )}
+      </header>
+
+      {!status?.connected && (
+        <div style={{ marginTop: 'var(--aria-space-sm)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            aria-label="Todoist API token"
+            data-testid="todoist-token-input"
+            type="password"
+            value={token}
+            onChange={(event) => setToken(event.currentTarget.value)}
+            placeholder="Paste Todoist API token"
+            style={{ minWidth: 260 }}
+          />
+          <button
+            type="button"
+            data-testid="todoist-connect-token-btn"
+            disabled={busy || token.trim().length === 0}
+            onClick={onConnect}
+          >
+            Connect Todoist
+          </button>
+        </div>
+      )}
+
+      {connectError && (
+        <div role="alert" data-testid="todoist-connect-error" style={bannerStyle()}>
+          <p style={{ margin: 0 }}>{connectError}</p>
+        </div>
+      )}
+
+      {status?.lastError && (
+        <p data-testid="todoist-sync-error" style={{ color: 'red', fontSize: 12, margin: '4px 0 0 0' }}>
+          Last sync: {status.lastError}
+        </p>
+      )}
+
+      {syncMessage && !status?.lastError && (
+        <p data-testid="todoist-sync-success" style={{ color: '#16a34a', fontSize: 12, margin: '4px 0 0 0' }}>
+          {syncMessage}
+        </p>
+      )}
+
+      {status?.connected && (
+        <div style={actionsStyle()}>
+          <button type="button" onClick={onForceSync} disabled={busy} data-testid="todoist-sync-now-btn">
+            {busy ? 'Syncing...' : 'Sync now'}
+          </button>
+          <button type="button" onClick={onDisconnect} disabled={busy} data-testid="todoist-disconnect-btn">
+            Disconnect
+          </button>
+        </div>
+      )}
+    </article>
   );
 }
 

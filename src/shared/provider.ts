@@ -1,4 +1,4 @@
-export type ProviderKey = 'google' | 'microsoft';
+export type ProviderKey = 'google' | 'microsoft' | 'todoist';
 
 export interface DeltaResult<T> {
   items: T[];
@@ -44,6 +44,19 @@ export interface CanonicalEvent {
   }>;
 }
 
+export interface CanonicalTask {
+  externalId: string;
+  content: string;
+  description?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
+  labels: string[];
+  dueIso?: string | null;
+  priority: number;
+  isCompleted: boolean;
+  updatedAt?: string | null;
+}
+
 export interface MailSendInput {
   to: string[];
   subject: string;
@@ -72,11 +85,26 @@ export interface CalendarCapability {
   freeBusy(args: { startDateTime: string; endDateTime: string; calendarIds: string[] }): Promise<Record<string, Array<{ start: string; end: string }>>>;
 }
 
+export interface TaskCreateInput {
+  content: string;
+  description?: string;
+  projectId?: string;
+  labels?: string[];
+  dueIso?: string;
+  priority?: number;
+}
+
+export interface TaskCapability {
+  listTasksDelta(opts?: { cursor?: string | null }): Promise<DeltaResult<CanonicalTask>>;
+  createTask(task: TaskCreateInput, opts: { idempotencyKey: string }): Promise<{ externalId: string }>;
+}
+
 export interface ProviderCapabilities {
-  recurrenceFormat: 'rrule' | 'graph';
-  supportsSendUpdates: boolean;
-  mailLabelModel: 'gmail' | 'outlook';
-  mailSendReturnsId: boolean;
+  recurrenceFormat?: 'rrule' | 'graph';
+  supportsSendUpdates?: boolean;
+  mailLabelModel?: 'gmail' | 'outlook';
+  mailSendReturnsId?: boolean;
+  tasks?: boolean;
 }
 
 export interface Provider {
@@ -86,5 +114,6 @@ export interface Provider {
   capabilities: ProviderCapabilities;
   mail?: MailCapability;
   calendar?: CalendarCapability;
+  task?: TaskCapability;
   disconnect?: () => Promise<void> | void;
 }

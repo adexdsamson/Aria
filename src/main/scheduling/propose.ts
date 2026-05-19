@@ -40,6 +40,7 @@ import { transitionTo } from '../approvals/persist';
 import { logCalendarAction } from './audit';
 
 type Db = Database.Database;
+type CalendarProviderKey = Extract<ProviderKey, 'google' | 'microsoft'>;
 
 export interface ProposeResult {
   approvalId: string;
@@ -76,7 +77,7 @@ export interface ProposeDeps {
   /** Pre-built CalendarClient or factory; tests inject a fake. */
   client?: CalendarClient;
   userEmail?: string;
-  providerKey?: ProviderKey;
+  providerKey?: CalendarProviderKey;
   accountId?: string;
   identitySet?: IdentitySet;
   registry?: ProviderRegistry;

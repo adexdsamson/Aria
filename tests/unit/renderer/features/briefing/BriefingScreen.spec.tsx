@@ -86,6 +86,18 @@ describe('BriefingScreen', () => {
     expect(screen.getAllByTestId('rationale').length).toBeGreaterThanOrEqual(9);
   });
 
+  it('Phase 6 — renders Open Actions from Todoist and meeting-action tasks', async () => {
+    installAria(makePayload({
+      openActions: [
+        { id: 'todoist:remote-1', title: 'Send QBR deck', why: 'Open task due 2026-05-20' },
+      ],
+    }));
+    render(<BriefingScreen />);
+    const section = await screen.findByTestId('briefing-open-actions');
+    expect(section.textContent).toContain('Send QBR deck');
+    expect(section.textContent).toContain('Open task due 2026-05-20');
+  });
+
   it('Case 3 — top-3 cap visible: backend returns 5 items in calendar → renderer slices to 3', async () => {
     const payload = makePayload({
       calendar: Array.from({ length: 5 }, (_, i) => ({

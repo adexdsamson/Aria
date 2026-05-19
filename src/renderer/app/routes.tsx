@@ -5,6 +5,8 @@ import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { RoutingLogScreen } from '../features/diagnostics/RoutingLogScreen';
 import { SchedulingChat } from '../features/scheduling/SchedulingChat';
 import { UnifiedCalendarScreen } from '../features/calendar/UnifiedCalendarScreen';
+import { TranscriptCaptureScreen } from '../features/meetings/TranscriptCaptureScreen';
+import { TasksScreen } from '../features/tasks/TasksScreen';
 
 export function AppRoutes(): JSX.Element {
   return (
@@ -13,6 +15,8 @@ export function AppRoutes(): JSX.Element {
       <Route path="/briefing" element={<BriefingScreen />} />
       <Route path="/approvals" element={<ApprovalsScreen />} />
       <Route path="/calendar" element={<UnifiedCalendarScreen />} />
+      <Route path="/meetings" element={<TranscriptCaptureScreen />} />
+      <Route path="/tasks" element={<TasksScreen />} />
       <Route path="/scheduling" element={<SchedulingChat />} />
       <Route path="/routing-log" element={<RoutingLogScreen />} />
       <Route path="/settings/*" element={<SettingsScreen />} />

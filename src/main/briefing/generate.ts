@@ -400,6 +400,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   if (newsRes.status === 'rejected') {
     errors.news = describeErr(newsRes.reason);
   }
+  const openActions = gatherOpenActions(db);
 
   // ── B4 SC2 fallback detection (BEFORE LLM call) ───────────────────────────
   // Plan 03-03 supersedes Phase 2's `no-important-label` placeholder. When the
@@ -623,6 +624,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
       calendar,
       email,
       news,
+      openActions,
       errors,
       emailEmptyStateReason,
       route: decision.route,
@@ -659,6 +661,7 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
       calendarCandidates,
       emailCandidates,
       newsCandidates,
+      openActions,
       errors,
       emailEmptyStateReason,
       route: decision.route,
@@ -686,6 +689,7 @@ function buildPayload(args: {
   calendar: BriefingItem[];
   email: BriefingItem[];
   news: BriefingNewsItem[];
+  openActions?: BriefingItem[];
   errors: BriefingPayload['errors'];
   emailEmptyStateReason: BriefingPayload['emailEmptyStateReason'];
   route: Route;
@@ -699,6 +703,7 @@ function buildPayload(args: {
     calendar: args.calendar,
     email: args.email,
     news: args.news,
+    openActions: args.openActions,
     errors: args.errors,
     emailEmptyStateReason: args.emailEmptyStateReason,
     route: args.route,
@@ -714,6 +719,7 @@ function degradedPayload(args: {
   calendarCandidates: CalendarCandidate[];
   emailCandidates: EmailCandidate[];
   newsCandidates: NewsCandidate[];
+  openActions?: BriefingItem[];
   errors: BriefingPayload['errors'];
   emailEmptyStateReason: BriefingPayload['emailEmptyStateReason'];
   route: Route;
@@ -740,7 +746,27 @@ function degradedPayload(args: {
     sourceKind: candidateKind(c.id),
     dismissed: false,
   }));
-  return buildPayload({ ...args, calendar, email, news });
+  return buildPayload({ ...args, calendar, email, news, openActions: args.openActions });
+}
+
+function gatherOpenActions(db: Db): BriefingItem[] {
+  try {
+    const rows = db.prepare(
+      `SELECT id, content AS title,
+              CASE
+                WHEN due_iso IS NOT NULL THEN 'Open task due ' || due_iso
+                WHEN source = 'aria' THEN 'Approved meeting action awaiting completion'
+                ELSE 'Open Todoist task'
+              END AS why
+         FROM todoist_task
+        WHERE is_completed = 0
+        ORDER BY COALESCE(due_iso, '9999-12-31') ASC, priority DESC, local_updated_at DESC
+        LIMIT 3`,
+    ).all() as BriefingItem[];
+    return rows;
+  } catch {
+    return [];
+  }
 }
 
 function candidateKind(id: string): 'hn' | 'rss' | 'bundle' {
@@ -778,6 +804,7 @@ function safeUpsert(
         calendar: payload.calendar,
         email: payload.email,
         news: payload.news,
+        openActions: payload.openActions ?? [],
         errors: payload.errors,
         emailEmptyStateReason: payload.emailEmptyStateReason,
         reason: payload.reason,

@@ -25,6 +25,7 @@ import { getOAuth2Client } from '../integrations/google/auth';
 import { logCalendarAction } from '../scheduling/audit';
 import { getApproval, transitionTo } from '../approvals/persist';
 import { listProviderAccounts } from '../integrations/microsoft/provider-account';
+import type { ProviderAccountRow } from '../integrations/microsoft/types';
 
 export interface SchedulingDeps {
   logger: Logger;
@@ -67,12 +68,12 @@ function buildE2eCalendarClient(): CalendarClient {
     listEvents: async () => ({ items: [] }),
     listEventsWindow: async () => ({ items: [] }),
     getCalendarMetadata: async () => ({ email: 'e2e@example.com' }),
-    patchEvent: async (args) => {
+    patchEvent: async (args: { eventId: string }) => {
       e2eCal.calls.push({ kind: 'patch', args });
       if (!e2eCal.ok) throw new Error('e2e-mocked-failure');
       return { id: args.eventId, etag: 'etag-new' };
     },
-    insertEvent: async (args) => {
+    insertEvent: async (args: unknown) => {
       e2eCal.calls.push({ kind: 'insert', args });
       if (!e2eCal.ok) throw new Error('e2e-mocked-failure');
       return { id: 'new-event-id', etag: 'etag-new' };
@@ -190,6 +191,7 @@ export function registerSchedulingHandlers(
     if (!db) return { error: 'DB_NOT_OPEN' };
     try {
       const account = listProviderAccounts(db).find((row) => {
+        if (row.providerKey !== 'google' && row.providerKey !== 'microsoft') return false;
         if (row.status !== 'ok') return false;
         if (!row.capabilitiesJson) return true;
         try {
@@ -197,7 +199,7 @@ export function registerSchedulingHandlers(
         } catch {
           return true;
         }
-      });
+      }) as (ProviderAccountRow & { providerKey: 'google' | 'microsoft' }) | undefined;
       const client = account ? undefined : await buildClient();
       const userEmail = account
         ? account.displayEmail

@@ -30,7 +30,7 @@ describe('db/migrations', () => {
     // calendar_event etag/recurrence cols, scheduling_rules, calendar_action_log).
     // Plan 05-01 added 011 (provider_account/provider_sync_state + recurrence_unsupported).
     // Plan 05-01 added 012 (provider_key/account_id backfill columns).
-    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 121, 122]);
+    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 121, 122, 123, 124, 125]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -41,9 +41,16 @@ describe('db/migrations', () => {
     expect(tables).toContain('routing_log');
     expect(tables).toContain('provider_account');
     expect(tables).toContain('provider_sync_state');
+    expect(tables).toContain('meeting_note');
+    expect(tables).toContain('meeting_note_segment');
+    expect(tables).toContain('meeting_summary');
+    expect(tables).toContain('meeting_summary_item');
+    expect(tables).toContain('meeting_action');
+    expect(tables).toContain('todoist_task');
+    expect(tables).toContain('meeting_action_task_link');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(122);
+    expect(version).toBe(125);
     const views = db
       .prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name")
       .all()
