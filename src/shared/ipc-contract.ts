@@ -817,6 +817,13 @@ export interface AriaApi {
     summaryItems: MeetingSummaryItemDto[];
     actions: MeetingActionDto[];
   } | IpcError>;
+
+  // Plan 07-02 RAG admin
+  ragIndexStatus(): Promise<RagIndexStatusDto | IpcError>;
+  ragBackfillStatus(): Promise<RagBackfillStatusDto | IpcError>;
+  ragBackfillStart(): Promise<{ enqueuedBySourceKind: { email: number; event: number; note: number; action: number } } | IpcError>;
+  ragBackfillSkip(): Promise<{ ok: boolean } | IpcError>;
+  ragWipeAccount(req: { providerKey: string; accountId: string }): Promise<{ deletedChunks: number } | IpcError>;
 }
 
 // Plan 04-02 — scheduling rules DTOs ---------------------------------------
@@ -941,4 +948,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   TRANSCRIPT_LIST_NOTES: 'transcriptListNotes',
   TRANSCRIPT_LINK_EVENT: 'transcriptLinkEvent',
   TRANSCRIPT_GET_REVIEW: 'transcriptGetReview',
+  RAG_INDEX_STATUS: 'ragIndexStatus',
+  RAG_BACKFILL_STATUS: 'ragBackfillStatus',
+  RAG_BACKFILL_START: 'ragBackfillStart',
+  RAG_BACKFILL_SKIP: 'ragBackfillSkip',
+  RAG_WIPE_ACCOUNT: 'ragWipeAccount',
 } as const;
