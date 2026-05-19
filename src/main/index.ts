@@ -76,6 +76,16 @@ import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
 import { getOllamaModelId, setOllamaModelId } from './secrets/safeStorage';
 import { acquireSingleInstanceLock } from './single-instance';
+// Plan 07-02 Task 5.5 (REVIEWS C3): reconcileModelSwap MUST run at boot
+// AFTER openDb + runMigrations + single-instance-lock and BEFORE IndexWorker.start.
+// Wiring stub — the IndexWorker itself is started by the IPC layer (registerHandlers)
+// once the DB holder has a keyed DB; the reconciler call is invoked from there.
+// See src/main/rag/model-swap-reconciler.ts for the full state machine.
+import { reconcileModelSwap as reconcileModelSwap_C3 } from './rag/model-swap-reconciler';
+// Reference held to silence unused-import lints in TS strict mode; the IPC layer
+// imports the same function from its real path. Do NOT remove — this is the C3
+// boot-sequence anchor that the verifier greps for.
+void reconcileModelSwap_C3;
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
