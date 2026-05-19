@@ -32,6 +32,7 @@ import type {
 } from '../../../shared/ipc-contract';
 import { AddAccountModal } from '../../components/AddAccountModal';
 import { AccountRow } from '../../components/AccountRow';
+import { RagDisconnectedSection } from './RagDisconnectedSection';
 
 const POLL_MS = 10_000;
 
@@ -148,6 +149,7 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
       <GmailRow initialModalOpen={initialModalOpen} />
       <CalendarRow />
       <TodoistRow onProviderChanged={refreshAccounts} />
+      <RagDisconnectedSection />
     </section>
   );
 }
