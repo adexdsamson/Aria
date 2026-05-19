@@ -50,7 +50,10 @@ describe('migration 126 rag index', () => {
     const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: false });
     runMigrations(db, { dir: MIGRATIONS_DIR });
 
-    expect(db.pragma('user_version', { simple: true })).toBe(126);
+    // Migration 127 (Phase 7 UAT Gap 8) rebuilds rag_source_dirty for dedupe.
+    // The runner advances to the latest migration; assert ≥126 to remain
+    // forward-compatible with later schema bumps.
+    expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(126);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
