@@ -42,10 +42,9 @@ function addPerson(
 }
 
 function setRebuildStamp(db: ReturnType<typeof setupDb>, iso: string) {
-  db.exec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
   db.prepare(
-    `INSERT INTO app_meta(key,value) VALUES('last_people_directory_rebuild_at', ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    `INSERT INTO app_meta(k,v) VALUES('last_people_directory_rebuild_at', ?)
+     ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
   ).run(iso);
 }
 

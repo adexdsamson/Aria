@@ -242,11 +242,10 @@ export function rebuildPeopleDirectory(db: Db, opts: RebuildOptions = {}): Rebui
     // schema may not have meeting_note_segment in some test setups; ignore.
   }
 
-  // Record bulk-rebuild timestamp in app_meta.
-  db.exec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
+  // Record bulk-rebuild timestamp in app_meta (schema owned by migration 001).
   db.prepare(
-    `INSERT INTO app_meta (key, value) VALUES ('last_people_directory_rebuild_at', ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    `INSERT INTO app_meta (k, v) VALUES ('last_people_directory_rebuild_at', ?)
+     ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
   ).run(now);
 
   return {
@@ -259,10 +258,10 @@ export function rebuildPeopleDirectory(db: Db, opts: RebuildOptions = {}): Rebui
 
 function isStale(db: Db): boolean {
   const row = db
-    .prepare(`SELECT value FROM app_meta WHERE key = 'last_people_directory_rebuild_at'`)
-    .get() as { value: string } | undefined;
+    .prepare(`SELECT v FROM app_meta WHERE k = 'last_people_directory_rebuild_at'`)
+    .get() as { v: string } | undefined;
   if (!row) return true;
-  const last = new Date(row.value).getTime();
+  const last = new Date(row.v).getTime();
   return Date.now() - last > 24 * 3600 * 1000;
 }
 

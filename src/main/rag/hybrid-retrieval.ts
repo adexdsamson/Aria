@@ -75,10 +75,10 @@ export function rrfFuse(
 function readRrfKFromMeta(db: Db, fallback: number): number {
   try {
     const row = db
-      .prepare(`SELECT value FROM app_meta WHERE key = 'rag_rrf_k'`)
-      .get() as { value: string } | undefined;
+      .prepare(`SELECT v FROM app_meta WHERE k = 'rag_rrf_k'`)
+      .get() as { v: string } | undefined;
     if (!row) return fallback;
-    const n = parseInt(row.value, 10);
+    const n = parseInt(row.v, 10);
     return Number.isFinite(n) && n > 0 ? n : fallback;
   } catch {
     return fallback;

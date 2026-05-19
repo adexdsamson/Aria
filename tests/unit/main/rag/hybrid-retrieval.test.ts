@@ -184,8 +184,7 @@ describe('hybridRetrieve — fusion + hydration', () => {
   });
 
   it('rrf k is configurable via app_meta', async () => {
-    db.exec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
-    db.prepare(`INSERT INTO app_meta (key, value) VALUES ('rag_rrf_k', '10')`).run();
+    db.prepare(`INSERT INTO app_meta (k, v) VALUES ('rag_rrf_k', '10')`).run();
     insertChunk(db, 'k1', 'tunable parameter');
     const vectorStore = new FakeVectorStore([]);
     const res = await hybridRetrieve(

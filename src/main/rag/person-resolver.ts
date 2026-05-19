@@ -153,10 +153,10 @@ function lookupAliases(db: Db, alias: string): Person[] {
 function isDirectoryStale(db: Db): boolean {
   try {
     const row = db
-      .prepare(`SELECT value FROM app_meta WHERE key = 'last_people_directory_rebuild_at'`)
-      .get() as { value: string } | undefined;
+      .prepare(`SELECT v FROM app_meta WHERE k = 'last_people_directory_rebuild_at'`)
+      .get() as { v: string } | undefined;
     if (!row) return true;
-    const last = new Date(row.value).getTime();
+    const last = new Date(row.v).getTime();
     return Date.now() - last > 24 * 3600 * 1000;
   } catch {
     return true;

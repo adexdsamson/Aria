@@ -2,9 +2,9 @@
  * Plan 07-02 Task 6 — Opt-in backfill (RESEARCH §3 / Pitfall 5).
  *
  * Seeds `rag_source_dirty` from canonical Phase 2/5/6 tables in throttled
- * batches. Resumable: state persisted in `app_meta(key='rag_backfill_state')` ∈
+ * batches. Resumable: state persisted in `app_meta(k='rag_backfill_state')` ∈
  * `pending | in_progress | done | skipped`. ETA seeded by a 50-chunk probe
- * stored in `app_meta(key='rag_backfill_eta_seconds_per_chunk')`.
+ * stored in `app_meta(k='rag_backfill_eta_seconds_per_chunk')`.
  *
  * NEVER auto-saturates Ollama on first launch — only runs when the user
  * confirms via `ragBackfillStart()` IPC.
@@ -15,8 +15,7 @@
  *   - note:   meeting_note
  *   - action: meeting_action + todoist_task (when present)
  *
- * app_meta is a small key/value table. We CREATE IT IF MISSING here because
- * not every migration may have wired it; treat as a forward-compat shim.
+ * app_meta is a small key/value table owned by migration 001 (columns: k, v).
  */
 import type Database from 'better-sqlite3-multiple-ciphers';
 import type { Logger } from 'pino';
@@ -44,28 +43,17 @@ const SOURCE_TABLES: Array<{ kind: SourceKind; table: string; idCol: string }> =
   { kind: 'action', table: 'meeting_action', idCol: 'id' },
 ];
 
-function ensureAppMeta(db: Db): void {
-  db.exec(
-    `CREATE TABLE IF NOT EXISTS app_meta (
-       key   TEXT PRIMARY KEY,
-       value TEXT
-     )`,
-  );
-}
-
 export function readBackfillState(db: Db): BackfillState {
-  ensureAppMeta(db);
   const row = db
-    .prepare(`SELECT value FROM app_meta WHERE key = 'rag_backfill_state'`)
-    .get() as { value: string } | undefined;
-  return (row?.value as BackfillState) ?? 'pending';
+    .prepare(`SELECT v FROM app_meta WHERE k = 'rag_backfill_state'`)
+    .get() as { v: string } | undefined;
+  return (row?.v as BackfillState) ?? 'pending';
 }
 
 function writeMeta(db: Db, key: string, value: string): void {
-  ensureAppMeta(db);
   db.prepare(
-    `INSERT INTO app_meta (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    `INSERT INTO app_meta (k, v) VALUES (?, ?)
+     ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
   ).run(key, value);
 }
 
@@ -88,7 +76,6 @@ export interface SeedOptions {
 }
 
 export function seedBackfill(db: Db, opts: SeedOptions = {}): SeedResult {
-  ensureAppMeta(db);
   const batchSize = Math.max(1, opts.batchSize ?? 500);
   const now = new Date().toISOString();
   setBackfillState(db, 'in_progress');
@@ -165,7 +152,6 @@ export function recordEtaProbe(db: Db, secondsPerChunk: number): void {
 }
 
 export function getStatus(db: Db): BackfillStatus {
-  ensureAppMeta(db);
   const state = readBackfillState(db);
   const counts: Record<SourceKind, number> = { email: 0, event: 0, note: 0, action: 0 };
   const rows = db
@@ -180,9 +166,9 @@ export function getStatus(db: Db): BackfillStatus {
     .get() as { n: number }).n;
 
   const etaRow = db
-    .prepare(`SELECT value FROM app_meta WHERE key = 'rag_backfill_eta_seconds_per_chunk'`)
-    .get() as { value: string } | undefined;
-  const etaPer = etaRow ? Number(etaRow.value) || 0 : 0;
+    .prepare(`SELECT v FROM app_meta WHERE k = 'rag_backfill_eta_seconds_per_chunk'`)
+    .get() as { v: string } | undefined;
+  const etaPer = etaRow ? Number(etaRow.v) || 0 : 0;
   const queuedRemaining = (db
     .prepare(`SELECT count(*) AS n FROM rag_source_dirty WHERE target_model_id IS NULL`)
     .get() as { n: number }).n;

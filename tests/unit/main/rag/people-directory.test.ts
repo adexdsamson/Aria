@@ -97,7 +97,7 @@ describe('people-directory — Plan 07-02 Task 8 / REVIEWS C10', () => {
     // Stomp app_meta to 48h ago.
     const old = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     db.prepare(
-      `UPDATE app_meta SET value = ? WHERE key = 'last_people_directory_rebuild_at'`,
+      `UPDATE app_meta SET v = ? WHERE k = 'last_people_directory_rebuild_at'`,
     ).run(old);
     const res = resolvePersonMention(db, 'Sarah Doe');
     expect(res.directoryStale).toBe(true);
