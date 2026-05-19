@@ -91,7 +91,37 @@ export const CHANNELS = {
   TRANSCRIPT_LIST_NOTES: 'aria:transcripts:list-notes',
   TRANSCRIPT_LINK_EVENT: 'aria:transcripts:link-event',
   TRANSCRIPT_GET_REVIEW: 'aria:transcripts:get-review',
+  // Plan 07-02 RAG index admin
+  RAG_INDEX_STATUS: 'aria:rag:index-status',
+  RAG_BACKFILL_STATUS: 'aria:rag:backfill-status',
+  RAG_BACKFILL_START: 'aria:rag:backfill-start',
+  RAG_BACKFILL_SKIP: 'aria:rag:backfill-skip',
+  RAG_WIPE_ACCOUNT: 'aria:rag:wipe-account',
 } as const;
+
+// Plan 07-02 RAG DTOs --------------------------------------------------------
+
+export interface RagIndexStatusDto {
+  vectorBackend: 'sqlite-vec' | 'fallback';
+  activeModelId: string;
+  activeModelDim: number;
+  rebuildInProgress: boolean;
+  rebuildTargetModelId: string | null;
+  rebuildProgressDone: number;
+  rebuildProgressTotal: number;
+  aliveChunkCount: number;
+  dirtyChunkCount: number;
+  perMinute: number;
+  lastErrorKind?: string;
+  lastErrorMessage?: string;
+}
+
+export interface RagBackfillStatusDto {
+  state: 'pending' | 'in_progress' | 'done' | 'skipped';
+  enqueuedBySourceKind: { email: number; event: number; note: number; action: number };
+  dirtyRemaining: number;
+  etaSecondsRemaining: number;
+}
 
 // Plan 03-03 triage DTOs ----------------------------------------------------
 

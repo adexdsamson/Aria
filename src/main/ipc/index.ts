@@ -44,6 +44,7 @@ import { registerProviderAccountHandlers } from './provider-accounts';
 import { registerTranscriptHandlers } from './transcripts';
 import { registerTodoistHandlers } from './todoist';
 import { registerTasksHandlers } from './tasks';
+import { registerRagHandlers } from './rag';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -312,6 +313,19 @@ export function registerHandlers(
       },
     });
     schedulingChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 07-02 RAG channels.
+  const ragChannels = [
+    CHANNELS.RAG_INDEX_STATUS,
+    CHANNELS.RAG_BACKFILL_STATUS,
+    CHANNELS.RAG_BACKFILL_START,
+    CHANNELS.RAG_BACKFILL_SKIP,
+    CHANNELS.RAG_WIPE_ACCOUNT,
+  ];
+  if (!ragChannels.every((c) => skip.has(c))) {
+    registerRagHandlers(ipcMain, { logger, dbHolder });
+    ragChannels.forEach((c) => skip.add(c));
   }
 
   const transcriptChannels = [
