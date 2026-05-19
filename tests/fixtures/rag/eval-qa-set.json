@@ -1,0 +1,380 @@
+{
+  "_comment": [
+    "Synthetic fixture authored by executor under user override on 2026-05-19.",
+    "The chunking-strategy decision from the spike is PROVISIONAL; replace with a user-authored",
+    "fixture against real local DB rows before relying on 07-02/07-03's chunk-size choices in production.",
+    "See 07-01-SUMMARY.md `Deferred / Followups` for the replacement tracking item.",
+    "",
+    "Schema:",
+    "  sources[]: synthetic 'source rows' the chunking spike indexes against. Each row mirrors the",
+    "             SourceDoc shape (sourceKind, sourceId, title, text, providerKey?, accountId?,",
+    "             parentRef?, occurredAt?, segments?). Char offsets in `questions[].answer_span`",
+    "             are 0-indexed into the matching source's `text` field.",
+    "  questions[]: 20 entries (5 per corpus). `answer_span.charStart/charEnd` mark the substring",
+    "               of the source text that contains the ground-truth answer.",
+    "",
+    "Realism caveat: names/companies/dates are fabricated but mimic the shape of real exec mail/",
+    "calendar/meeting traffic. The spike measures *retrieval quality on synthetic data* only;",
+    "absolute recall@10 / MRR numbers should be read as a relative ranking between strategies,",
+    "not an absolute production-quality signal."
+  ],
+  "sources": [
+    {
+      "sourceKind": "email",
+      "sourceId": "email:syn:e001",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "thread-e001",
+      "title": "Q3 budget revision — engineering headcount",
+      "occurredAt": "2026-05-12T14:22:00Z",
+      "text": "Hi team,\n\nFollowing up on yesterday's planning sync: Sarah Chen confirmed the engineering headcount cap for Q3 will hold at 42 FTE, down from the 48 we proposed. The savings flow to the new infra reserve. Please update your hiring plans by Friday.\n\nThree open reqs (Staff PM, two Senior eng) are grandfathered through the cap. Anything beyond that needs my sign-off.\n\n- Alex"
+    },
+    {
+      "sourceKind": "email",
+      "sourceId": "email:syn:e002",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "thread-e002",
+      "title": "Re: Acme renewal — pricing pushback",
+      "occurredAt": "2026-05-14T09:05:00Z",
+      "text": "Quick update: Marcus over at Acme pushed back hard on the 18% uplift. He's proposing 9% with a two-year commit and a free seat for their new APAC office. I'm inclined to accept if procurement can stomach the multi-year hold. Need your read by EOD Thursday so I can close before their board meeting next Tuesday."
+    },
+    {
+      "sourceKind": "email",
+      "sourceId": "email:syn:e003",
+      "providerKey": "microsoft",
+      "accountId": "exec",
+      "parentRef": "thread-e003",
+      "title": "Board prep — May materials",
+      "occurredAt": "2026-05-10T16:40:00Z",
+      "text": "All — the May board deck draft is in the shared drive. Three items need owner sign-off before Friday: (1) revenue restated Q1, owned by finance; (2) the customer-concentration slide, owned by Priya; (3) the org-chart refresh, owned by HR. Priya, please confirm your slide is final by Wednesday EOD. Thanks."
+    },
+    {
+      "sourceKind": "email",
+      "sourceId": "email:syn:e004",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "thread-e004",
+      "title": "Office lease — 4th floor sublet option",
+      "occurredAt": "2026-05-08T11:15:00Z",
+      "text": "The landlord came back with a sublet option for the 4th floor: 12-month term, $48/sqft, build-out credit of $75k. That's roughly $36k under our current run-rate on the 5th. I think it's worth a walkthrough next week. Tuesday 10am or Wednesday 2pm work for you?"
+    },
+    {
+      "sourceKind": "email",
+      "sourceId": "email:syn:e005",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "thread-e005",
+      "title": "Security incident — postmortem owner",
+      "occurredAt": "2026-05-15T08:30:00Z",
+      "text": "Reminder: the April 28 auth-service incident postmortem is due to the audit committee by May 22. Dana volunteered to drive it but is heads-down on the SOC2 evidence collection. I think we should reassign to Tom — he was on the rotation that night and has the full context. Please confirm and I'll loop him in."
+    },
+    {
+      "sourceKind": "event",
+      "sourceId": "event:syn:c001",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "event:syn:c001",
+      "title": "Board meeting — May",
+      "occurredAt": "2026-05-22T14:00:00Z",
+      "text": "Board meeting — May\n\nQuarterly board meeting. Agenda: CEO update, financial review (restated Q1), customer concentration discussion, org refresh, ask for budget-reserve approval. Materials due Friday 5/16. Dinner with Priya and two outside directors at Quince after."
+    },
+    {
+      "sourceKind": "event",
+      "sourceId": "event:syn:c002",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "event:syn:c002",
+      "title": "1:1 — Marcus (Acme)",
+      "occurredAt": "2026-05-19T15:30:00Z",
+      "text": "1:1 — Marcus (Acme)\n\nRenewal close conversation. Last status: counter at 9% uplift with two-year commit and APAC free seat. Need to confirm procurement aligned and that legal has the multi-year template ready. Goal: signed by EOD or firm verbal commit."
+    },
+    {
+      "sourceKind": "event",
+      "sourceId": "event:syn:c003",
+      "providerKey": "microsoft",
+      "accountId": "exec",
+      "parentRef": "event:syn:c003",
+      "title": "Office walkthrough — 4th floor sublet",
+      "occurredAt": "2026-05-20T17:00:00Z",
+      "text": "Office walkthrough — 4th floor sublet\n\nWalkthrough of the 4th floor sublet space with the landlord rep. Bring the build-out wishlist; confirm HVAC capacity for the 30-person ops cluster; ask about the $75k build-out credit timeline."
+    },
+    {
+      "sourceKind": "event",
+      "sourceId": "event:syn:c004",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "event:syn:c004",
+      "title": "Engineering staff offsite — kickoff",
+      "occurredAt": "2026-05-27T13:00:00Z",
+      "text": "Engineering staff offsite — kickoff\n\nDay 1 of the two-day eng staff offsite. Themes: H2 roadmap prioritization, hiring cap impact, on-call rotation refresh. Sarah Chen presenting the org structure update at 2pm. Dinner at Sons & Daughters at 7pm."
+    },
+    {
+      "sourceKind": "event",
+      "sourceId": "event:syn:c005",
+      "providerKey": "google",
+      "accountId": "primary",
+      "parentRef": "event:syn:c005",
+      "title": "Security review — Q2 audit prep",
+      "occurredAt": "2026-05-21T16:00:00Z",
+      "text": "Security review — Q2 audit prep\n\nReview SOC2 evidence collection progress with Dana and the auditors. Confirm the April 28 auth incident postmortem is on track for May 22 audit-committee delivery. Tom to share his reconstruction of the incident timeline."
+    },
+    {
+      "sourceKind": "note",
+      "sourceId": "note:syn:n001",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n001",
+      "title": "1:1 with Sarah Chen — May 14",
+      "occurredAt": "2026-05-14T15:00:00Z",
+      "text": "Sarah: I'm comfortable with the 42 FTE cap if we can keep the three open reqs. The Staff PM is the most critical — losing that slot would slip the platform migration by a quarter.\nAlex: Confirmed, those three are grandfathered. I'll send the team-wide note today.\nSarah: One more thing — I want to revisit the on-call rotation. Tom should rotate off after the postmortem, he's been pulling double for six weeks.\nAlex: Agreed. Action item on me to talk to engineering ops about backfill.\nSarah: Also, the offsite agenda — can we cut the H2 roadmap session to 45 minutes and add a slot for the hiring-impact discussion?\nAlex: Yes, I'll update the agenda by tomorrow.",
+      "segments": [
+        { "charStart": 0, "charEnd": 196, "speaker": "Sarah" },
+        { "charStart": 196, "charEnd": 274, "speaker": "Alex" },
+        { "charStart": 274, "charEnd": 416, "speaker": "Sarah" },
+        { "charStart": 416, "charEnd": 510, "speaker": "Alex" },
+        { "charStart": 510, "charEnd": 644, "speaker": "Sarah" },
+        { "charStart": 644, "charEnd": 695, "speaker": "Alex" }
+      ]
+    },
+    {
+      "sourceKind": "note",
+      "sourceId": "note:syn:n002",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n002",
+      "title": "Acme renewal — internal sync — May 13",
+      "occurredAt": "2026-05-13T11:00:00Z",
+      "text": "Discussion of Marcus's pushback on the 18% uplift. Procurement (Jasmine) believes the two-year commit is acceptable if we can pull forward 50% of year-two revenue. Legal flagged that the APAC free-seat needs a side letter — not material but adds a week. Decision: counter at 9% with two-year commit, APAC free seat via side letter, target close by 5/22 board meeting.",
+      "segments": [
+        { "charStart": 0, "charEnd": 369, "speaker": "group" }
+      ]
+    },
+    {
+      "sourceKind": "note",
+      "sourceId": "note:syn:n003",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n003",
+      "title": "Security postmortem prep — May 15",
+      "occurredAt": "2026-05-15T10:00:00Z",
+      "text": "Tom: The April 28 incident was triggered by a stale JWT in the auth-cache after the rotation script failed silently at 03:14 UTC. Blast radius: ~4 minutes of 503s on the login endpoint, no data exposure.\nDana: Detection was via the synthetic probe, alert fired at 03:17 UTC, paged me at 03:18.\nTom: Root cause: the rotation script's exit code wasn't checked by the wrapper. One-line fix landed May 1.\nAlex: Audit committee wants the timeline + root cause + remediation in writing by May 22. Tom owns the writeup.",
+      "segments": [
+        { "charStart": 0, "charEnd": 196, "speaker": "Tom" },
+        { "charStart": 196, "charEnd": 285, "speaker": "Dana" },
+        { "charStart": 285, "charEnd": 411, "speaker": "Tom" },
+        { "charStart": 411, "charEnd": 525, "speaker": "Alex" }
+      ]
+    },
+    {
+      "sourceKind": "note",
+      "sourceId": "note:syn:n004",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n004",
+      "title": "Board prep — content review — May 11",
+      "occurredAt": "2026-05-11T17:30:00Z",
+      "text": "Walkthrough of the May board deck. Priya: the customer-concentration slide will show top-5 at 41% of ARR, down from 47% last quarter — the new pipeline is genuinely diversifying. Finance: restated Q1 revenue is +$1.8M after the deferred-rev correction. HR: org chart refresh is ready, no leadership changes since February. Decision: deck final by Friday 5/16; dry run with Priya and finance on Wednesday.",
+      "segments": [
+        { "charStart": 0, "charEnd": 405, "speaker": "group" }
+      ]
+    },
+    {
+      "sourceKind": "note",
+      "sourceId": "note:syn:n005",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n005",
+      "title": "Office lease — options review — May 9",
+      "occurredAt": "2026-05-09T14:00:00Z",
+      "text": "Reviewed three options for the lease decision: (1) stay on 5th floor at current rate, (2) sublet 4th floor at $48/sqft with $75k build-out credit, (3) move entirely to the suburban campus. Finance prefers option 2 — saves ~$36k vs current run-rate and preserves the downtown presence. Walkthrough scheduled for May 20. Decision deferred until walkthrough.",
+      "segments": [
+        { "charStart": 0, "charEnd": 358, "speaker": "group" }
+      ]
+    },
+    {
+      "sourceKind": "action",
+      "sourceId": "action:syn:a001",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n001",
+      "title": "Talk to engineering ops about Tom's on-call backfill",
+      "occurredAt": "2026-05-14T15:30:00Z",
+      "text": "Talk to engineering ops about Tom's on-call backfill\n\nOwner: Alex. Due: this week. Context from Sarah 1:1 — Tom rotates off after the May 22 postmortem delivery; need a replacement on the primary rotation."
+    },
+    {
+      "sourceKind": "action",
+      "sourceId": "action:syn:a002",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n002",
+      "title": "Confirm procurement aligned on Acme two-year commit",
+      "occurredAt": "2026-05-13T11:30:00Z",
+      "text": "Confirm procurement aligned on Acme two-year commit\n\nOwner: Alex. Due: 5/19 (before Marcus 1:1). Jasmine in procurement signed off informally; need written confirmation in the channel before the close conversation."
+    },
+    {
+      "sourceKind": "action",
+      "sourceId": "action:syn:a003",
+      "providerKey": "todoist",
+      "accountId": "default",
+      "parentRef": null,
+      "title": "Send team-wide note on Q3 headcount cap",
+      "occurredAt": "2026-05-14T16:00:00Z",
+      "text": "Send team-wide note on Q3 headcount cap\n\nOwner: Alex. Confirm 42 FTE cap, call out the three grandfathered open reqs (Staff PM, two Senior eng), explain the infra reserve rationale. Due: end of day 5/14."
+    },
+    {
+      "sourceKind": "action",
+      "sourceId": "action:syn:a004",
+      "providerKey": null,
+      "accountId": null,
+      "parentRef": "note:syn:n003",
+      "title": "Tom — write up April 28 postmortem for audit committee",
+      "occurredAt": "2026-05-15T10:30:00Z",
+      "text": "Tom — write up April 28 postmortem for audit committee\n\nOwner: Tom. Due: 5/22. Must include incident timeline, root cause (stale JWT after silent rotation-script failure), remediation (exit-code check landed 5/1), and blast-radius summary (4 minutes of 503s, no data exposure)."
+    },
+    {
+      "sourceKind": "action",
+      "sourceId": "action:syn:a005",
+      "providerKey": "todoist",
+      "accountId": "default",
+      "parentRef": null,
+      "title": "Update engineering staff offsite agenda",
+      "occurredAt": "2026-05-14T16:15:00Z",
+      "text": "Update engineering staff offsite agenda\n\nOwner: Alex. Cut H2 roadmap session to 45 minutes; add a 30-minute slot for hiring-cap impact discussion led by Sarah. Due: 5/15."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-email-01",
+      "corpus": "email",
+      "question": "What did Sarah Chen confirm about the Q3 engineering headcount cap?",
+      "ground_truth": { "sourceId": "email:syn:e001", "charStart": 53, "charEnd": 175 },
+      "explicit_person": "Sarah Chen"
+    },
+    {
+      "id": "q-email-02",
+      "corpus": "email",
+      "question": "What pricing did Marcus propose for the Acme renewal?",
+      "ground_truth": { "sourceId": "email:syn:e002", "charStart": 0, "charEnd": 174 },
+      "explicit_person": "Marcus"
+    },
+    {
+      "id": "q-email-03",
+      "corpus": "email",
+      "question": "Who owns the customer-concentration slide in the May board deck?",
+      "ground_truth": { "sourceId": "email:syn:e003", "charStart": 130, "charEnd": 260 },
+      "explicit_person": "Priya"
+    },
+    {
+      "id": "q-email-04",
+      "corpus": "email",
+      "question": "What's the build-out credit on the 4th floor sublet?",
+      "ground_truth": { "sourceId": "email:syn:e004", "charStart": 0, "charEnd": 175 }
+    },
+    {
+      "id": "q-email-05",
+      "corpus": "email",
+      "question": "When is the April auth-service postmortem due?",
+      "ground_truth": { "sourceId": "email:syn:e005", "charStart": 0, "charEnd": 110 }
+    },
+    {
+      "id": "q-event-01",
+      "corpus": "event",
+      "question": "When is the May board meeting?",
+      "ground_truth": { "sourceId": "event:syn:c001", "charStart": 0, "charEnd": 90 }
+    },
+    {
+      "id": "q-event-02",
+      "corpus": "event",
+      "question": "What's the goal of the 1:1 with Marcus on May 19?",
+      "ground_truth": { "sourceId": "event:syn:c002", "charStart": 0, "charEnd": 260 },
+      "explicit_person": "Marcus"
+    },
+    {
+      "id": "q-event-03",
+      "corpus": "event",
+      "question": "What needs confirmation at the 4th floor sublet walkthrough?",
+      "ground_truth": { "sourceId": "event:syn:c003", "charStart": 0, "charEnd": 240 }
+    },
+    {
+      "id": "q-event-04",
+      "corpus": "event",
+      "question": "Who is presenting the org structure update at the engineering offsite?",
+      "ground_truth": { "sourceId": "event:syn:c004", "charStart": 0, "charEnd": 260 },
+      "explicit_person": "Sarah Chen"
+    },
+    {
+      "id": "q-event-05",
+      "corpus": "event",
+      "question": "What's on the agenda for the Q2 audit-prep security review?",
+      "ground_truth": { "sourceId": "event:syn:c005", "charStart": 0, "charEnd": 270 }
+    },
+    {
+      "id": "q-note-01",
+      "corpus": "note",
+      "question": "What did Sarah say about cutting the H2 roadmap session?",
+      "ground_truth": { "sourceId": "note:syn:n001", "charStart": 510, "charEnd": 644 },
+      "explicit_person": "Sarah"
+    },
+    {
+      "id": "q-note-02",
+      "corpus": "note",
+      "question": "What did Jasmine in procurement say about the Acme two-year commit?",
+      "ground_truth": { "sourceId": "note:syn:n002", "charStart": 0, "charEnd": 200 },
+      "explicit_person": "Jasmine"
+    },
+    {
+      "id": "q-note-03",
+      "corpus": "note",
+      "question": "What caused the April 28 auth-service incident?",
+      "ground_truth": { "sourceId": "note:syn:n003", "charStart": 0, "charEnd": 196 },
+      "explicit_person": "Tom"
+    },
+    {
+      "id": "q-note-04",
+      "corpus": "note",
+      "question": "What is the restated Q1 revenue figure for the board deck?",
+      "ground_truth": { "sourceId": "note:syn:n004", "charStart": 175, "charEnd": 270 }
+    },
+    {
+      "id": "q-note-05",
+      "corpus": "note",
+      "question": "What were the three office lease options reviewed on May 9?",
+      "ground_truth": { "sourceId": "note:syn:n005", "charStart": 0, "charEnd": 300 }
+    },
+    {
+      "id": "q-action-01",
+      "corpus": "action",
+      "question": "Who needs an on-call backfill after the postmortem?",
+      "ground_truth": { "sourceId": "action:syn:a001", "charStart": 0, "charEnd": 200 },
+      "explicit_person": "Tom"
+    },
+    {
+      "id": "q-action-02",
+      "corpus": "action",
+      "question": "What does Alex need to confirm with procurement before the Acme 1:1?",
+      "ground_truth": { "sourceId": "action:syn:a002", "charStart": 0, "charEnd": 215 },
+      "explicit_person": "Alex"
+    },
+    {
+      "id": "q-action-03",
+      "corpus": "action",
+      "question": "What goes in the team-wide note about the Q3 headcount cap?",
+      "ground_truth": { "sourceId": "action:syn:a003", "charStart": 0, "charEnd": 205 }
+    },
+    {
+      "id": "q-action-04",
+      "corpus": "action",
+      "question": "What does Tom need to include in the postmortem writeup?",
+      "ground_truth": { "sourceId": "action:syn:a004", "charStart": 0, "charEnd": 280 },
+      "explicit_person": "Tom"
+    },
+    {
+      "id": "q-action-05",
+      "corpus": "action",
+      "question": "What change to the offsite agenda did Sarah ask for?",
+      "ground_truth": { "sourceId": "action:syn:a005", "charStart": 0, "charEnd": 175 },
+      "explicit_person": "Sarah"
+    }
+  ]
+}
