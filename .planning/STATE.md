@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-18T08:35:00.000Z"
+last_updated: "2026-05-19T17:45:00.000Z"
 progress:
   total_phases: 9
-  completed_phases: 3
-  total_plans: 17
-  completed_plans: 15
-  percent: 38
+  completed_phases: 6
+  total_plans: 26
+  completed_plans: 25
+  percent: 71
 ---
 
 # State
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 7 Plan 01 complete** — RAG indexing foundation: migration 126 schema, chunk primitives, four-corpus harvesters, three chunking strategies, synthetic-fixture spike. Provisional winner `A-per-message`; replace synthetic fixture with real-DB user-authored fixture before plan 07-02 commits chunk-size (see 07-01-SUMMARY.md `Deferred / Followups` item 1). Task 0 human-action checkpoint was overridden by user authorization on 2026-05-19.
 
 **Phase 4 complete (pending verification)** — All 3 waves landed. Wave 3 (04-03 NL pipeline + SchedulingChat + ApprovalCard calendar variant + APPR-02 dispatch) green: 43 scheduling unit tests + 2 skip-tolerant e2e specs. SC-1 demonstrable: "move my 3pm to Thursday" → ProposeResult with conflict check → approve → applyCalendarChange chokepoint.
 

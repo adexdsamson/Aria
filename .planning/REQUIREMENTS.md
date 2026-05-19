@@ -86,11 +86,11 @@
 
 ### Conversational Q&A / RAG (RAG)
 
-- [ ] **RAG-01**: System indexes the user emails, meeting transcripts, and calendar events locally using nomic-embed-text (or equivalent)
+- [x] **RAG-01**: System indexes the user emails, meeting transcripts, and calendar events locally using nomic-embed-text (or equivalent)
 - [ ] **RAG-02**: User can ask natural-language questions ("what did Sarah commit to on Q3?") and get a cited answer
 - [ ] **RAG-03**: Every RAG answer cites at least one source (email / transcript / event); user can click to inspect the source
 - [ ] **RAG-04**: System uses hybrid retrieval (BM25 + vector) for accuracy on named entities
-- [ ] **RAG-05**: System re-indexes incrementally when source data is updated or deleted
+- [x] **RAG-05**: System re-indexes incrementally when source data is updated or deleted
 
 ### Weekly Recap (RECAP)
 
