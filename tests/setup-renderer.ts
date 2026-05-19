@@ -1,5 +1,5 @@
 /**
- * Renderer-only Vitest setup (Phase 7 UAT Gaps 2-3).
+ * Renderer-only Vitest setup (Phase 7 UAT Gaps 2-4).
  *
  * Loaded by the `renderer` project AFTER tests/setup.ts. Keeps jsdom-specific
  * imports out of the `main` (node-env) project so we don't pull DOM matchers
@@ -7,8 +7,12 @@
  *
  *   Gap 2 — register @testing-library/jest-dom matchers with vitest expect.
  *   Gap 3 — polyfill ResizeObserver (jsdom omits it; cmdk throws at mount).
+ *   Gap 4 — auto-cleanup mounted React trees between cases so bleed-through
+ *           on duplicate test-ids (e.g. citation-1) doesn't cause false reds.
  */
 import '@testing-library/jest-dom/vitest';
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   // Minimal no-op polyfill — sufficient for cmdk and shadcn primitives that
@@ -20,3 +24,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect(): void {}
   };
 }
+
+afterEach(() => {
+  cleanup();
+});
