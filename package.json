@@ -41,6 +41,7 @@
     "react-router-dom": "^6.0.0",
     "rrule": "^2.8.1",
     "rss-parser": "^3.13.0",
+    "sqlite-vec": "0.1.9",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -68,5 +69,14 @@
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vitest": "^4.0.0"
+  },
+  "build": {
+    "asarUnpack": [
+      "**/node_modules/sqlite-vec/dist/native/**",
+      "**/node_modules/sqlite-vec-darwin-x64/**",
+      "**/node_modules/sqlite-vec-darwin-arm64/**",
+      "**/node_modules/sqlite-vec-linux-x64/**",
+      "**/node_modules/sqlite-vec-windows-x64/**"
+    ]
   }
 }
