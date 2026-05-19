@@ -58,12 +58,23 @@ describe('IntegrationsSection provider accounts', () => {
     expect(screen.getByTestId('account-reconnect-gmail')).toBeTruthy();
   });
 
-  it('disconnect cascades through providerAccountDisconnect', async () => {
+  it('disconnect requires confirmation before calling providerAccountDisconnect (Phase 7 Gap 10)', async () => {
     const aria = installAria();
     const user = userEvent.setup();
     render(<IntegrationsSection />);
 
+    // Initial click opens confirm dialog but MUST NOT fire the IPC.
     await user.click(await screen.findByTestId('account-disconnect-acct-1'));
+    expect(await screen.findByTestId('disconnect-confirm-account-acct-1')).toBeTruthy();
+    expect(aria.providerAccountDisconnect).not.toHaveBeenCalled();
+
+    // Cancel should leave the account intact.
+    await user.click(screen.getByTestId('disconnect-confirm-cancel-account-acct-1'));
+    expect(aria.providerAccountDisconnect).not.toHaveBeenCalled();
+
+    // Re-open and confirm — IPC fires now.
+    await user.click(screen.getByTestId('account-disconnect-acct-1'));
+    await user.click(await screen.findByTestId('disconnect-confirm-ok-account-acct-1'));
     await waitFor(() => expect(aria.providerAccountDisconnect).toHaveBeenCalledWith({
       providerKey: 'microsoft',
       accountId: 'acct-1',

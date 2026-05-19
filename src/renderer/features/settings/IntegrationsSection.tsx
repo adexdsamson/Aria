@@ -32,6 +32,7 @@ import type {
 } from '../../../shared/ipc-contract';
 import { AddAccountModal } from '../../components/AddAccountModal';
 import { AccountRow } from '../../components/AccountRow';
+import { DisconnectConfirmDialog } from '../../components/DisconnectConfirmDialog';
 import { RagDisconnectedSection } from './RagDisconnectedSection';
 
 const POLL_MS = 10_000;
@@ -97,6 +98,8 @@ interface IntegrationsSectionProps {
 export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionProps = {}): JSX.Element {
   const [accounts, setAccounts] = useState<ProviderAccountDto[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [pendingDisconnect, setPendingDisconnect] = useState<ProviderAccountDto | null>(null);
+  const [disconnectBusy, setDisconnectBusy] = useState(false);
   const refreshAccounts = useCallback(async () => {
     const api = window.aria as typeof window.aria & {
       providerAccountsList?: typeof window.aria.providerAccountsList;
@@ -110,17 +113,33 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
     void refreshAccounts();
   }, [refreshAccounts]);
 
-  const disconnectAccount = useCallback(async (account: ProviderAccountDto) => {
+  // Phase 7 Gap 10 — destructive disconnect requires explicit confirmation.
+  // Click opens the dialog; the IPC fires only on confirm.
+  const requestDisconnectAccount = useCallback((account: ProviderAccountDto) => {
+    setPendingDisconnect(account);
+  }, []);
+
+  const confirmDisconnectAccount = useCallback(async () => {
+    if (!pendingDisconnect) return;
     const api = window.aria as typeof window.aria & {
       providerAccountDisconnect?: typeof window.aria.providerAccountDisconnect;
     };
-    if (!api.providerAccountDisconnect) return;
-    await api.providerAccountDisconnect({
-      providerKey: account.providerKey,
-      accountId: account.accountId,
-    });
-    await refreshAccounts();
-  }, [refreshAccounts]);
+    if (!api.providerAccountDisconnect) {
+      setPendingDisconnect(null);
+      return;
+    }
+    setDisconnectBusy(true);
+    try {
+      await api.providerAccountDisconnect({
+        providerKey: pendingDisconnect.providerKey,
+        accountId: pendingDisconnect.accountId,
+      });
+      await refreshAccounts();
+    } finally {
+      setDisconnectBusy(false);
+      setPendingDisconnect(null);
+    }
+  }, [pendingDisconnect, refreshAccounts]);
 
   return (
     <section data-testid="settings-integrations" style={{ padding: 'var(--aria-space-lg)' }}>
@@ -136,7 +155,7 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
             <AccountRow
               key={`${account.providerKey}:${account.accountId}`}
               account={account}
-              onDisconnect={disconnectAccount}
+              onDisconnect={requestDisconnectAccount}
             />
           ))}
         </div>
@@ -150,6 +169,26 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
       <CalendarRow />
       <TodoistRow onProviderChanged={refreshAccounts} />
       <RagDisconnectedSection />
+      {pendingDisconnect && (
+        <DisconnectConfirmDialog
+          provider={
+            pendingDisconnect.providerKey === 'microsoft'
+              ? 'Outlook'
+              : pendingDisconnect.providerKey === 'todoist'
+                ? 'Todoist'
+                : 'Google'
+          }
+          account={pendingDisconnect.displayEmail}
+          wipesRagData={
+            pendingDisconnect.providerKey === 'google' ||
+            pendingDisconnect.providerKey === 'microsoft'
+          }
+          testIdSuffix={`account-${pendingDisconnect.accountId}`}
+          busy={disconnectBusy}
+          onCancel={() => setPendingDisconnect(null)}
+          onConfirm={confirmDisconnectAccount}
+        />
+      )}
     </section>
   );
 }
@@ -164,6 +203,7 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
   const [modalOpen, setModalOpen] = useState<boolean>(initialModalOpen ?? false);
   const [busy, setBusy] = useState<boolean>(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
     const next = await window.aria.gmailStatus();
@@ -195,13 +235,16 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
     }
   }, [refresh]);
   const onModalCancel = useCallback(() => setModalOpen(false), []);
-  const onDisconnect = useCallback(async () => {
+  // Phase 7 Gap 10 — gate disconnect behind explicit confirmation.
+  const onDisconnectClick = useCallback(() => setConfirmOpen(true), []);
+  const onConfirmDisconnect = useCallback(async () => {
     setBusy(true);
     try {
       await window.aria.gmailDisconnect();
       await refresh();
     } finally {
       setBusy(false);
+      setConfirmOpen(false);
     }
   }, [refresh]);
   const onForceSync = useCallback(async () => {
@@ -269,7 +312,7 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
               <button type="button" onClick={onForceSync} disabled={busy} data-testid="gmail-sync-now-btn">
                 Sync now
               </button>
-              <button type="button" onClick={onDisconnect} disabled={busy} data-testid="gmail-disconnect-btn">
+              <button type="button" onClick={onDisconnectClick} disabled={busy} data-testid="gmail-disconnect-btn">
                 Disconnect
               </button>
               <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-reconnect-btn">
@@ -292,6 +335,18 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
           </div>
         </div>
       )}
+
+      {confirmOpen && (
+        <DisconnectConfirmDialog
+          provider="Gmail"
+          account={status?.email ?? null}
+          wipesRagData={true}
+          testIdSuffix="gmail"
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={onConfirmDisconnect}
+        />
+      )}
     </>
   );
 }
@@ -305,6 +360,7 @@ function CalendarRow(): JSX.Element {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
     const next = await window.aria.calendarStatus();
@@ -336,13 +392,16 @@ function CalendarRow(): JSX.Element {
     }
   }, [refresh]);
   const onModalCancel = useCallback(() => setModalOpen(false), []);
-  const onDisconnect = useCallback(async () => {
+  // Phase 7 Gap 10 — gate disconnect behind explicit confirmation.
+  const onDisconnectClick = useCallback(() => setConfirmOpen(true), []);
+  const onConfirmDisconnect = useCallback(async () => {
     setBusy(true);
     try {
       await window.aria.calendarDisconnect();
       await refresh();
     } finally {
       setBusy(false);
+      setConfirmOpen(false);
     }
   }, [refresh]);
   const onForceSync = useCallback(async () => {
@@ -413,7 +472,7 @@ function CalendarRow(): JSX.Element {
               <button type="button" onClick={onForceSync} disabled={busy} data-testid="calendar-sync-now-btn">
                 Sync now
               </button>
-              <button type="button" onClick={onDisconnect} disabled={busy} data-testid="calendar-disconnect-btn">
+              <button type="button" onClick={onDisconnectClick} disabled={busy} data-testid="calendar-disconnect-btn">
                 Disconnect
               </button>
             </>
@@ -433,6 +492,18 @@ function CalendarRow(): JSX.Element {
           </div>
         </div>
       )}
+
+      {confirmOpen && (
+        <DisconnectConfirmDialog
+          provider="Google Calendar"
+          account={status?.email ?? null}
+          wipesRagData={true}
+          testIdSuffix="calendar"
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={onConfirmDisconnect}
+        />
+      )}
     </>
   );
 }
@@ -443,6 +514,7 @@ function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<v
   const [busy, setBusy] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
     const next = await window.aria.todoistStatus();
@@ -469,7 +541,9 @@ function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<v
     }
   }, [onProviderChanged, refresh, token]);
 
-  const onDisconnect = useCallback(async () => {
+  // Phase 7 Gap 10 — gate disconnect behind explicit confirmation.
+  const onDisconnectClick = useCallback(() => setConfirmOpen(true), []);
+  const onConfirmDisconnect = useCallback(async () => {
     setBusy(true);
     try {
       await window.aria.todoistDisconnect();
@@ -477,6 +551,7 @@ function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<v
       await onProviderChanged?.();
     } finally {
       setBusy(false);
+      setConfirmOpen(false);
     }
   }, [onProviderChanged, refresh]);
 
@@ -554,10 +629,22 @@ function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<v
           <button type="button" onClick={onForceSync} disabled={busy} data-testid="todoist-sync-now-btn">
             {busy ? 'Syncing...' : 'Sync now'}
           </button>
-          <button type="button" onClick={onDisconnect} disabled={busy} data-testid="todoist-disconnect-btn">
+          <button type="button" onClick={onDisconnectClick} disabled={busy} data-testid="todoist-disconnect-btn">
             Disconnect
           </button>
         </div>
+      )}
+
+      {confirmOpen && (
+        <DisconnectConfirmDialog
+          provider="Todoist"
+          account={null}
+          wipesRagData={false}
+          testIdSuffix="todoist"
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={onConfirmDisconnect}
+        />
       )}
     </article>
   );
