@@ -2,6 +2,7 @@ import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { SideNav } from '../components/SideNav';
+import { CommandPalette } from '../components/CommandPalette';
 import { AppRoutes } from './routes';
 import { OnboardingWizard } from '../features/onboarding/OnboardingWizard';
 import { UnlockScreen } from '../features/onboarding/UnlockScreen';
@@ -81,6 +82,7 @@ function AppShell(): JSX.Element {
       <main style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
         <AppRoutes />
       </main>
+      <CommandPalette />
     </div>
   );
 }
