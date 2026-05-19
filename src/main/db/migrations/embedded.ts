@@ -338,4 +338,250 @@ CREATE INDEX idx_calendar_action_log_approval ON calendar_action_log(approval_id
 CREATE INDEX idx_calendar_action_log_event ON calendar_action_log(event_id);
 `,
   },
+  {
+    version: 11,
+    file: '011_provider_accounts.sql',
+    sql: `
+CREATE TABLE IF NOT EXISTS provider_account (
+  account_id          TEXT NOT NULL,
+  provider_key        TEXT NOT NULL CHECK (provider_key IN ('google','microsoft')),
+  display_email       TEXT NOT NULL,
+  display_label       TEXT,
+  display_color       TEXT,
+  status              TEXT NOT NULL DEFAULT 'ok' CHECK (status IN ('ok','degraded','needs-auth','disconnected')),
+  identity_set_json   TEXT,
+  last_synced_at      TEXT,
+  last_error          TEXT,
+  last_error_at       TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  capabilities_json   TEXT NOT NULL,
+  PRIMARY KEY (provider_key, account_id)
+);
+
+CREATE TABLE IF NOT EXISTS provider_sync_state (
+  provider_key   TEXT NOT NULL,
+  account_id     TEXT NOT NULL,
+  resource       TEXT NOT NULL CHECK (resource IN ('mail','calendar')),
+  cursor         TEXT,
+  last_sync_at   TEXT,
+  last_error     TEXT,
+  PRIMARY KEY (provider_key, account_id, resource),
+  FOREIGN KEY (provider_key, account_id) REFERENCES provider_account(provider_key, account_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_account_status ON provider_account(status);
+
+ALTER TABLE calendar_event ADD COLUMN recurrence_unsupported INTEGER NOT NULL DEFAULT 0;
+
+PRAGMA user_version = 11;
+`,
+  },
+  {
+    version: 12,
+    file: '012_message_provider_key.sql',
+    sql: `
+ALTER TABLE gmail_message ADD COLUMN provider_key TEXT;
+ALTER TABLE gmail_message ADD COLUMN account_id TEXT;
+ALTER TABLE calendar_event ADD COLUMN provider_key TEXT;
+ALTER TABLE calendar_event ADD COLUMN account_id TEXT;
+ALTER TABLE approval ADD COLUMN provider_key TEXT;
+ALTER TABLE approval ADD COLUMN account_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_gmail_message_provider_account ON gmail_message(provider_key, account_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_event_provider_account ON calendar_event(provider_key, account_id);
+CREATE INDEX IF NOT EXISTS idx_approval_provider_account ON approval(provider_key, account_id);
+
+UPDATE gmail_message
+   SET provider_key = 'google',
+       account_id = (SELECT email FROM gmail_account LIMIT 1)
+ WHERE provider_key IS NULL
+   AND EXISTS (SELECT 1 FROM gmail_account);
+
+UPDATE calendar_event
+   SET provider_key = 'google',
+       account_id = (SELECT email FROM calendar_account LIMIT 1)
+ WHERE provider_key IS NULL
+   AND EXISTS (SELECT 1 FROM calendar_account);
+
+UPDATE approval
+   SET provider_key = 'google',
+       account_id = (SELECT email FROM gmail_account LIMIT 1)
+ WHERE provider_key IS NULL
+   AND kind = 'email_send'
+   AND EXISTS (SELECT 1 FROM gmail_account);
+
+UPDATE approval
+   SET provider_key = 'google',
+       account_id = (SELECT email FROM calendar_account LIMIT 1)
+ WHERE provider_key IS NULL
+   AND kind = 'calendar_change'
+   AND EXISTS (SELECT 1 FROM calendar_account);
+
+INSERT OR IGNORE INTO provider_account (
+  account_id, provider_key, display_email, status, capabilities_json
+)
+SELECT email, 'google', email, 'ok', '{"mail":true,"calendar":false}'
+  FROM gmail_account;
+
+INSERT OR IGNORE INTO provider_account (
+  account_id, provider_key, display_email, status, capabilities_json
+)
+SELECT email, 'google', email, 'ok', '{"mail":false,"calendar":true}'
+  FROM calendar_account;
+
+UPDATE provider_account
+   SET capabilities_json = '{"mail":true,"calendar":true}'
+ WHERE provider_key = 'google'
+   AND account_id IN (SELECT email FROM gmail_account)
+   AND account_id IN (SELECT email FROM calendar_account);
+
+PRAGMA user_version = 12;
+`,
+  },
+  {
+    version: 121,
+    file: '012a_idempotency_key.sql',
+    sql: `
+PRAGMA foreign_keys=OFF;
+BEGIN;
+
+ALTER TABLE approval ADD COLUMN idempotency_key TEXT;
+ALTER TABLE approval ADD COLUMN last_error_message TEXT;
+
+UPDATE approval
+   SET idempotency_key = lower(hex(randomblob(16)))
+ WHERE idempotency_key IS NULL;
+
+CREATE TABLE approval_new (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('email_send','calendar_change')),
+  state TEXT NOT NULL CHECK (state IN (
+    'pending','generating','ready','approved','rejected','snoozed','interrupted','sent',
+    'sending','failed','needs-operator-decision'
+  )),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  approval_path TEXT NOT NULL DEFAULT 'explicit' CHECK (approval_path IN ('explicit','silent')),
+  source_message_id TEXT,
+  recipients_json TEXT,
+  subject TEXT,
+  body_original TEXT,
+  body_edited TEXT,
+  classifier_version TEXT,
+  categories_json TEXT,
+  severity TEXT,
+  confidence REAL,
+  classifier_rationale TEXT,
+  routed TEXT,
+  triage_signals_json TEXT,
+  triage_summary TEXT,
+  rejection_reason TEXT,
+  snooze_until TEXT,
+  sent_at TEXT,
+  send_log_id INTEGER,
+  beta_voice INTEGER NOT NULL DEFAULT 0,
+  calendar_event_id TEXT,
+  calendar_action TEXT CHECK (calendar_action IS NULL OR calendar_action IN ('move','create','find-time')),
+  recurring_scope TEXT CHECK (recurring_scope IS NULL OR recurring_scope IN ('this','future','all')),
+  before_json TEXT,
+  after_json TEXT,
+  conflicts_json TEXT,
+  alternatives_json TEXT,
+  rule_overrides_json TEXT,
+  provider_key TEXT,
+  account_id TEXT,
+  idempotency_key TEXT NOT NULL,
+  last_error_message TEXT
+);
+
+INSERT INTO approval_new (
+  id, kind, state, created_at, updated_at, approval_path,
+  source_message_id, recipients_json, subject, body_original, body_edited,
+  classifier_version, categories_json, severity, confidence,
+  classifier_rationale, routed, triage_signals_json, triage_summary,
+  rejection_reason, snooze_until, sent_at, send_log_id, beta_voice,
+  calendar_event_id, calendar_action, recurring_scope,
+  before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json,
+  provider_key, account_id, idempotency_key, last_error_message
+)
+SELECT
+  id, kind, state, created_at, updated_at, approval_path,
+  source_message_id, recipients_json, subject, body_original, body_edited,
+  classifier_version, categories_json, severity, confidence,
+  classifier_rationale, routed, triage_signals_json, triage_summary,
+  rejection_reason, snooze_until, sent_at, send_log_id, beta_voice,
+  calendar_event_id, calendar_action, recurring_scope,
+  before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json,
+  provider_key, account_id, idempotency_key, NULL
+FROM approval;
+
+DROP TABLE approval;
+ALTER TABLE approval_new RENAME TO approval;
+
+CREATE INDEX IF NOT EXISTS idx_approval_state ON approval(state);
+CREATE INDEX IF NOT EXISTS idx_approval_kind_state ON approval(kind, state);
+CREATE INDEX IF NOT EXISTS idx_approval_updated_at ON approval(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_approval_provider_account ON approval(provider_key, account_id);
+
+ALTER TABLE send_log RENAME TO send_log_old;
+
+CREATE TABLE send_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  approval_id TEXT NOT NULL,
+  ts TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_msg_id TEXT,
+  recipients_json TEXT NOT NULL,
+  subject TEXT,
+  ok INTEGER NOT NULL CHECK (ok IN (0,1)),
+  error TEXT,
+  FOREIGN KEY (approval_id) REFERENCES approval(id)
+);
+INSERT INTO send_log (
+  id, approval_id, ts, provider, provider_msg_id, recipients_json, subject, ok, error
+)
+SELECT
+  id, approval_id, ts, provider, provider_msg_id, recipients_json, subject, ok, error
+FROM send_log_old;
+DROP TABLE send_log_old;
+CREATE INDEX IF NOT EXISTS idx_send_log_ts ON send_log(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_send_log_approval ON send_log(approval_id);
+
+PRAGMA user_version = 121;
+COMMIT;
+PRAGMA foreign_keys=ON;
+`,
+  },
+  {
+    version: 122,
+    file: '014_legacy_singleton_views.sql',
+    sql: `
+DROP TABLE IF EXISTS gmail_account;
+DROP TABLE IF EXISTS calendar_account;
+
+CREATE VIEW gmail_account_view AS
+  SELECT account_id AS email,
+         display_email,
+         status,
+         last_synced_at,
+         last_error,
+         created_at AS connected_at,
+         identity_set_json
+    FROM provider_account
+   WHERE provider_key = 'google'
+     AND json_extract(capabilities_json, '$.mail') = 1;
+
+CREATE VIEW calendar_account_view AS
+  SELECT account_id AS email,
+         display_email,
+         status,
+         last_synced_at,
+         last_error,
+         created_at AS connected_at,
+         identity_set_json
+    FROM provider_account
+   WHERE provider_key = 'google'
+     AND json_extract(capabilities_json, '$.calendar') = 1;
+`,
+  },
 ];

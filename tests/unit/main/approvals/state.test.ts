@@ -18,6 +18,11 @@ describe('approvals/state assertTransition', () => {
     ['snoozed', 'ready'],
     ['interrupted', 'generating'],
     ['approved', 'sent'],
+    ['approved', 'sending'],
+    ['sending', 'sent'],
+    ['sending', 'failed'],
+    ['sending', 'needs-operator-decision'],
+    ['failed', 'needs-operator-decision'],
   ])('allows %s -> %s', (from, to) => {
     expect(() => assertTransition(from, to)).not.toThrow();
   });
@@ -32,6 +37,9 @@ describe('approvals/state assertTransition', () => {
     ['rejected', 'ready'],
     ['pending', 'approved'],
     ['approved', 'ready'],
+    ['approved', 'failed'],
+    ['sent', 'failed'],
+    ['needs-operator-decision', 'approved'],
   ])('rejects %s -> %s', (from, to) => {
     expect(() => assertTransition(from, to)).toThrow(/invalid-transition/);
   });

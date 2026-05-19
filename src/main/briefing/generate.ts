@@ -161,11 +161,16 @@ export function buildBriefingPrompt(
 // ---------------------------------------------------------------------------
 
 async function gatherCalendarCandidates(
+  db: Db,
   calendarClient: CalendarClient,
+  date: string,
   userTz: string,
-): Promise<CalendarCandidate[]> {
+): Promise<{ rows: CalendarCandidate[]; unsupportedCount: number }> {
+  const local = gatherCalendarCandidatesFromDb(db, date);
+  if (local.rows.length > 0 || local.unsupportedCount > 0) return local;
+
   const raws = await readTodaysEvents(calendarClient, userTz);
-  return raws.map((r: CalendarEventRaw) => {
+  return { rows: raws.map((r: CalendarEventRaw) => {
     const startsAt = r.start?.dateTime ?? r.start?.date ?? null;
     const allDay = !r.start?.dateTime && !!r.start?.date;
     return {
@@ -175,7 +180,56 @@ async function gatherCalendarCandidates(
       allDay,
       location: r.location ?? null,
     };
-  });
+  }), unsupportedCount: 0 };
+}
+
+function gatherCalendarCandidatesFromDb(
+  db: Db,
+  date: string,
+): { rows: CalendarCandidate[]; unsupportedCount: number } {
+  try {
+    const startUtc = `${date}T00:00:00.000Z`;
+    const end = new Date(startUtc);
+    end.setUTCDate(end.getUTCDate() + 1);
+    const endUtc = end.toISOString();
+    const unsupported = db.prepare(
+      `SELECT COUNT(*) AS n
+         FROM calendar_event e
+         JOIN provider_account p
+           ON p.provider_key = e.provider_key
+          AND p.account_id = e.account_id
+        WHERE p.status IN ('ok', 'degraded')
+          AND e.recurrence_unsupported = 1
+          AND (
+            (e.start_at_utc IS NOT NULL AND e.start_at_utc < @endUtc AND COALESCE(e.end_at_utc, e.start_at_utc) >= @startUtc)
+            OR e.start_date = @date
+          )`,
+    ).get({ startUtc, endUtc, date }) as { n: number };
+    const rows = db.prepare(
+      `SELECT e.id,
+              e.summary AS title,
+              COALESCE(e.start_at_utc, e.start_date) AS startsAt,
+              CASE WHEN e.start_at_utc IS NULL THEN 1 ELSE 0 END AS allDay,
+              e.location,
+              e.provider_key AS provider_key,
+              e.account_id AS account_id
+         FROM calendar_event e
+         JOIN provider_account p
+           ON p.provider_key = e.provider_key
+          AND p.account_id = e.account_id
+        WHERE p.status IN ('ok', 'degraded')
+          AND e.recurrence_unsupported = 0
+          AND (
+            (e.start_at_utc IS NOT NULL AND e.start_at_utc < @endUtc AND COALESCE(e.end_at_utc, e.start_at_utc) >= @startUtc)
+            OR e.start_date = @date
+          )
+        ORDER BY COALESCE(e.start_at_utc, e.start_date) ASC
+        LIMIT 20`,
+    ).all({ startUtc, endUtc, date }) as CalendarCandidate[];
+    return { rows, unsupportedCount: unsupported.n };
+  } catch {
+    return { rows: [], unsupportedCount: 0 };
+  }
 }
 
 /**
@@ -315,8 +369,8 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
   const dismissedHashes = new Set(dismissedRows.map((r) => r.url_hash));
 
   // ── Promise.allSettled gather ─────────────────────────────────────────────
-  const calPromise: Promise<CalendarCandidate[]> = calendarClient
-    ? gatherCalendarCandidates(calendarClient, userTz)
+  const calPromise: Promise<{ rows: CalendarCandidate[]; unsupportedCount: number }> = calendarClient
+    ? gatherCalendarCandidates(db, calendarClient, date, userTz)
     : Promise.reject(new Error('calendar-not-connected'));
   const emailPromise = gatherEmailCandidates(db);
   const newsPromise = gatherNewsCandidates(db, date, dismissedHashes);
@@ -329,9 +383,14 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
 
   const errors: BriefingPayload['errors'] = {};
   const calendarCandidates: CalendarCandidate[] =
-    calRes.status === 'fulfilled' ? calRes.value : [];
+    calRes.status === 'fulfilled' ? calRes.value.rows : [];
+  const recurrenceUnsupportedCount = calRes.status === 'fulfilled' ? calRes.value.unsupportedCount : 0;
   if (calRes.status === 'rejected') {
     errors.calendar = describeErr(calRes.reason);
+  }
+  if (recurrenceUnsupportedCount > 0) {
+    const note = `${recurrenceUnsupportedCount} Outlook events with complex recurrence not shown - see calendar grid for 'View in Outlook' badges.`;
+    errors.calendar = errors.calendar ? `${errors.calendar} ${note}` : note;
   }
   const emailCandidates: EmailCandidate[] = emailRes.status === 'fulfilled' ? emailRes.value : [];
   if (emailRes.status === 'rejected') {
@@ -523,11 +582,16 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
     const latency_ms = Math.max(0, Date.now() - startMs);
     const obj = (result as { object: BriefingLLMObject }).object;
 
-    const calendar: BriefingItem[] = (obj.calendar ?? []).slice(0, 3).map((c) => ({
-      id: c.id,
-      title: c.title,
-      why: c.why,
-    }));
+    const calendar: BriefingItem[] = (obj.calendar ?? []).slice(0, 3).map((c) => {
+      const source = calendarCandidates.find((candidate) => candidate.id === c.id);
+      return {
+        id: c.id,
+        title: c.title,
+        why: c.why,
+        provider_key: source?.provider_key ?? null,
+        account_id: source?.account_id ?? null,
+      };
+    });
     const email: BriefingItem[] = (obj.email ?? []).slice(0, 3).map((c) => ({
       id: c.id,
       title: c.title,
@@ -660,6 +724,8 @@ function degradedPayload(args: {
     id: c.id,
     title: c.title,
     why: '(rationale unavailable)',
+    provider_key: c.provider_key ?? null,
+    account_id: c.account_id ?? null,
   }));
   const email: BriefingItem[] = args.emailCandidates.slice(0, 3).map((c) => ({
     id: c.id,

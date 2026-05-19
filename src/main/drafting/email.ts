@@ -3,7 +3,7 @@
  *
  * `draftReply(db, sourceMessage)` creates an `approval` row in state='ready'
  * with the generated draft body in `body_original`. NEVER sends — sending is
- * the exclusive domain of `src/main/integrations/google/send.ts` and the
+ * the exclusive domain of `src/main/integrations/send.ts` and the
  * `assertApproved` gate (Plan 03-01).
  *
  * Crash-recovery invariant (RESEARCH §Pattern 2):

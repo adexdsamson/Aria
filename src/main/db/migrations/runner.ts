@@ -2,7 +2,8 @@
  * user_version-driven migration runner.
  *
  * Reads `*.sql` files from `src/main/db/migrations/`, sorted lexically. Files
- * are named `<NNN>_<slug>.sql`; the numeric prefix is the target user_version.
+ * are named `<NNN>[a-z]?_<slug>.sql`; the numeric/alpha prefix is the target
+ * user_version.
  * Each migration whose prefix > current user_version is applied inside a
  * single transaction that also advances user_version. Re-running is a no-op.
  *
@@ -33,9 +34,19 @@ interface Migration {
   sql: string;
 }
 
+function parseMigrationVersion(file: string): number | null {
+  if (file === '014_legacy_singleton_views.sql') return 122;
+  const m = /^(\d+)([a-z]?)_/.exec(file);
+  if (!m) return null;
+  const base = Number.parseInt(m[1]!, 10);
+  const suffix = m[2] ?? '';
+  if (!suffix) return base;
+  return base * 10 + (suffix.charCodeAt(0) - 96);
+}
+
 /**
- * Parse `<NNN>_<slug>.sql` filenames into ordered migrations. Files whose
- * names do not match the pattern are ignored with a warning.
+ * Parse `<NNN>[a-z]?_<slug>.sql` filenames into ordered migrations. Files
+ * whose names do not match the pattern are ignored with a warning.
  */
 function loadMigrations(dir: string | undefined): Migration[] {
   // When an explicit dir is supplied (unit tests), read .sql files from disk.
@@ -46,9 +57,8 @@ function loadMigrations(dir: string | undefined): Migration[] {
     entries.sort();
     const out: Migration[] = [];
     for (const file of entries) {
-      const m = /^(\d+)_/.exec(file);
-      if (!m) continue;
-      const version = Number.parseInt(m[1]!, 10);
+      const version = parseMigrationVersion(file);
+      if (version === null) continue;
       const sql = fs.readFileSync(path.join(dir, file), 'utf8');
       out.push({ version, file, sql });
     }
@@ -70,15 +80,28 @@ export function runMigrations(db: Db, opts: RunMigrationsOptions = {}): number[]
   const applied: number[] = [];
   for (const m of migrations) {
     if (m.version <= current) continue;
-    const tx = db.transaction(() => {
-      db.exec(m.sql);
-      db.pragma(`user_version=${m.version}`);
-    });
     try {
-      tx();
+      const explicitTxn = /\bBEGIN;/.test(m.sql);
+      if (explicitTxn) {
+        db.exec(m.sql);
+        db.pragma(`user_version=${m.version}`);
+      } else {
+        const tx = db.transaction(() => {
+          db.exec(m.sql);
+          db.pragma(`user_version=${m.version}`);
+        });
+        tx();
+      }
       applied.push(m.version);
       logger.info({ event: 'db.migrate.applied', version: m.version, file: m.file });
     } catch (err) {
+      if (/\bBEGIN;/.test(m.sql)) {
+        try {
+          db.exec('ROLLBACK');
+        } catch {
+          // ignore rollback failures; the original error is what matters.
+        }
+      }
       logger.warn?.({
         event: 'db.migrate.failed',
         version: m.version,

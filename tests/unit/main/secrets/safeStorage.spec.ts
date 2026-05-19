@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createTempUserDataDir } from '../../../setup';
 
-async function freshModule(dataDir: string) {
+async function freshModule(dataDir: string, backend = 'keychain') {
   vi.resetModules();
   // Override app.getPath to point at the per-test dir.
   vi.doMock('electron', async () => {
@@ -28,7 +28,7 @@ async function freshModule(dataDir: string) {
         isEncryptionAvailable: () => true,
         encryptString: (s: string) => Buffer.from('enc:' + s, 'utf8'),
         decryptString: (b: Buffer) => b.toString('utf8').replace(/^enc:/, ''),
-        getSelectedStorageBackend: () => 'keychain',
+        getSelectedStorageBackend: () => backend,
       },
     };
   });
@@ -168,5 +168,119 @@ describe('safeStorage frontier-key module', () => {
     await expect(m.setFrontierKey({ provider: 'anthropic', key: 'x' })).rejects.toMatchObject({
       reason: 'not-available',
     });
+  });
+
+  it('round-trips opaque provider token blobs via providerTokens', async () => {
+    const m = await freshModule(dataDir);
+    m.setProviderTokens('microsoft:acct-123', 'opaque-token-blob');
+    expect(m.getProviderTokens('microsoft:acct-123')).toBe('opaque-token-blob');
+    expect(m.listProviderTokenKeys()).toContain('microsoft:acct-123');
+    const raw = fs.readFileSync(path.join(dataDir, 'secrets.json'), 'utf8');
+    expect(raw).not.toContain('opaque-token-blob');
+  });
+
+  it('mirrors legacy Google provider keys into googleTokens when JSON-shaped', async () => {
+    const m = await freshModule(dataDir);
+    m.setProviderTokens(
+      'google:gmail',
+      JSON.stringify({ refreshToken: 'refresh-123', email: 'user@example.com' }),
+    );
+    expect(m.getProviderTokens('google:gmail')).toBe(
+      JSON.stringify({ refreshToken: 'refresh-123', email: 'user@example.com' }),
+    );
+    expect(m.listProviderTokenKeys()).toContain('google:gmail');
+    expect(m.getGoogleTokens('gmail')).toEqual({
+      refreshToken: 'refresh-123',
+      email: 'user@example.com',
+    });
+  });
+
+  it('can write fresh Google provider tokens without re-populating googleTokens', async () => {
+    const m = await freshModule(dataDir);
+    m.setProviderTokens(
+      'google:gmail',
+      JSON.stringify({ refreshToken: 'fresh-refresh', email: 'fresh@example.com' }),
+      { mirrorLegacyGoogle: false },
+    );
+    expect(m.getProviderTokens('google:gmail')).toBe(
+      JSON.stringify({ refreshToken: 'fresh-refresh', email: 'fresh@example.com' }),
+    );
+    expect(m.getGoogleTokens('gmail')).toBeNull();
+  });
+
+  it('persists legacy googleTokens into providerTokens during migration', async () => {
+    const m = await freshModule(dataDir);
+    m.setGoogleTokens({ kind: 'calendar', refreshToken: 'legacy-refresh', email: 'legacy@example.com' });
+    const result = m.migrateLegacyGoogleTokensToProviderTokens();
+    expect(result.migrated).toEqual(['google:calendar']);
+    expect(m.getProviderTokens('google:calendar')).toBe(
+      JSON.stringify({ refreshToken: 'legacy-refresh', email: 'legacy@example.com' }),
+    );
+
+    const raw = fs.readFileSync(path.join(dataDir, 'secrets.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    expect(typeof parsed.providerTokens['google:calendar']).toBe('string');
+    expect(raw).not.toContain('legacy-refresh');
+  });
+
+  it('drops verified legacy Google entries per account', async () => {
+    const m = await freshModule(dataDir);
+    const Database = (await import('better-sqlite3-multiple-ciphers')).default;
+    const db = new Database(':memory:');
+    db.exec(
+      `CREATE TABLE provider_account (
+        account_id TEXT NOT NULL,
+        provider_key TEXT NOT NULL,
+        display_email TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        last_error TEXT,
+        last_error_at TEXT
+      )`,
+    );
+    db.prepare(
+      `INSERT INTO provider_account (account_id, provider_key, display_email, status, capabilities_json)
+       VALUES ('verified@example.com', 'google', 'verified@example.com', 'ok', '{"mail":true}')`,
+    ).run();
+    m.setGoogleTokens({ kind: 'gmail', refreshToken: 'legacy-refresh', email: 'verified@example.com' });
+    m.setProviderTokens(
+      'google:gmail',
+      JSON.stringify({ refreshToken: 'new-refresh', email: 'verified@example.com' }),
+      { mirrorLegacyGoogle: false },
+    );
+
+    const result = m.runDropLegacyGoogleKeyringPerAccount(db);
+
+    expect(result.droppedCount).toBe(1);
+    expect(m.getGoogleTokens('gmail')).toBeNull();
+    db.close();
+  });
+
+  it('skips legacy Google drops on Linux basic_text backend', async () => {
+    const m = await freshModule(dataDir, 'basic_text');
+    const Database = (await import('better-sqlite3-multiple-ciphers')).default;
+    const db = new Database(':memory:');
+    db.exec(
+      `CREATE TABLE provider_account (
+        account_id TEXT NOT NULL,
+        provider_key TEXT NOT NULL,
+        display_email TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL
+      )`,
+    );
+    db.prepare(
+      `INSERT INTO provider_account (account_id, provider_key, display_email, status, capabilities_json)
+       VALUES ('skip@example.com', 'google', 'skip@example.com', 'ok', '{"mail":true}')`,
+    ).run();
+
+    const result = m.runDropLegacyGoogleKeyringPerAccount(db);
+
+    expect(result).toMatchObject({
+      droppedCount: 0,
+      skippedCount: 1,
+      reason: 'basic_text-backend',
+    });
+    db.close();
   });
 });

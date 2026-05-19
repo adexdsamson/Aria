@@ -18,6 +18,9 @@
  */
 import type Database from 'better-sqlite3-multiple-ciphers';
 import type { CalendarClient } from '../integrations/google/calendar';
+import type { ProviderKey } from '../../shared/provider';
+import { ProviderRegistry, type ProviderRegistryDeps } from '../integrations/registry';
+import { getProviderAccount } from '../integrations/microsoft/provider-account';
 import { parseIntent, IntentRefusedError, type Intent, type ParseIntentDeps } from './intent';
 import {
   resolveTarget,
@@ -25,7 +28,7 @@ import {
   type ResolvedTarget,
   type ResolveDeps,
 } from './resolver';
-import { assertSelfOnly, SelfOnlyGateError } from './self-only-gate';
+import { assertSelfOnly, SelfOnlyGateError, type IdentitySet } from './self-only-gate';
 import { loadActiveRules } from './rules';
 import {
   detectConflictsAndAlternatives,
@@ -71,8 +74,13 @@ export type ProposeOutcome = ProposeResult | ProposeClarification | ProposeRefus
 export interface ProposeDeps {
   db: Db;
   /** Pre-built CalendarClient or factory; tests inject a fake. */
-  client: CalendarClient;
-  userEmail: string;
+  client?: CalendarClient;
+  userEmail?: string;
+  providerKey?: ProviderKey;
+  accountId?: string;
+  identitySet?: IdentitySet;
+  registry?: ProviderRegistry;
+  registryDeps?: ProviderRegistryDeps;
   /** Hand off to parseIntent. */
   parseIntentDeps?: ParseIntentDeps;
   /** Hand off to resolveTarget — used for confirmTarget short-circuit. */
@@ -84,6 +92,64 @@ export interface ProposeDeps {
    * a thrown error. When set, the NL string is ignored.
    */
   intentFn?: (nl: string) => Promise<Intent>;
+}
+
+interface FreeBusyClient {
+  freebusyQuery(args: { timeMin: string; timeMax: string; calendarIds: string[] }): Promise<{
+    calendars: Record<string, { busy: Array<{ start: string; end: string }> }>;
+  }>;
+}
+
+function fallbackIdentity(userEmail: string | undefined): IdentitySet {
+  const email = userEmail ?? 'user@local';
+  return { primaryEmail: email, aliases: [email] };
+}
+
+function resolveAccountIdentity(deps: ProposeDeps): IdentitySet {
+  if (deps.identitySet) return deps.identitySet;
+  if (deps.providerKey && deps.accountId) {
+    const account = getProviderAccount(deps.db, deps.providerKey, deps.accountId);
+    if (!account) {
+      throw new Error(`unknown account: ${deps.providerKey}:${deps.accountId}`);
+    }
+    return account.identitySet ?? {
+      primaryEmail: account.displayEmail,
+      aliases: [],
+    };
+  }
+  return fallbackIdentity(deps.userEmail);
+}
+
+function primaryEmailOf(identitySet: IdentitySet): string {
+  return identitySet.primaryEmail;
+}
+
+function resolveCalendarClient(deps: ProposeDeps): FreeBusyClient {
+  if (deps.providerKey && deps.accountId) {
+    const registry = deps.registry ?? new ProviderRegistry(deps.db, deps.registryDeps);
+    const provider = registry.get(deps.providerKey, deps.accountId);
+    if (!provider.calendar) {
+      throw new Error(`calendar-not-available:${deps.providerKey}:${deps.accountId}`);
+    }
+    return {
+      async freebusyQuery(args) {
+        const calendars = await provider.calendar!.freeBusy({
+          startDateTime: args.timeMin,
+          endDateTime: args.timeMax,
+          calendarIds: args.calendarIds,
+        });
+        return {
+          calendars: Object.fromEntries(
+            Object.entries(calendars).map(([id, busy]) => [id, { busy }]),
+          ),
+        };
+      },
+    };
+  }
+  if (!deps.client) {
+    throw new Error('calendar-client-required');
+  }
+  return deps.client;
 }
 
 function refused(
@@ -114,6 +180,9 @@ export async function proposeCalendarChange(
   deps: ProposeDeps,
 ): Promise<ProposeOutcome> {
   const nowIso = deps.nowIso ?? new Date().toISOString();
+  const identitySet = resolveAccountIdentity(deps);
+  const userEmail = primaryEmailOf(identitySet);
+  const client = resolveCalendarClient(deps);
 
   // 1. Intent
   let intent: Intent;
@@ -140,7 +209,7 @@ export async function proposeCalendarChange(
   // 2. Resolve target
   let target: ResolvedTarget;
   try {
-    target = await resolveTarget(intent, deps.db, deps.client, deps.userEmail, {
+    target = await resolveTarget(intent, deps.db, deps.client ?? null, userEmail, {
       nowIso,
       ...(deps.resolveDeps ?? {}),
     });
@@ -160,7 +229,7 @@ export async function proposeCalendarChange(
 
   // 3. Self-only gate
   try {
-    assertSelfOnly(target.event, deps.userEmail);
+    assertSelfOnly(target.event, identitySet);
   } catch (err) {
     if (err instanceof SelfOnlyGateError) {
       return refused(
@@ -179,7 +248,7 @@ export async function proposeCalendarChange(
           ],
           gate: {
             code: err.code,
-            userEmail: deps.userEmail,
+            userEmail,
             organizer: target.event.organizer ?? null,
             attendees: target.event.attendees ?? null,
           },
@@ -193,7 +262,7 @@ export async function proposeCalendarChange(
   const proposedStartMs = Date.parse(target.proposedChange.startUtc);
   const fbStart = new Date(proposedStartMs - 14 * 24 * 60 * 60 * 1000).toISOString();
   const fbEnd = new Date(proposedStartMs + 14 * 24 * 60 * 60 * 1000).toISOString();
-  const fb = await deps.client.freebusyQuery({
+  const fb = await client.freebusyQuery({
     timeMin: fbStart,
     timeMax: fbEnd,
     calendarIds: ['primary'],
@@ -251,6 +320,8 @@ export async function proposeCalendarChange(
     after_json: afterJson,
     conflicts_json: conflictsJson,
     alternatives_json: alternativesJson,
+    provider_key: deps.providerKey ?? null,
+    account_id: deps.accountId ?? null,
   });
   // Transition pending → generating → ready (state machine demands this path).
   transitionTo(deps.db, approvalId, 'generating');

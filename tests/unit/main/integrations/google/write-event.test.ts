@@ -21,7 +21,7 @@ import {
   transitionTo,
   getApproval,
 } from '../../../../../src/main/approvals/persist';
-import { applyCalendarChange } from '../../../../../src/main/integrations/google/write-event';
+import { applyCalendarChange } from '../../../../../src/main/integrations/write-event';
 import {
   InvalidInstanceIdError,
   type CalendarClient,

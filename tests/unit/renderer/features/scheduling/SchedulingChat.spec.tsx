@@ -82,7 +82,7 @@ describe('SchedulingChat', () => {
     });
   });
 
-  it('(c) cancel-not-in-v1 refusal renders correct copy', async () => {
+  it('(c) cancel-not-in-v1 refusal renders backend copy when present', async () => {
     installAria({
       schedulingPropose: vi.fn().mockResolvedValue({
         refused: true,
@@ -98,15 +98,15 @@ describe('SchedulingChat', () => {
     await user.click(screen.getByTestId('scheduling-submit'));
     const refusal = await screen.findByTestId('scheduling-refusal');
     expect(refusal.getAttribute('data-code')).toBe('cancel-not-in-v1');
-    expect(refusal.textContent).toMatch(/Cancel commands/);
+    expect(refusal.textContent).toMatch(/^x$/);
   });
 
-  it('(c2) multi-attendee refusal renders correct copy', async () => {
+  it('(c2) multi-attendee refusal falls back when backend copy is empty', async () => {
     installAria({
       schedulingPropose: vi.fn().mockResolvedValue({
         refused: true,
         code: 'multi-attendee',
-        message: 'x',
+        message: '',
       }),
     });
     const user = userEvent.setup();

@@ -39,7 +39,14 @@ import { registerTriageHandlers } from './triage';
 import { registerDraftingHandlers } from './drafting';
 import { registerGmailSendHandlers } from './gmail-send';
 import { registerSchedulingHandlers } from './scheduling';
+import { registerMicrosoftHandlers } from './microsoft';
+import { registerProviderAccountHandlers } from './provider-accounts';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
+import {
+  startSyncOrchestrator,
+  stopSyncOrchestrator,
+  type SyncOrchestrator,
+} from '../integrations/sync-orchestrator';
 
 export interface IpcDeps {
   logger: Logger;
@@ -69,6 +76,7 @@ export function registerHandlers(
   const dataDir = deps.dataDir;
   const dbHolder = deps.dbHolder ?? createDbHolder();
   const skip = new Set(options.skipChannels ?? []);
+  let syncOrchestrator: SyncOrchestrator | null = null;
 
   const onboardingChannels = [
     CHANNELS.ONBOARDING_GEN_MNEMONIC,
@@ -78,7 +86,19 @@ export function registerHandlers(
     CHANNELS.ONBOARDING_STATUS,
   ];
   if (dataDir && !onboardingChannels.every((c) => skip.has(c))) {
-    registerOnboardingHandlers(ipcMain, { logger, dataDir, dbHolder });
+    registerOnboardingHandlers(ipcMain, {
+      logger,
+      dataDir,
+      dbHolder,
+      onDbReady: (db) => {
+        stopSyncOrchestrator(syncOrchestrator);
+        syncOrchestrator = startSyncOrchestrator({
+          db,
+          scheduler: getScheduler(),
+          logger,
+        });
+      },
+    });
     onboardingChannels.forEach((c) => skip.add(c));
   }
 
@@ -147,10 +167,32 @@ export function registerHandlers(
     CHANNELS.CALENDAR_STATUS,
     CHANNELS.CALENDAR_DISCONNECT,
     CHANNELS.CALENDAR_FORCE_SYNC,
+    CHANNELS.CALENDAR_LIST_EVENTS_RANGE,
   ];
   if (!calendarChannels.every((c) => skip.has(c))) {
     registerCalendarHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
     calendarChannels.forEach((c) => skip.add(c));
+  }
+
+  const microsoftChannels = [
+    CHANNELS.MICROSOFT_CONNECT,
+    CHANNELS.MICROSOFT_STATUS,
+    CHANNELS.MICROSOFT_DISCONNECT,
+    CHANNELS.MICROSOFT_FORCE_SYNC,
+  ];
+  if (!microsoftChannels.every((c) => skip.has(c))) {
+    registerMicrosoftHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
+    microsoftChannels.forEach((c) => skip.add(c));
+  }
+
+  const providerAccountChannels = [
+    CHANNELS.PROVIDER_ACCOUNTS_LIST,
+    CHANNELS.PROVIDER_ACCOUNT_UPDATE,
+    CHANNELS.PROVIDER_ACCOUNT_DISCONNECT,
+  ];
+  if (!providerAccountChannels.every((c) => skip.has(c))) {
+    registerProviderAccountHandlers(ipcMain, { logger, dbHolder });
+    providerAccountChannels.forEach((c) => skip.add(c));
   }
 
   const newsChannels = [

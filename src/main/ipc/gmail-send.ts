@@ -21,7 +21,7 @@ import type { DbHolder } from './onboarding';
 import {
   sendApprovedEmail,
   type SendApprovedDeps,
-} from '../integrations/google/send';
+} from '../integrations/send';
 import { ApprovalGateError } from '../approvals/gate';
 import {
   setVerificationPending,

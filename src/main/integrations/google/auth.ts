@@ -37,7 +37,12 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { OAuth2Client, type CodeChallengeMethod } from 'google-auth-library';
-import { setGoogleTokens, getGoogleTokens, type GoogleTokenKind } from '../../secrets/safeStorage';
+import {
+  getGoogleTokens,
+  getProviderTokens,
+  setProviderTokens,
+  type GoogleTokenKind,
+} from '../../secrets/safeStorage';
 
 export const SCOPES: Record<GoogleTokenKind, readonly string[]> = {
   // Plan 03-04 — Gmail scope extends to gmail.send (incremental consent,
@@ -311,7 +316,11 @@ export async function connectGoogle(
     client.setCredentials(tokens);
     const email = await deps.resolveEmail(client);
 
-    setGoogleTokens({ kind, refreshToken: tokens.refresh_token, email });
+    setProviderTokens(
+      `google:${kind}`,
+      JSON.stringify({ refreshToken: tokens.refresh_token, email }),
+      { mirrorLegacyGoogle: false },
+    );
 
     return { ok: true, email };
   } finally {
@@ -328,7 +337,10 @@ export async function connectGoogle(
  * persisted back to safeStorage without losing access.
  */
 export function getOAuth2Client(kind: GoogleTokenKind): OAuth2Client | null {
-  const persisted = getGoogleTokens(kind);
+  const providerBlob = getProviderTokens(`google:${kind}`);
+  const persisted = providerBlob
+    ? (JSON.parse(providerBlob) as { refreshToken: string; email: string })
+    : getGoogleTokens(kind);
   if (!persisted) return null;
   const { clientId, clientSecret } = readOAuthConfig();
   const client = new OAuth2Client(clientId, clientSecret);
@@ -337,7 +349,11 @@ export function getOAuth2Client(kind: GoogleTokenKind): OAuth2Client | null {
     // Google rarely rotates the refresh_token; when it does, re-persist.
     if (tokens.refresh_token && tokens.refresh_token !== persisted.refreshToken) {
       try {
-        setGoogleTokens({ kind, refreshToken: tokens.refresh_token, email: persisted.email });
+        setProviderTokens(
+          `google:${kind}`,
+          JSON.stringify({ refreshToken: tokens.refresh_token, email: persisted.email }),
+          { mirrorLegacyGoogle: false },
+        );
       } catch {
         /* best-effort rotation persist; next sync will surface auth errors anyway */
       }

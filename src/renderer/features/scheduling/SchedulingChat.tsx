@@ -26,6 +26,10 @@ function isRefusal(r: ProposeResponse): r is ProposeRefusalDto {
   return !!r && typeof r === 'object' && 'refused' in r;
 }
 
+function refusalMessage(result: ProposeRefusalDto): string {
+  return result.message?.trim() || REFUSAL_COPY[result.code];
+}
+
 const REFUSAL_COPY: Record<ProposeRefusalDto['code'], string> = {
   'cancel-not-in-v1':
     'Cancel commands are coming in v1.x — please do this one in Google Calendar for now.',
@@ -124,7 +128,7 @@ export function SchedulingChat(): JSX.Element {
                 fontSize: 13,
               }}
             >
-              {result.message || REFUSAL_COPY[result.code]}
+              {refusalMessage(result)}
             </p>
           )}
           {isClarification(result) && (

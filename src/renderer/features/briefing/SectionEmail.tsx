@@ -7,6 +7,7 @@
  * limitation. Phase 3's classifier replaces it.
  */
 import type { BriefingItem, BriefingPayload } from '../../../shared/ipc-contract';
+import { BriefingItem as BriefingItemRow } from './BriefingItem';
 
 export const NO_IMPORTANT_LABEL_COPY =
   "No mail flagged Important by Gmail. Phase 3 adds Aria's own priority classifier.";
@@ -46,12 +47,7 @@ export function SectionEmail({
       {!error && top3.length === 0 && !showSc2Fallback && <p>No items today.</p>}
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {top3.map((it) => (
-          <li key={it.id} data-testid={`email-item-${it.id}`} style={{ marginBottom: 12 }}>
-            <strong>{it.title}</strong>
-            <div data-testid="rationale" style={{ color: 'var(--aria-muted-fg)' }}>
-              {it.why}
-            </div>
-          </li>
+          <BriefingItemRow key={it.id} item={it} testId={`email-item-${it.id}`} />
         ))}
       </ul>
     </section>

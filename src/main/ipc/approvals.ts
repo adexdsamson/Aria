@@ -6,6 +6,7 @@
  * raw UPDATEs — that's the chokepoint guarantee.
  */
 import type { IpcMain } from 'electron';
+import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import {
   CHANNELS,
@@ -19,7 +20,7 @@ import {
   getApproval,
   insertApproval,
 } from '../approvals/persist';
-import { applyCalendarChange, type ApplyCalendarChangeDeps } from '../integrations/google/write-event';
+import { applyCalendarChange, type ApplyCalendarChangeDeps } from '../integrations/write-event';
 
 export interface ApprovalsDeps {
   logger: Logger;
@@ -32,6 +33,10 @@ const DEFAULT_LIST_STATES: ApprovalUiState[] = [
   'pending',
   'generating',
   'ready',
+  'approved',
+  'sending',
+  'failed',
+  'needs-operator-decision',
   'interrupted',
   'snoozed',
 ];
@@ -66,12 +71,13 @@ export function registerApprovalsHandlers(
       // Insert directly with state='generating' (bypassing transitionTo,
       // which would reject pending->generating without setup). Used by the
       // crash-recovery e2e ONLY.
-      const id = (await import('node:crypto')).randomUUID();
+      const id = randomUUID();
       const now = new Date().toISOString();
+      const idempotencyKey = randomUUID().replace(/-/g, '').toLowerCase();
       db.prepare(
-        `INSERT INTO approval (id, kind, state, created_at, updated_at, approval_path, subject)
-         VALUES (?, 'email_send', 'generating', ?, ?, 'explicit', ?)`,
-      ).run(id, now, now, r.subject ?? 'E2E pending draft');
+        `INSERT INTO approval (id, kind, state, created_at, updated_at, approval_path, subject, idempotency_key, last_error_message)
+         VALUES (?, 'email_send', 'generating', ?, ?, 'explicit', ?, ?, NULL)`,
+      ).run(id, now, now, r.subject ?? 'E2E pending draft', idempotencyKey);
       return { id };
     });
 
@@ -292,6 +298,22 @@ export function registerApprovalsHandlers(
         event: 'approvals.batch-approve.failed',
         error: err instanceof Error ? err.message : String(err),
       });
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.APPROVALS_CANCEL_STUCK, async (_e, req: unknown) => {
+    const db = dbHolder.db;
+    if (!db) return notReady();
+    const r = req as { id?: string };
+    if (!r?.id) return { error: 'ID_REQUIRED' };
+    try {
+      transitionTo(db, r.id, 'needs-operator-decision', {
+        last_error_message: 'User cancelled stuck send',
+      });
+      logger.info({ event: 'approvals.cancel-stuck', id: r.id });
+      return { ok: true as const };
+    } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) };
     }
   });

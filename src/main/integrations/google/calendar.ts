@@ -61,7 +61,9 @@ export interface CalendarEventRaw {
   id: string;
   status?: string;
   summary?: string;
+  description?: string;
   location?: string;
+  webLink?: string;
   start?: { dateTime?: string; date?: string; timeZone?: string };
   end?: { dateTime?: string; date?: string; timeZone?: string };
   attendees?: Array<{ email?: string; responseStatus?: string; displayName?: string; self?: boolean }>;

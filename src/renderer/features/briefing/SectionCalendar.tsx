@@ -5,6 +5,7 @@
  * "All day" tag (XCUT-07 surfacing).
  */
 import type { BriefingItem } from '../../../shared/ipc-contract';
+import { BriefingItem as BriefingItemRow } from './BriefingItem';
 
 export function SectionCalendar({
   items,
@@ -36,8 +37,7 @@ export function SectionCalendar({
         {top3.map((it) => {
           const allDay = it.title.startsWith('[All day]') || /\ball day\b/i.test(it.why);
           return (
-            <li key={it.id} data-testid={`calendar-item-${it.id}`} style={{ marginBottom: 12 }}>
-              <strong>{it.title}</strong>
+            <BriefingItemRow key={it.id} item={it} testId={`calendar-item-${it.id}`}>
               {allDay && (
                 <span
                   data-testid={`calendar-item-${it.id}-allday`}
@@ -50,10 +50,7 @@ export function SectionCalendar({
                   All day
                 </span>
               )}
-              <div data-testid="rationale" style={{ color: 'var(--aria-muted-fg)' }}>
-                {it.why}
-              </div>
-            </li>
+            </BriefingItemRow>
           );
         })}
       </ul>

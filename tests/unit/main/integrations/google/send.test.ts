@@ -20,7 +20,7 @@ import {
 import {
   sendApprovedEmail,
   buildRfc2822,
-} from '../../../../../src/main/integrations/google/send';
+} from '../../../../../src/main/integrations/send';
 import { ApprovalGateError } from '../../../../../src/main/approvals/gate';
 
 const MIGRATIONS_DIR = path.resolve(

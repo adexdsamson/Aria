@@ -31,6 +31,8 @@ import {
 import { deriveDbKey } from '../vault/derive';
 import { openDb, closeDb, type Db } from '../db/connect';
 import { reapInterruptedOnStartup } from '../approvals/persist';
+import { recoverInflightSends } from '../integrations/send';
+import { migrateLegacyGoogleTokensToProviderTokens } from '../secrets/safeStorage';
 
 export interface DbHolder {
   db: Db | null;
@@ -67,6 +69,7 @@ export interface OnboardingDeps {
   logger: Logger;
   dataDir: string;
   dbHolder: DbHolder;
+  onDbReady?: (db: Db) => void | Promise<void>;
 }
 
 /**
@@ -87,6 +90,52 @@ function vaultPathOf(dataDir: string): string {
  * cannot leak the mnemonic to the renderer.
  */
 const ARIA_E2E_CHANNEL = 'aria:onboarding:__e2e_get_pending__';
+
+async function runApprovalStartupRecovery(db: Db, logger: Logger): Promise<void> {
+  try {
+    const migrated = migrateLegacyGoogleTokensToProviderTokens();
+    if (migrated.migrated.length > 0) {
+      logger.info({
+        event: 'secrets.provider-tokens.migrated',
+        keys: migrated.migrated,
+      });
+    }
+  } catch (err) {
+    logger.warn({
+      event: 'secrets.provider-tokens.migration.failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  try {
+    const reaped = reapInterruptedOnStartup(db);
+    if (reaped > 0) {
+      logger.info({ event: 'approvals.reap-interrupted', count: reaped });
+    }
+  } catch (err) {
+    logger.warn({
+      event: 'approvals.reap-interrupted.failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  try {
+    const recovered = await recoverInflightSends(db, {});
+    if (recovered.reconciledToSent > 0 || recovered.stuck.length > 0) {
+      logger.info({
+        event: 'approvals.recover-inflight-sends',
+        reconciledToSent: recovered.reconciledToSent,
+        stuckCount: recovered.stuck.length,
+        stuckIds: recovered.stuck.map((row) => row.id),
+      });
+    }
+  } catch (err) {
+    logger.warn({
+      event: 'approvals.recover-inflight-sends.failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 export function registerOnboardingHandlers(
   ipcMain: IpcMain,
@@ -144,17 +193,8 @@ export function registerOnboardingHandlers(
       // RESEARCH Pattern 2 — convert any stale 'generating' rows BEFORE the
       // approvals IPC layer can be invoked. (IPC handlers register at boot;
       // the DB only becomes reachable at this point via dbHolder.set().)
-      try {
-        const reaped = reapInterruptedOnStartup(db);
-        if (reaped > 0) {
-          logger.info({ event: 'approvals.reap-interrupted', count: reaped });
-        }
-      } catch (err) {
-        logger.warn({
-          event: 'approvals.reap-interrupted.failed',
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      await runApprovalStartupRecovery(db, logger);
+      await deps.onDbReady?.(db);
       logger.info({ event: 'onboarding.sealed' });
       return { ok: true };
     } finally {
@@ -174,17 +214,8 @@ export function registerOnboardingHandlers(
         dbHolder.close();
         const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: true });
         dbHolder.set(db);
-        try {
-          const reaped = reapInterruptedOnStartup(db);
-          if (reaped > 0) {
-            logger.info({ event: 'approvals.reap-interrupted', count: reaped });
-          }
-        } catch (err) {
-          logger.warn({
-            event: 'approvals.reap-interrupted.failed',
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+        await runApprovalStartupRecovery(db, logger);
+        await deps.onDbReady?.(db);
         logger.info({ event: 'onboarding.unlocked' });
         return { ok: true };
       } finally {

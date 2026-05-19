@@ -4,6 +4,7 @@ import { ApprovalsScreen } from '../features/approvals/ApprovalsScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { RoutingLogScreen } from '../features/diagnostics/RoutingLogScreen';
 import { SchedulingChat } from '../features/scheduling/SchedulingChat';
+import { UnifiedCalendarScreen } from '../features/calendar/UnifiedCalendarScreen';
 
 export function AppRoutes(): JSX.Element {
   return (
@@ -11,6 +12,7 @@ export function AppRoutes(): JSX.Element {
       <Route path="/" element={<Navigate to="/briefing" replace />} />
       <Route path="/briefing" element={<BriefingScreen />} />
       <Route path="/approvals" element={<ApprovalsScreen />} />
+      <Route path="/calendar" element={<UnifiedCalendarScreen />} />
       <Route path="/scheduling" element={<SchedulingChat />} />
       <Route path="/routing-log" element={<RoutingLogScreen />} />
       <Route path="/settings/*" element={<SettingsScreen />} />

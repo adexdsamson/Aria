@@ -10,6 +10,7 @@
  */
 import { useState } from 'react';
 import type { BriefingNewsItem } from '../../../shared/ipc-contract';
+import { AccountChip } from '../../components/AccountChip';
 
 function safeHref(url: string): string | null {
   try {
@@ -73,15 +74,18 @@ export function SectionNews({
           const href = safeHref(it.url);
           return (
             <li key={it.id} data-testid={`news-item-${it.id}`} style={{ marginBottom: 12 }}>
-              <strong>
-                {href ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer">
-                    {it.title}
-                  </a>
-                ) : (
-                  it.title
-                )}
-              </strong>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <strong>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {it.title}
+                    </a>
+                  ) : (
+                    it.title
+                  )}
+                </strong>
+                <AccountChip compact />
+              </div>
               <div data-testid="rationale" style={{ color: 'var(--aria-muted-fg)' }}>
                 {it.why}
               </div>

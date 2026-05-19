@@ -74,6 +74,8 @@ export interface CalendarCandidate {
   startsAt?: string | null;
   allDay?: boolean;
   location?: string | null;
+  provider_key?: 'google' | 'microsoft' | null;
+  account_id?: string | null;
 }
 
 export interface EmailCandidate {

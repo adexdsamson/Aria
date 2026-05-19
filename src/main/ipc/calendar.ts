@@ -18,7 +18,7 @@
 import type { IpcMain } from 'electron';
 import type { Logger } from 'pino';
 import cron from 'node-cron';
-import { CHANNELS, type CalendarIntegrationStatus } from '../../shared/ipc-contract';
+import { CHANNELS, type CalendarEventDto, type CalendarIntegrationStatus } from '../../shared/ipc-contract';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import type { DbHolder } from './onboarding';
 import { registerLifecycleCallbacks } from '../lifecycle/powerMonitor';
@@ -215,4 +215,61 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
   ipcMain.handle(CHANNELS.CALENDAR_FORCE_SYNC, async () => {
     return await runTick();
   });
+
+  ipcMain.handle(
+    CHANNELS.CALENDAR_LIST_EVENTS_RANGE,
+    async (_event, req: { startUtc: string; endUtc: string; accountIds?: string[] }) => {
+      const db = dbHolder.db;
+      if (!db) return { error: 'db-locked' } as const;
+      const accountIds = Array.isArray(req.accountIds) ? req.accountIds.filter(Boolean) : [];
+      const accountFilter =
+        accountIds.length > 0
+          ? `AND e.account_id IN (${accountIds.map((_, index) => `@account${index}`).join(', ')})`
+          : '';
+      const params: Record<string, string> = { startUtc: req.startUtc, endUtc: req.endUtc };
+      accountIds.forEach((accountId, index) => {
+        params[`account${index}`] = accountId;
+      });
+      const rows = db.prepare(
+        `SELECT e.id,
+                e.calendar_id as calendarId,
+                e.summary,
+                e.location,
+                e.start_at_utc as startAtUtc,
+                e.end_at_utc as endAtUtc,
+                e.start_date as startDate,
+                e.end_date as endDate,
+                e.start_timezone as startTimezone,
+                e.status,
+                e.recurring_id as recurringId,
+                e.recurrence_json as recurrenceJson,
+                e.recurrence_unsupported as recurrenceUnsupported,
+                e.provider_key as providerKey,
+                e.account_id as accountId,
+                p.display_email as accountDisplayEmail,
+                p.display_label as accountDisplayLabel,
+                p.display_color as accountDisplayColor
+           FROM calendar_event e
+           JOIN provider_account p
+             ON p.provider_key = e.provider_key
+            AND p.account_id = e.account_id
+          WHERE p.status IN ('ok', 'degraded')
+            AND e.provider_key IS NOT NULL
+            AND e.account_id IS NOT NULL
+            AND (
+              (e.start_at_utc IS NOT NULL AND e.start_at_utc < @endUtc AND COALESCE(e.end_at_utc, e.start_at_utc) >= @startUtc)
+              OR (e.start_date IS NOT NULL)
+            )
+            ${accountFilter}
+          ORDER BY COALESCE(e.start_at_utc, e.start_date) ASC`,
+      ).all(params) as Array<Omit<CalendarEventDto, 'recurrenceUnsupported' | 'webLink'> & { recurrenceUnsupported: 0 | 1 }>;
+      return {
+        rows: rows.map((row) => ({
+          ...row,
+          recurrenceUnsupported: row.recurrenceUnsupported === 1,
+          webLink: null,
+        })),
+      } as const;
+    },
+  );
 }

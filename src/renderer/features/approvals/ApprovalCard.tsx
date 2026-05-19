@@ -17,6 +17,7 @@ import type {
   ApprovalRowDto,
   TriageResultDto,
 } from '../../../shared/ipc-contract';
+import { AccountChip } from '../../components/AccountChip';
 
 export interface ApprovalCardProps {
   row: ApprovalRowDto;
@@ -99,7 +100,10 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
   const categories = parseCategories(row.categories_json);
 
   const isInterrupted = row.state === 'interrupted';
-  const isReady = row.state === 'ready';
+  const isSending = row.state === 'sending';
+  const isTerminal = row.state === 'sent' || row.state === 'failed';
+  const canApprove = row.state === 'ready' || row.state === 'approved';
+  const showApprovalActions = canApprove || isSending || isTerminal;
   const isDiffed = row.body_edited !== null && row.body_edited !== row.body_original;
 
   // Plan 03-02 APPR-07 belt+suspenders: disable the silent-approve UI path
@@ -131,11 +135,12 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
             data-testid={`approval-select-${row.id}`}
             aria-label={`Select ${row.subject ?? row.id}`}
             checked={props.selected}
-            disabled={!isReady}
+            disabled={!canApprove || isSending || isTerminal}
             onChange={(e) => props.onSelect(row.id, e.target.checked)}
           />
         )}
         <strong style={{ flex: '1 1 auto' }}>{row.subject ?? '(no subject)'}</strong>
+        <AccountChip providerKey={row.provider_key} accountId={row.account_id} compact />
         <span
           data-testid={`approval-state-${row.id}`}
           style={{
@@ -149,6 +154,8 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
           {row.state}
         </span>
       </header>
+
+      <BackendError row={row} />
 
       {isInterrupted && (
         <div
@@ -316,12 +323,12 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-        {isReady && !editing && !rejecting && (
+        {showApprovalActions && !editing && !rejecting && (
           <>
             <button
               type="button"
               data-testid={`approval-approve-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={async () => {
                 setBusy(true);
                 try {
@@ -331,12 +338,12 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
                 }
               }}
             >
-              Approve
+              {isSending ? 'Sending...' : 'Approve'}
             </button>
             <button
               type="button"
               data-testid={`approval-edit-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={() => setEditing(true)}
             >
               Edit
@@ -344,7 +351,7 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
             <button
               type="button"
               data-testid={`approval-reject-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={() => setRejecting(true)}
             >
               Reject
@@ -352,7 +359,7 @@ export function ApprovalCard(props: ApprovalCardProps): JSX.Element {
             <button
               type="button"
               data-testid={`approval-snooze-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={async () => {
                 setBusy(true);
                 try {
@@ -453,6 +460,12 @@ function stateBg(s: string): string {
       return '#059669';
     case 'approved':
       return '#0d9488';
+    case 'sending':
+      return '#2563eb';
+    case 'failed':
+      return '#b91c1c';
+    case 'needs-operator-decision':
+      return '#b45309';
     case 'rejected':
       return '#dc2626';
     case 'snoozed':
@@ -488,6 +501,29 @@ function preStyle(bg: string): React.CSSProperties {
     borderRadius: 4,
     border: '1px solid #e5e7eb',
   };
+}
+
+function BackendError({ row }: { row: ApprovalRowDto }): JSX.Element | null {
+  const message = row.last_error_message?.trim();
+  if (!message) return null;
+  return (
+    <details
+      data-testid={`approval-backend-error-${row.id}`}
+      open
+      style={{
+        background: '#fef2f2',
+        color: '#991b1b',
+        border: '1px solid #fecaca',
+        borderRadius: 6,
+        padding: 8,
+        marginBottom: 8,
+        fontSize: 12,
+      }}
+    >
+      <summary>Backend error</summary>
+      <code style={{ whiteSpace: 'pre-wrap' }}>{message}</code>
+    </details>
+  );
 }
 
 // ─── Plan 04-03 — calendar_change variant ──────────────────────────────────
@@ -561,9 +597,29 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  const [tz, setTz] = useState('UTC');
 
-  const tz = 'UTC';
-  const isReady = row.state === 'ready';
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await window.aria.schedulingRulesGet();
+        if (!cancelled && !('error' in res) && res.timeZone) {
+          setTz(res.timeZone);
+        }
+      } catch {
+        /* UTC fallback keeps old approvals readable if rules are unavailable. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isSending = row.state === 'sending';
+  const isTerminal = row.state === 'sent' || row.state === 'failed';
+  const canApprove = row.state === 'ready' || row.state === 'approved';
+  const showApprovalActions = canApprove || isSending || isTerminal;
   const hardConflicts = conflicts.filter((c) => c.severity === 'hard');
 
   const attendeeEmails = (before.attendees ?? [])
@@ -614,13 +670,14 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
             type="checkbox"
             data-testid={`approval-select-${row.id}`}
             checked={props.selected}
-            disabled={!isReady}
+            disabled={!canApprove || isSending || isTerminal}
             onChange={(e) => props.onSelect(row.id, e.target.checked)}
           />
         )}
         <strong style={{ flex: '1 1 auto' }}>
           📅 {before.summary ?? row.calendar_action ?? 'Calendar change'}
         </strong>
+        <AccountChip providerKey={row.provider_key} accountId={row.account_id} compact />
         <span
           data-testid={`approval-state-${row.id}`}
           style={{
@@ -634,6 +691,8 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
           {row.state}
         </span>
       </header>
+
+      <BackendError row={row} />
 
       <div
         data-testid={`calendar-before-after-${row.id}`}
@@ -780,20 +839,25 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        {isReady && (
+        {showApprovalActions && (
           <>
             <button
               type="button"
               data-testid={`approval-approve-${row.id}`}
-              disabled={busy || (hardConflicts.length > 0 && (!showOverride || !overrideReason.trim()))}
+              disabled={
+                busy ||
+                isSending ||
+                isTerminal ||
+                (hardConflicts.length > 0 && (!showOverride || !overrideReason.trim()))
+              }
               onClick={() => void handleApprove()}
             >
-              Approve & apply
+              {isSending ? 'Sending...' : 'Approve & apply'}
             </button>
             <button
               type="button"
               data-testid={`approval-reject-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={() => void props.onReject(row.id)}
             >
               Reject
@@ -801,7 +865,7 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
             <button
               type="button"
               data-testid={`approval-snooze-${row.id}`}
-              disabled={busy}
+              disabled={busy || isSending || isTerminal}
               onClick={() => {
                 const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
                 void props.onSnooze(row.id, until);

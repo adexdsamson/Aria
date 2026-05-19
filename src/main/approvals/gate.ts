@@ -2,9 +2,9 @@
  * Plan 03-01 — The single send-authorization gate.
  *
  * `assertApproved` is the ONLY function permitted to declare a row "safe to
- * send." It is called as the first line of the future Gmail send adapter
- * (`src/main/integrations/google/send.ts`, landing in Plan 03-04). The
- * static-grep test `tests/static/single-send-call-site.test.ts` asserts that
+ * send." It is called as the first line of the unified send adapter
+ * (`src/main/integrations/send.ts`). The
+ * static-grep test `tests/static/single-mail-send-site.test.ts` asserts that
  * no other module reaches the Gmail send method.
  *
  * APPR-07 forced-explicit override: when `severity === 'high'` or any of the

@@ -10,12 +10,13 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApprovalRowDto, ApprovalUiState } from '../../../shared/ipc-contract';
-import { ApprovalCard } from './ApprovalCard';
+import { ApprovalQueue } from './ApprovalQueue';
 
 const FILTERABLE_STATES: ApprovalUiState[] = [
   'pending',
   'generating',
   'ready',
+  'sending',
   'interrupted',
   'snoozed',
 ];
@@ -110,6 +111,12 @@ export function ApprovalsScreen(): JSX.Element {
     const res = await window.aria.approvalsBatchApprove({ ids });
     if (isErr(res)) setActionError(res.error);
     setSelected(new Set());
+    await load();
+  };
+
+  const runCancelStuck = async (id: string): Promise<void> => {
+    const res = await window.aria.approvalsCancelStuck({ id });
+    if (isErr(res)) setActionError(res.error);
     await load();
   };
 
@@ -239,21 +246,15 @@ export function ApprovalsScreen(): JSX.Element {
         </p>
       )}
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {visible.map((row) => (
-          <li key={row.id}>
-            <ApprovalCard
-              row={row}
-              selectable
-              selected={selected.has(row.id)}
-              onSelect={toggleSelect}
-              onApprove={runApprove}
-              onReject={runReject}
-              onSnooze={runSnooze}
-            />
-          </li>
-        ))}
-      </ul>
+      <ApprovalQueue
+        rows={visible}
+        selected={selected}
+        onSelect={toggleSelect}
+        onApprove={runApprove}
+        onReject={runReject}
+        onSnooze={runSnooze}
+        onCancelStuck={runCancelStuck}
+      />
     </section>
   );
 }

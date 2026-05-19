@@ -35,6 +35,15 @@ export const CHANNELS = {
   CALENDAR_STATUS: 'aria:calendar:status',
   CALENDAR_DISCONNECT: 'aria:calendar:disconnect',
   CALENDAR_FORCE_SYNC: 'aria:calendar:force-sync',
+  CALENDAR_LIST_EVENTS_RANGE: 'aria:calendar:list-events-range',
+  // Plan 05-01 Microsoft Outlook integration
+  MICROSOFT_CONNECT: 'aria:microsoft:connect',
+  MICROSOFT_STATUS: 'aria:microsoft:status',
+  MICROSOFT_DISCONNECT: 'aria:microsoft:disconnect',
+  MICROSOFT_FORCE_SYNC: 'aria:microsoft:force-sync',
+  PROVIDER_ACCOUNTS_LIST: 'aria:provider-accounts:list',
+  PROVIDER_ACCOUNT_UPDATE: 'aria:provider-accounts:update',
+  PROVIDER_ACCOUNT_DISCONNECT: 'aria:provider-accounts:disconnect',
   // Plan 02-03 News sources
   NEWS_LIST_SOURCES: 'aria:news:list-sources',
   NEWS_ADD_RSS: 'aria:news:add-rss',
@@ -54,6 +63,7 @@ export const CHANNELS = {
   APPROVALS_REJECT: 'aria:approvals:reject',
   APPROVALS_SNOOZE: 'aria:approvals:snooze',
   APPROVALS_BATCH_APPROVE: 'aria:approvals:batch-approve',
+  APPROVALS_CANCEL_STUCK: 'aria:approvals:cancel-stuck',
   // Plan 03-02 sensitivity classifier + routing-log query
   CLASSIFY: 'aria:classify',
   ROUTING_LOG_QUERY: 'aria:routing-log:query',
@@ -244,6 +254,36 @@ export interface CalendarIntegrationStatus {
 }
 
 /**
+ * Plan 05-01 â€” Microsoft Outlook integration status payload.
+ *
+ * Mirrors Gmail/Calendar status so the renderer can reuse the same row
+ * component shape. `status` and `tokenStatus` are intentionally separate:
+ * `status` reflects the persisted provider_account row while `tokenStatus`
+ * reflects the cached token/access state.
+ */
+export interface MicrosoftIntegrationStatus {
+  connected: boolean;
+  email?: string;
+  displayName?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  tokenStatus: 'ok' | 'missing' | 'expired' | 'revoked';
+  queueDepth: number;
+}
+
+export interface ProviderAccountDto {
+  providerKey: 'google' | 'microsoft';
+  accountId: string;
+  displayEmail: string;
+  displayLabel?: string | null;
+  displayColor?: string | null;
+  status: 'ok' | 'degraded' | 'needs-auth' | 'disconnected';
+  capabilitiesJson?: string | null;
+  lastSyncedAt?: string | null;
+  lastError?: string | null;
+}
+
+/**
  * Plan 02-02 — calendar_event row shape consumed by Plan 02-04's briefing
  * reader. Mirrors the migration 003 columns. EITHER `start_at_utc` (timed
  * events) OR `start_date` (YYYY-MM-DD all-day events) is set, never both;
@@ -303,6 +343,8 @@ export interface BriefingItem {
   id: string;
   title: string;
   why: string;
+  provider_key?: 'google' | 'microsoft' | null;
+  account_id?: string | null;
 }
 
 export interface BriefingNewsItem extends BriefingItem {
@@ -356,7 +398,10 @@ export type ApprovalUiState =
   | 'rejected'
   | 'snoozed'
   | 'interrupted'
-  | 'sent';
+  | 'sent'
+  | 'sending'
+  | 'failed'
+  | 'needs-operator-decision';
 
 export interface ApprovalRowDto {
   id: string;
@@ -395,6 +440,32 @@ export interface ApprovalRowDto {
   conflicts_json?: string | null;
   alternatives_json?: string | null;
   rule_overrides_json?: string | null;
+  provider_key?: 'google' | 'microsoft' | null;
+  account_id?: string | null;
+  idempotency_key?: string | null;
+  last_error_message?: string | null;
+}
+
+export interface CalendarEventDto {
+  id: string;
+  calendarId: string;
+  summary: string;
+  location: string | null;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  startTimezone: string | null;
+  status: string;
+  recurringId: string | null;
+  recurrenceJson?: string | null;
+  recurrenceUnsupported: boolean;
+  webLink?: string | null;
+  providerKey: 'google' | 'microsoft';
+  accountId: string;
+  accountDisplayEmail: string;
+  accountDisplayLabel?: string | null;
+  accountDisplayColor?: string | null;
 }
 
 // Plan 04-03 — scheduling propose DTOs ------------------------------------
@@ -502,6 +573,27 @@ export interface AriaApi {
   calendarStatus(): Promise<CalendarIntegrationStatus | IpcError>;
   calendarDisconnect(): Promise<{ ok: boolean } | IpcError>;
   calendarForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
+  calendarListEventsRange(req: {
+    startUtc: string;
+    endUtc: string;
+    accountIds?: string[];
+  }): Promise<{ rows: CalendarEventDto[] } | IpcError>;
+
+  microsoftConnect(): Promise<{ ok: true; email: string; displayName: string } | { ok: false; error: string } | IpcError>;
+  microsoftStatus(): Promise<MicrosoftIntegrationStatus | IpcError>;
+  microsoftDisconnect(): Promise<{ ok: boolean } | IpcError>;
+  microsoftForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
+  providerAccountsList(): Promise<{ rows: ProviderAccountDto[] } | IpcError>;
+  providerAccountUpdate(req: {
+    providerKey: 'google' | 'microsoft';
+    accountId: string;
+    displayLabel?: string | null;
+    displayColor?: string | null;
+  }): Promise<{ ok: true } | IpcError>;
+  providerAccountDisconnect(req: {
+    providerKey: 'google' | 'microsoft';
+    accountId: string;
+  }): Promise<{ ok: true } | IpcError>;
 
   newsListSources(): Promise<{ sources: NewsSourceRow[] } | IpcError>;
   newsAddRss(req: { url: string; title?: string }): Promise<{ ok: true; id: number } | { ok: false; error: string } | IpcError>;
@@ -529,6 +621,7 @@ export interface AriaApi {
   approvalsBatchApprove(req: {
     ids: string[];
   }): Promise<{ ok: true; count: number } | IpcError>;
+  approvalsCancelStuck(req: { id: string }): Promise<{ ok: true } | IpcError>;
 
   // Plan 03-02
   classify(req: { text: string; approvalId?: string }): Promise<SensitivityResultDto | IpcError>;
@@ -644,6 +737,14 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   CALENDAR_STATUS: 'calendarStatus',
   CALENDAR_DISCONNECT: 'calendarDisconnect',
   CALENDAR_FORCE_SYNC: 'calendarForceSync',
+  CALENDAR_LIST_EVENTS_RANGE: 'calendarListEventsRange',
+  MICROSOFT_CONNECT: 'microsoftConnect',
+  MICROSOFT_STATUS: 'microsoftStatus',
+  MICROSOFT_DISCONNECT: 'microsoftDisconnect',
+  MICROSOFT_FORCE_SYNC: 'microsoftForceSync',
+  PROVIDER_ACCOUNTS_LIST: 'providerAccountsList',
+  PROVIDER_ACCOUNT_UPDATE: 'providerAccountUpdate',
+  PROVIDER_ACCOUNT_DISCONNECT: 'providerAccountDisconnect',
   NEWS_LIST_SOURCES: 'newsListSources',
   NEWS_ADD_RSS: 'newsAddRss',
   NEWS_REMOVE_SOURCE: 'newsRemoveSource',
@@ -660,6 +761,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   APPROVALS_REJECT: 'approvalsReject',
   APPROVALS_SNOOZE: 'approvalsSnooze',
   APPROVALS_BATCH_APPROVE: 'approvalsBatchApprove',
+  APPROVALS_CANCEL_STUCK: 'approvalsCancelStuck',
   CLASSIFY: 'classify',
   ROUTING_LOG_QUERY: 'routingLogQuery',
   TRIAGE_SUMMARIZE_THREAD: 'triageSummarizeThread',

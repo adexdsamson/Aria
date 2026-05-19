@@ -27,7 +27,10 @@ import type {
   CalendarIntegrationStatus,
   GmailIntegrationStatus,
   IpcError,
+  ProviderAccountDto,
 } from '../../../shared/ipc-contract';
+import { AddAccountModal } from '../../components/AddAccountModal';
+import { AccountRow } from '../../components/AccountRow';
 
 const POLL_MS = 10_000;
 
@@ -90,9 +93,57 @@ interface IntegrationsSectionProps {
 }
 
 export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionProps = {}): JSX.Element {
+  const [accounts, setAccounts] = useState<ProviderAccountDto[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const refreshAccounts = useCallback(async () => {
+    const api = window.aria as typeof window.aria & {
+      providerAccountsList?: typeof window.aria.providerAccountsList;
+    };
+    if (!api.providerAccountsList) return;
+    const result = await api.providerAccountsList();
+    if (!isErr(result)) setAccounts(result.rows);
+  }, []);
+
+  useEffect(() => {
+    void refreshAccounts();
+  }, [refreshAccounts]);
+
+  const disconnectAccount = useCallback(async (account: ProviderAccountDto) => {
+    const api = window.aria as typeof window.aria & {
+      providerAccountDisconnect?: typeof window.aria.providerAccountDisconnect;
+    };
+    if (!api.providerAccountDisconnect) return;
+    await api.providerAccountDisconnect({
+      providerKey: account.providerKey,
+      accountId: account.accountId,
+    });
+    await refreshAccounts();
+  }, [refreshAccounts]);
+
   return (
     <section data-testid="settings-integrations" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Integrations</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Integrations</h2>
+        <button type="button" data-testid="add-account-open" onClick={() => setAddOpen(true)}>
+          Add account
+        </button>
+      </div>
+      {accounts.length > 0 && (
+        <div data-testid="provider-account-list" style={{ marginBottom: 'var(--aria-space-md)' }}>
+          {accounts.map((account) => (
+            <AccountRow
+              key={`${account.providerKey}:${account.accountId}`}
+              account={account}
+              onDisconnect={disconnectAccount}
+            />
+          ))}
+        </div>
+      )}
+      <AddAccountModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onConnected={refreshAccounts}
+      />
       <GmailRow initialModalOpen={initialModalOpen} />
       <CalendarRow />
     </section>

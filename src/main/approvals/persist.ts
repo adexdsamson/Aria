@@ -59,6 +59,10 @@ export interface ApprovalRow {
   conflicts_json: string | null;
   alternatives_json: string | null;
   rule_overrides_json: string | null;
+  provider_key: 'google' | 'microsoft' | null;
+  account_id: string | null;
+  idempotency_key: string | null;
+  last_error_message: string | null;
 }
 
 export interface NewApprovalInput {
@@ -87,6 +91,14 @@ export interface NewApprovalInput {
   conflicts_json?: string | null;
   alternatives_json?: string | null;
   rule_overrides_json?: string | null;
+  provider_key?: 'google' | 'microsoft' | null;
+  account_id?: string | null;
+  idempotency_key?: string | null;
+  last_error_message?: string | null;
+}
+
+function createIdempotencyKey(): string {
+  return crypto.randomUUID().replace(/-/g, '').toLowerCase();
 }
 
 const INSERT_SQL = `INSERT INTO approval (
@@ -95,14 +107,18 @@ const INSERT_SQL = `INSERT INTO approval (
   classifier_version, categories_json, severity, confidence,
   classifier_rationale, routed, triage_signals_json, triage_summary,
   calendar_event_id, calendar_action, recurring_scope,
-  before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json
+  before_json, after_json, conflicts_json, alternatives_json, rule_overrides_json,
+  provider_key, account_id,
+  idempotency_key, last_error_message
 ) VALUES (
   @id, @kind, @state, @created_at, @updated_at, @approval_path,
   @source_message_id, @recipients_json, @subject, @body_original, @body_edited,
   @classifier_version, @categories_json, @severity, @confidence,
   @classifier_rationale, @routed, @triage_signals_json, @triage_summary,
   @calendar_event_id, @calendar_action, @recurring_scope,
-  @before_json, @after_json, @conflicts_json, @alternatives_json, @rule_overrides_json
+  @before_json, @after_json, @conflicts_json, @alternatives_json, @rule_overrides_json,
+  @provider_key, @account_id,
+  @idempotency_key, @last_error_message
 )`;
 
 export function insertApproval(db: Db, input: NewApprovalInput): string {
@@ -136,6 +152,10 @@ export function insertApproval(db: Db, input: NewApprovalInput): string {
     conflicts_json: input.conflicts_json ?? null,
     alternatives_json: input.alternatives_json ?? null,
     rule_overrides_json: input.rule_overrides_json ?? null,
+    provider_key: input.provider_key ?? null,
+    account_id: input.account_id ?? null,
+    idempotency_key: input.idempotency_key ?? createIdempotencyKey(),
+    last_error_message: input.last_error_message ?? null,
   };
   const tx = db.transaction(() => {
     db.prepare(INSERT_SQL).run(row);
@@ -171,6 +191,10 @@ const ALLOWED_PATCH_COLS = new Set<keyof ApprovalRow>([
   'conflicts_json',
   'alternatives_json',
   'rule_overrides_json',
+  'provider_key',
+  'account_id',
+  'idempotency_key',
+  'last_error_message',
 ]);
 
 export function getApprovalState(db: Db, id: string): ApprovalState | null {

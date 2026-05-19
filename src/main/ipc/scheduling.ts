@@ -24,6 +24,7 @@ import {
 import { getOAuth2Client } from '../integrations/google/auth';
 import { logCalendarAction } from '../scheduling/audit';
 import { getApproval, transitionTo } from '../approvals/persist';
+import { listProviderAccounts } from '../integrations/microsoft/provider-account';
 
 export interface SchedulingDeps {
   logger: Logger;
@@ -188,14 +189,27 @@ export function registerSchedulingHandlers(
     const db = dbHolder.db;
     if (!db) return { error: 'DB_NOT_OPEN' };
     try {
-      const client = await buildClient();
-      const userEmail = deps.getUserEmail
-        ? await deps.getUserEmail()
-        : 'user@local';
+      const account = listProviderAccounts(db).find((row) => {
+        if (row.status !== 'ok') return false;
+        if (!row.capabilitiesJson) return true;
+        try {
+          return Boolean((JSON.parse(row.capabilitiesJson) as { calendar?: boolean }).calendar);
+        } catch {
+          return true;
+        }
+      });
+      const client = account ? undefined : await buildClient();
+      const userEmail = account
+        ? account.displayEmail
+        : deps.getUserEmail
+          ? await deps.getUserEmail()
+          : 'user@local';
       return await proposeCalendarChange(nl, {
         db,
         client,
         userEmail,
+        providerKey: account?.providerKey,
+        accountId: account?.accountId,
         ...(deps.proposeOverrides ?? {}),
         ...extra,
       });

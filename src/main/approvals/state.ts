@@ -17,17 +17,23 @@ export type ApprovalState =
   | 'rejected'
   | 'snoozed'
   | 'interrupted'
-  | 'sent';
+  | 'sent'
+  | 'sending'
+  | 'failed'
+  | 'needs-operator-decision';
 
 const ALLOWED: Record<ApprovalState, readonly ApprovalState[]> = {
   pending: ['generating'],
   generating: ['ready', 'interrupted'],
   ready: ['approved', 'rejected', 'snoozed'],
-  approved: ['sent'],
+  approved: ['sent', 'sending'],
   rejected: [],
   snoozed: ['ready'],
   interrupted: ['generating'],
   sent: [],
+  sending: ['sent', 'failed', 'needs-operator-decision'],
+  failed: ['needs-operator-decision'],
+  'needs-operator-decision': [],
 };
 
 export function assertTransition(from: ApprovalState, to: ApprovalState): void {

@@ -75,6 +75,7 @@ import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
 import { getOllamaModelId, setOllamaModelId } from './secrets/safeStorage';
+import { acquireSingleInstanceLock } from './single-instance';
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -252,6 +253,8 @@ async function bootstrap(): Promise<void> {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
 }
+
+acquireSingleInstanceLock({ app });
 
 app.whenReady().then(bootstrap).catch((err) => {
   // Logger may not yet exist; fall back to console.

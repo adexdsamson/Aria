@@ -28,7 +28,9 @@ describe('db/migrations', () => {
     // Plan 03-04 added 009 (voice_match_holdout + approval.beta_voice + send_log).
     // Plan 04-01 added 010 (calendar write-back schema: approval kind widen,
     // calendar_event etag/recurrence cols, scheduling_rules, calendar_action_log).
-    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    // Plan 05-01 added 011 (provider_account/provider_sync_state + recurrence_unsupported).
+    // Plan 05-01 added 012 (provider_key/account_id backfill columns).
+    expect(applied).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 121, 122]);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -37,9 +39,19 @@ describe('db/migrations', () => {
     expect(tables).toContain('app_meta');
     expect(tables).toContain('settings');
     expect(tables).toContain('routing_log');
+    expect(tables).toContain('provider_account');
+    expect(tables).toContain('provider_sync_state');
 
     const version = db.pragma('user_version', { simple: true }) as number;
-    expect(version).toBe(10);
+    expect(version).toBe(122);
+    const views = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name")
+      .all()
+      .map((r) => (r as { name: string }).name);
+    expect(views).toContain('gmail_account_view');
+    expect(views).toContain('calendar_account_view');
+    expect(tables).not.toContain('gmail_account');
+    expect(tables).not.toContain('calendar_account');
 
     // Plan 04-01 — migration 010 schema assertions
     expect(tables).toContain('scheduling_rules');
@@ -58,25 +70,42 @@ describe('db/migrations', () => {
     for (const c of ['etag', 'i_cal_uid', 'sequence', 'organizer_email', 'organizer_self', 'recurrence_json']) {
       expect(calCols).toContain(c);
     }
+    expect(calCols).toContain('recurrence_unsupported');
+    expect(calCols).toContain('provider_key');
+    expect(calCols).toContain('account_id');
+
+    const gmailCols = db
+      .prepare("PRAGMA table_info(gmail_message)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    expect(gmailCols).toContain('provider_key');
+    expect(gmailCols).toContain('account_id');
+
+    const approvalCols = db
+      .prepare("PRAGMA table_info(approval)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    expect(approvalCols).toContain('provider_key');
+    expect(approvalCols).toContain('account_id');
 
     // approval.kind CHECK now accepts 'calendar_change'.
     const now = new Date().toISOString();
     expect(() =>
       db
         .prepare(
-          `INSERT INTO approval (id, kind, state, created_at, updated_at)
-           VALUES (?, 'calendar_change', 'pending', ?, ?)`,
+          `INSERT INTO approval (id, kind, state, created_at, updated_at, idempotency_key)
+           VALUES (?, 'calendar_change', 'pending', ?, ?, ?)`,
         )
-        .run('cal-1', now, now),
+        .run('cal-1', now, now, 'idempotency-cal-1'),
     ).not.toThrow();
     // CHECK still rejects unknown kinds.
     expect(() =>
       db
         .prepare(
-          `INSERT INTO approval (id, kind, state, created_at, updated_at)
-           VALUES (?, 'bogus', 'pending', ?, ?)`,
+          `INSERT INTO approval (id, kind, state, created_at, updated_at, idempotency_key)
+           VALUES (?, 'bogus', 'pending', ?, ?, ?)`,
         )
-        .run('bad-1', now, now),
+        .run('bad-1', now, now, 'idempotency-bad-1'),
     ).toThrow();
 
     closeDb(db);
@@ -91,9 +120,9 @@ describe('db/migrations', () => {
     // pre-dated migration 010's table rebuild).
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO approval (id, kind, state, created_at, updated_at, subject)
-       VALUES (?, 'email_send', 'pending', ?, ?, 'pre-010')`,
-    ).run('pre-010-id', now, now);
+      `INSERT INTO approval (id, kind, state, created_at, updated_at, subject, idempotency_key)
+       VALUES (?, 'email_send', 'pending', ?, ?, 'pre-010', ?)`,
+    ).run('pre-010-id', now, now, 'pre-010-idempotency');
     const row = db.prepare('SELECT id, kind, subject, calendar_event_id FROM approval WHERE id = ?').get('pre-010-id') as
       | { id: string; kind: string; subject: string; calendar_event_id: string | null }
       | undefined;
