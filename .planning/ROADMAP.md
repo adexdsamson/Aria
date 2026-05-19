@@ -14,7 +14,7 @@
 | 4 | Calendar Smart-Scheduling (Google) | Aria reschedules a meeting from a natural-language command, conflict-aware | 3/3 complete |
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
 | 6 | Meeting Capture + Todoist Push | Aria turns a pasted transcript into action items in Todoist | 3 |
-| 7 | 1/3 | In Progress|  |
+| 7 | 2/3 | In Progress|  |
 | 8 | Insights, Recap, Learning, Release Prep | Weekly recap shipped, insights derived, learning loop closed, app signed and shippable | 4 |
 
 ---
@@ -180,7 +180,7 @@ Plans:
 **Plans:**
 
 - [x] 07-01-PLAN.md - Chunking strategy spike on Aria-stored mail/calendar/transcripts/actions; schema and decision record
-- [ ] 07-02-PLAN.md - Local embedding pipeline with Ollama, sqlite-vec/fallback index, incremental re-index, and model-id versioning
+- [x] 07-02-PLAN.md - Local embedding pipeline with Ollama, sqlite-vec/fallback index, incremental re-index, and model-id versioning
 - [ ] 07-03-PLAN.md - Hybrid RAG query agent, person disambiguation, cited answer UI, and Q&A chat surface
 
 **Success Criteria:**

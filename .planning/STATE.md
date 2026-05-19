@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-19T17:45:00.000Z"
+last_updated: "2026-05-19T18:48:30.318Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 26
   completed_plans: 25
-  percent: 71
+  percent: 67
 ---
 
 # State
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 7 Plan 02 complete** — RAG index online: VectorStore dual-impl (sqlite-vec + brute-force fallback w/ 250k cap, C11/C2), Ollama `/api/embed` client + mandatory live-roundtrip contract (C13), IndexWriter w/ sensitivity-at-index-time (C5), IndexWorker w/ atomic rebuild_progress_done (Pitfall 4), ReindexScheduler + model-swap boot reconciler (C3, 4 cases), opt-in backfill, people directory w/ inline + cron freshness paths (C10), Settings → RAG Index UI reachable from SettingsScreen.tsx (L-04-04). 11 tasks, 11 atomic commits (`faba095…4ebc206`). Live OLLAMA_AVAILABLE=1 + RAG_BENCH=1 gates deferred to phase verification (Aria desktop app holds the native-binary lock — same constraint as 07-01).
 
 **Phase 7 Plan 01 complete** — RAG indexing foundation: migration 126 schema, chunk primitives, four-corpus harvesters, three chunking strategies, synthetic-fixture spike. Provisional winner `A-per-message`; replace synthetic fixture with real-DB user-authored fixture before plan 07-02 commits chunk-size (see 07-01-SUMMARY.md `Deferred / Followups` item 1). Task 0 human-action checkpoint was overridden by user authorization on 2026-05-19.
 
