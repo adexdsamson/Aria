@@ -7,6 +7,7 @@ import { SchedulingChat } from '../features/scheduling/SchedulingChat';
 import { UnifiedCalendarScreen } from '../features/calendar/UnifiedCalendarScreen';
 import { TranscriptCaptureScreen } from '../features/meetings/TranscriptCaptureScreen';
 import { TasksScreen } from '../features/tasks/TasksScreen';
+import { AskScreen } from '../features/ask/AskScreen';
 
 export function AppRoutes(): JSX.Element {
   return (
@@ -18,6 +19,7 @@ export function AppRoutes(): JSX.Element {
       <Route path="/meetings" element={<TranscriptCaptureScreen />} />
       <Route path="/tasks" element={<TasksScreen />} />
       <Route path="/scheduling" element={<SchedulingChat />} />
+      <Route path="/ask" element={<AskScreen />} />
       <Route path="/routing-log" element={<RoutingLogScreen />} />
       <Route path="/settings/*" element={<SettingsScreen />} />
       <Route path="*" element={<Navigate to="/briefing" replace />} />
