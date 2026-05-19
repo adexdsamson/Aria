@@ -315,13 +315,20 @@ export function registerHandlers(
     schedulingChannels.forEach((c) => skip.add(c));
   }
 
-  // Plan 07-02 RAG channels.
+  // Plan 07-02 + 07-03 RAG channels.
   const ragChannels = [
     CHANNELS.RAG_INDEX_STATUS,
     CHANNELS.RAG_BACKFILL_STATUS,
     CHANNELS.RAG_BACKFILL_START,
     CHANNELS.RAG_BACKFILL_SKIP,
     CHANNELS.RAG_WIPE_ACCOUNT,
+    CHANNELS.RAG_ASK,
+    CHANNELS.RAG_THREAD_LIST,
+    CHANNELS.RAG_THREAD_GET,
+    CHANNELS.RAG_THREAD_CREATE,
+    CHANNELS.RAG_THREAD_DELETE,
+    CHANNELS.RAG_OPEN_SOURCE,
+    CHANNELS.RAG_ACCOUNT_CHUNK_COUNTS,
   ];
   if (!ragChannels.every((c) => skip.has(c))) {
     registerRagHandlers(ipcMain, { logger, dbHolder });

@@ -97,6 +97,14 @@ export const CHANNELS = {
   RAG_BACKFILL_START: 'aria:rag:backfill-start',
   RAG_BACKFILL_SKIP: 'aria:rag:backfill-skip',
   RAG_WIPE_ACCOUNT: 'aria:rag:wipe-account',
+  // Plan 07-03 RAG Q&A surfaces
+  RAG_ASK: 'aria:rag:ask',
+  RAG_THREAD_LIST: 'aria:rag:thread-list',
+  RAG_THREAD_GET: 'aria:rag:thread-get',
+  RAG_THREAD_CREATE: 'aria:rag:thread-create',
+  RAG_THREAD_DELETE: 'aria:rag:thread-delete',
+  RAG_OPEN_SOURCE: 'aria:rag:open-source',
+  RAG_ACCOUNT_CHUNK_COUNTS: 'aria:rag:account-chunk-counts',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -824,6 +832,114 @@ export interface AriaApi {
   ragBackfillStart(): Promise<{ enqueuedBySourceKind: { email: number; event: number; note: number; action: number } } | IpcError>;
   ragBackfillSkip(): Promise<{ ok: boolean } | IpcError>;
   ragWipeAccount(req: { providerKey: string; accountId: string }): Promise<{ deletedChunks: number } | IpcError>;
+
+  // Plan 07-03 RAG Q&A
+  ragAsk(req: RagAskRequest): Promise<RagAskResponse | IpcError>;
+  ragThreadList(req?: { limit?: number; search?: string }): Promise<{ threads: RagThreadDto[] } | IpcError>;
+  ragThreadGet(req: { threadId: string; lastN?: number }): Promise<{ thread: RagThreadDto; turns: RagTurnDto[] } | null | IpcError>;
+  ragThreadCreate(req?: {
+    title?: string;
+    seedTurns?: Array<{ role: 'user' | 'assistant'; text: string; citations?: unknown; routing?: unknown }>;
+  }): Promise<{ thread: RagThreadDto } | IpcError>;
+  ragThreadDelete(req: { threadId: string }): Promise<{ ok: true } | IpcError>;
+  ragOpenSource(req: {
+    sourceKind: 'email' | 'event' | 'note' | 'action';
+    sourceId: string;
+    charStart: number;
+    charEnd: number;
+  }): Promise<{ ok: true } | IpcError>;
+  ragAccountChunkCounts(): Promise<{ rows: Array<{ providerKey: string; accountId: string; count: number }> } | IpcError>;
+}
+
+// Plan 07-03 RAG Q&A DTOs ---------------------------------------------------
+
+export interface RagCitationDto {
+  index: number;
+  sourceKind: 'email' | 'event' | 'note' | 'action';
+  sourceId: string;
+  title: string;
+  snippet: string;
+  charStart: number;
+  charEnd: number;
+  occurredAt?: string;
+  accountChip?: {
+    provider: 'google' | 'microsoft';
+    email: string;
+    disconnected?: boolean;
+  };
+}
+
+export interface RagRoutingDto {
+  route: Route;
+  modelId: string;
+  sensitivity: string;
+  reason: string;
+  directoryStale?: boolean;
+}
+
+export interface RagAnswerResultDto {
+  kind: 'answer';
+  text: string;
+  citations: RagCitationDto[];
+  routing: RagRoutingDto;
+  threadId: string;
+  turnId: string;
+}
+
+export interface RagRefusalResultDto {
+  kind: 'refusal';
+  text: string; // verbatim: "I couldn't find anything in your data about that."
+  threadId: string;
+  turnId: string;
+}
+
+export interface RagErrorResultDto {
+  kind: 'error';
+  text: string;
+  detail?: string;
+}
+
+export interface RagDisambiguationResultDto {
+  kind: 'disambiguation';
+  candidates: Array<{
+    personId: string;
+    displayName: string;
+    canonicalEmail: string | null;
+    recentContext: string;
+  }>;
+  threadId: string;
+}
+
+export type RagAskResponse =
+  | RagAnswerResultDto
+  | RagRefusalResultDto
+  | RagErrorResultDto
+  | RagDisambiguationResultDto;
+
+export interface RagAskRequest {
+  question: string;
+  threadId?: string;
+  accountFilter?: Array<{ providerKey: string; accountId: string }>;
+  forcePersonId?: string;
+  transient?: boolean;
+}
+
+export interface RagThreadDto {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RagTurnDto {
+  id: string;
+  threadId: string;
+  ord: number;
+  role: 'user' | 'assistant';
+  text: string;
+  citations: RagCitationDto[] | null;
+  routing: RagRoutingDto | null;
+  createdAt: string;
 }
 
 // Plan 04-02 — scheduling rules DTOs ---------------------------------------
@@ -953,4 +1069,11 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RAG_BACKFILL_START: 'ragBackfillStart',
   RAG_BACKFILL_SKIP: 'ragBackfillSkip',
   RAG_WIPE_ACCOUNT: 'ragWipeAccount',
+  RAG_ASK: 'ragAsk',
+  RAG_THREAD_LIST: 'ragThreadList',
+  RAG_THREAD_GET: 'ragThreadGet',
+  RAG_THREAD_CREATE: 'ragThreadCreate',
+  RAG_THREAD_DELETE: 'ragThreadDelete',
+  RAG_OPEN_SOURCE: 'ragOpenSource',
+  RAG_ACCOUNT_CHUNK_COUNTS: 'ragAccountChunkCounts',
 } as const;
