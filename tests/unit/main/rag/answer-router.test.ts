@@ -183,9 +183,16 @@ describe('Adversarial fixtures — RESEARCH §9 + REVIEWS C6', () => {
         redactAllPii,
       );
       // The </context> / <system> markers from the payload MUST be escaped so
-      // the model cannot interpret them as real tags.
-      expect(prompt).not.toMatch(/(^|\n)<\/context>/);
-      expect(prompt).not.toMatch(/(^|\n)<system>You are now/);
+      // the model cannot interpret them as real tags. The assembled prompt
+      // legitimately contains exactly ONE </context> (the real closer) and
+      // ONE <system>…</system> wrapper; anything beyond that means an
+      // injection payload survived escaping.
+      const ctxCloseMatches = prompt.match(/<\/context>/g) ?? [];
+      expect(ctxCloseMatches.length).toBe(1);
+      const sysOpenMatches = prompt.match(/<system>/g) ?? [];
+      expect(sysOpenMatches.length).toBe(1);
+      // Belt-and-suspenders: the specific injection lead-in must NOT appear.
+      expect(prompt).not.toMatch(/<system>You are now/);
     }
   });
 
