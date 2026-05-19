@@ -34,14 +34,37 @@ const ELECTRON_VARIANT = path.join(STASH, 'better_sqlite3.electron.node');
 const NODE_VARIANT = path.join(STASH, 'better_sqlite3.node-node');
 
 function ensureNodeVariant(): void {
-  if (fs.existsSync(NODE_VARIANT)) return;
+  const currentAbi = process.versions.modules;
+  const abiStamp = `${NODE_VARIANT}.abi`;
+
+  // Check whether the existing variant matches the host Node ABI. If the
+  // stamp is missing OR mismatched, treat the variant as stale and rebuild.
+  let needsRebuild = !fs.existsSync(NODE_VARIANT);
+  if (!needsRebuild) {
+    const stampedAbi = fs.existsSync(abiStamp)
+      ? fs.readFileSync(abiStamp, 'utf8').trim()
+      : null;
+    if (stampedAbi !== currentAbi) {
+      console.log(
+        `[setup-native-abi] Node-ABI variant stale (stamp=${String(stampedAbi)}, host=${currentAbi}) — rebuilding…`,
+      );
+      // Remove the stale binary so a failed rebuild surfaces as missing
+      // rather than silently leaving a wrong-ABI file in place.
+      try { fs.unlinkSync(NODE_VARIANT); } catch { /* ignore */ }
+      try { fs.unlinkSync(abiStamp); } catch { /* ignore */ }
+      needsRebuild = true;
+    }
+  }
+
+  if (!needsRebuild) return;
+
   if (!fs.existsSync(ELECTRON_VARIANT)) {
     throw new Error(
       '[setup-native-abi] No ABI variants present. Run: pnpm install (or `node scripts/build-native-dual.mjs`).',
     );
   }
   console.log(
-    '[setup-native-abi] Node-ABI variant missing — running node-only dual-build…',
+    '[setup-native-abi] Node-ABI variant missing or stale — running node-only dual-build…',
   );
   const result = spawnSync(
     'node',
@@ -50,7 +73,7 @@ function ensureNodeVariant(): void {
   );
   if (result.status !== 0) {
     throw new Error(
-      `[setup-native-abi] dual-build --node-only failed (exit ${String(result.status)}). Run \`pnpm install\` to fully rebuild.`,
+      `[setup-native-abi] dual-build --node-only failed (exit ${String(result.status)}). Run \`npm run rebuild:native\` to fully rebuild.`,
     );
   }
 }

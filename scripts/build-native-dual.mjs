@@ -111,8 +111,12 @@ run('node-gyp rebuild', process.execPath, [
   'rebuild',
 ], PKG_DIR);
 
-// Step 4: stash Node binary.
+// Step 4: stash Node binary + ABI stamp sidecar (consumed by
+// tests/setup-native-abi.ts to detect stale variants when the host Node's
+// NODE_MODULE_VERSION drifts past what the variant was built against).
 copy(ACTIVE, NODE_VARIANT);
+fs.writeFileSync(`${NODE_VARIANT}.abi`, process.versions.modules, 'utf8');
+console.log(`[dual-build] stamped ${path.basename(NODE_VARIANT)}.abi = ${process.versions.modules}`);
 
 // Step 5: restore Electron variant as the active default — runtime path
 // (electron-vite dev / packaged app) loads build/Release/better_sqlite3.node
