@@ -3,6 +3,10 @@
  *
  * Rendered above existing briefing sections; deep-links to /approvals.
  * Hidden when the queue is empty so the briefing remains visually quiet.
+ *
+ * Phase 9 Plan 03 — RE-SKINNED. Gold-tinted banner card with Playfair
+ * header, mono state pills, and an editorial "Open queue →" trigger.
+ * data-testid + behaviour preserved.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { ApprovalRowDto } from '../../../shared/ipc-contract';
@@ -36,9 +40,6 @@ export function InlineApprovalsPreview(): JSX.Element | null {
 
   const load = useCallback(async (): Promise<void> => {
     try {
-      // window.aria may be unmocked in existing BriefingScreen unit tests
-      // (Plan 02). The optional-chain + try keeps that suite green without
-      // requiring every test to re-stub approvalsList.
       const fn = (window as { aria?: { approvalsList?: typeof window.aria.approvalsList } }).aria
         ?.approvalsList;
       if (!fn) {
@@ -69,26 +70,46 @@ export function InlineApprovalsPreview(): JSX.Element | null {
       data-testid="inline-approvals-preview"
       aria-label="Pending approvals"
       style={{
-        border: '1px solid #d1d5db',
-        background: '#fffbeb',
-        padding: 12,
+        border: '1px solid rgba(184,134,11,0.30)',
+        background: 'rgba(184,134,11,0.05)',
+        padding: '14px 18px',
         borderRadius: 8,
-        marginBottom: 16,
+        marginBottom: 28,
       }}
     >
-      <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <strong style={{ fontSize: 14 }}>Approvals</strong>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
+        <strong
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontWeight: 500,
+            fontSize: 17,
+            color: 'var(--ink)',
+          }}
+        >
+          Approvals
+        </strong>
         <span
           data-testid="inline-approvals-count"
           style={{
-            display: 'inline-block',
-            background: '#dc2626',
-            color: '#fff',
-            borderRadius: 999,
-            padding: '0 8px',
-            fontSize: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             minWidth: 22,
-            textAlign: 'center',
+            height: 18,
+            borderRadius: 999,
+            padding: '0 6px',
+            background: 'var(--rose)',
+            color: '#fff',
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            fontWeight: 600,
           }}
         >
           {rows.length}
@@ -101,24 +122,49 @@ export function InlineApprovalsPreview(): JSX.Element | null {
             marginLeft: 'auto',
             background: 'transparent',
             border: 'none',
-            color: '#1d4ed8',
             cursor: 'pointer',
-            textDecoration: 'underline',
-            fontSize: 12,
+            fontFamily: 'var(--f-mono)',
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--gold-deep)',
+            padding: 0,
           }}
         >
           Open queue →
         </button>
       </header>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {rows.map((r) => (
           <li
             key={r.id}
             data-testid={`inline-approvals-row-${r.id}`}
-            style={{ fontSize: 13, padding: '4px 0', display: 'flex', gap: 8 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+            }}
           >
-            <span style={{ color: '#6b7280' }}>[{r.state}]</span>
-            <span style={{ flex: '1 1 auto', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span
+              style={{
+                fontFamily: 'var(--f-mono)',
+                fontSize: 9.5,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                padding: '1px 6px',
+                borderRadius: 3,
+                background: 'var(--ivory)',
+                color: 'var(--gray)',
+                border: '1px solid var(--rule)',
+                minWidth: 56,
+                textAlign: 'center',
+              }}
+            >
+              {r.state}
+            </span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {r.subject ?? '(no subject)'}
             </span>
           </li>
