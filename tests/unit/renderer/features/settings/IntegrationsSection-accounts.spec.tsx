@@ -35,6 +35,17 @@ function installAria() {
       ],
     }),
     providerAccountDisconnect: vi.fn().mockResolvedValue({ ok: true }),
+    // Phase 6 Todoist row + Phase 7 RagDisconnectedSection both render inside
+    // IntegrationsSection and poll on mount; stub so the renderer doesn't
+    // throw TypeError on first effect.
+    todoistStatus: vi
+      .fn()
+      .mockResolvedValue({ connected: false, tokenStatus: 'missing', queueDepth: 0 }),
+    todoistConnectToken: vi.fn().mockResolvedValue({ ok: true }),
+    todoistDisconnect: vi.fn().mockResolvedValue({ ok: true }),
+    todoistForceSync: vi.fn().mockResolvedValue({ ok: true }),
+    ragAccountChunkCounts: vi.fn().mockResolvedValue({ rows: [] }),
+    ragWipeAccount: vi.fn().mockResolvedValue({ deletedChunks: 0 }),
   };
   (globalThis as unknown as { window: { aria: typeof aria } }).window.aria = aria;
   return aria;

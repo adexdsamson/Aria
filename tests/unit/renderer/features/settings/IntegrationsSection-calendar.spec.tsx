@@ -35,6 +35,16 @@ interface AriaStub {
   calendarConnect: ReturnType<typeof vi.fn>;
   calendarDisconnect: ReturnType<typeof vi.fn>;
   calendarForceSync: ReturnType<typeof vi.fn>;
+  // Phase 6 added a Todoist row inside IntegrationsSection; it polls on mount.
+  todoistStatus: ReturnType<typeof vi.fn>;
+  todoistConnectToken: ReturnType<typeof vi.fn>;
+  todoistDisconnect: ReturnType<typeof vi.fn>;
+  todoistForceSync: ReturnType<typeof vi.fn>;
+  // Phase 7 embedded RagDisconnectedSection inside IntegrationsSection.
+  ragAccountChunkCounts: ReturnType<typeof vi.fn>;
+  ragWipeAccount: ReturnType<typeof vi.fn>;
+  providerAccountsList: ReturnType<typeof vi.fn>;
+  providerAccountDisconnect: ReturnType<typeof vi.fn>;
 }
 
 function installAria(opts: {
@@ -54,6 +64,16 @@ function installAria(opts: {
     calendarConnect: vi.fn().mockResolvedValue({ ok: true, email: calendar.email ?? 'cal@x.com' }),
     calendarDisconnect: vi.fn().mockResolvedValue({ ok: true }),
     calendarForceSync: vi.fn().mockResolvedValue({ ok: true }),
+    todoistStatus: vi
+      .fn()
+      .mockResolvedValue({ connected: false, tokenStatus: 'missing', queueDepth: 0 }),
+    todoistConnectToken: vi.fn().mockResolvedValue({ ok: true }),
+    todoistDisconnect: vi.fn().mockResolvedValue({ ok: true }),
+    todoistForceSync: vi.fn().mockResolvedValue({ ok: true }),
+    ragAccountChunkCounts: vi.fn().mockResolvedValue({ rows: [] }),
+    ragWipeAccount: vi.fn().mockResolvedValue({ deletedChunks: 0 }),
+    providerAccountsList: vi.fn().mockResolvedValue({ rows: [] }),
+    providerAccountDisconnect: vi.fn().mockResolvedValue({ ok: true }),
   };
   (globalThis as unknown as { window: { aria: AriaStub } }).window.aria = stub;
   return stub;
