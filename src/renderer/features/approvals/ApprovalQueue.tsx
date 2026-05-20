@@ -1,3 +1,8 @@
+/**
+ * Phase 9 Plan 03 — RE-SKINNED. Account-filter buttons rendered as
+ * editorial pills; queue list spacing tightened. ApprovalCard variant
+ * dispatch, data-testid attributes, and IPC plumbing unchanged.
+ */
 import type { ApprovalRowDto } from '../../../shared/ipc-contract';
 import { useMemo, useState } from 'react';
 import { AccountChip } from '../../components/AccountChip';
@@ -33,19 +38,29 @@ export function ApprovalQueue(props: ApprovalQueueProps): JSX.Element {
   return (
     <>
       {accounts.length > 0 && (
-        <div data-testid="approval-account-filters" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <button type="button" data-testid="approval-account-filter-all" onClick={() => setAccountFilter(null)}>
+        <div
+          data-testid="approval-account-filters"
+          style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}
+        >
+          <button
+            type="button"
+            data-testid="approval-account-filter-all"
+            onClick={() => setAccountFilter(null)}
+            style={accountFilterStyle(accountFilter === null)}
+          >
             All accounts
           </button>
           {accounts.map((row) => {
             const key = `${row.provider_key}:${row.account_id}`;
+            const on = accountFilter === key;
             return (
               <button
                 key={key}
                 type="button"
                 data-testid={`approval-account-filter-${row.provider_key}-${row.account_id}`}
-                aria-pressed={accountFilter === key}
+                aria-pressed={on}
                 onClick={() => setAccountFilter((current) => (current === key ? null : key))}
+                style={accountFilterStyle(on)}
               >
                 <AccountChip providerKey={row.provider_key} accountId={row.account_id} compact />
               </button>
@@ -73,4 +88,19 @@ export function ApprovalQueue(props: ApprovalQueueProps): JSX.Element {
       </ul>
     </>
   );
+}
+
+function accountFilterStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '4px 10px',
+    borderRadius: 999,
+    fontFamily: 'var(--f-mono)',
+    fontSize: 10.5,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    border: `1px solid ${active ? 'var(--ink)' : 'var(--rule)'}`,
+    background: active ? 'var(--ink)' : 'transparent',
+    color: active ? 'var(--ivory)' : 'var(--gray)',
+    cursor: 'pointer',
+  };
 }

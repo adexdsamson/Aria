@@ -5,11 +5,13 @@
  * generating, ready, interrupted, snoozed) with filter chips, multi-select
  * for batch approve, and per-card actions.
  *
- * No TanStack Query dependency (renderer doesn't pull it in for Plan 03-01;
- * the simple useEffect + reload pattern from BriefingScreen is sufficient).
+ * Phase 9 Plan 03 — RE-SKINNED. Editorial filter pills, gold-tinted batch
+ * action bar, ivory-deep confirm dialog. All IPC, state, data-testid, and
+ * action handlers preserved verbatim.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApprovalRowDto, ApprovalUiState } from '../../../shared/ipc-contract';
+import { Button } from '../../components/editorial';
 import { ApprovalQueue } from './ApprovalQueue';
 
 const FILTERABLE_STATES: ApprovalUiState[] = [
@@ -80,11 +82,6 @@ export function ApprovalsScreen(): JSX.Element {
       await load();
       return;
     }
-    // Plan 03-04 Task 5 — for email_send approvals, chain into the Gmail
-    // send adapter so the approve click drives the full approved -> sent
-    // transition. The gmail-send IPC is the SINGLE call site for Gmail
-    // sends; bypass attempts (non-approved rows, forced-explicit gaps) are
-    // rejected by assertApproved inside the adapter (APPR-01 / APPR-07).
     const row = rows.find((r) => r.id === id);
     if (row && row.kind === 'email_send') {
       const sendRes = await window.aria.gmailSendApproved({ approvalId: id });
@@ -132,44 +129,110 @@ export function ApprovalsScreen(): JSX.Element {
   return (
     <section
       data-testid="approvals-screen"
-      style={{ padding: 'var(--aria-space-xl)', color: 'var(--aria-fg)' }}
+      style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 32px 80px', color: 'var(--ink)' }}
     >
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 16 }}>
-        <h1 style={{ fontSize: 'var(--aria-type-3xl)', margin: 0 }}>Approvals</h1>
-        <span data-testid="approvals-count" style={{ color: '#6b7280' }}>
-          ({visible.length} of {rows.length})
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 14,
+          paddingBottom: 14,
+          marginBottom: 18,
+          borderBottom: '1px solid var(--rule)',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontWeight: 500,
+            fontSize: '2.25rem',
+            letterSpacing: '-0.015em',
+            margin: 0,
+          }}
+        >
+          Awaiting your call
+        </h1>
+        <span
+          data-testid="approvals-count"
+          className="smallcaps"
+          style={{ color: 'var(--gray-soft)' }}
+          aria-hidden="true"
+        >
+          {visible.length} of {rows.length}
+        </span>
+        <span style={{ flex: 1 }} />
+        <span
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            color: 'var(--gray)',
+            fontSize: 14,
+          }}
+        >
+          Nothing leaves Aria without this page.
         </span>
       </header>
 
       <div
         role="group"
         aria-label="Filter by state"
-        style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}
+        style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}
       >
-        {FILTERABLE_STATES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            data-testid={`approvals-filter-${s}`}
-            aria-pressed={stateFilter.has(s)}
-            onClick={() => toggleFilter(s)}
-            style={{
-              padding: '4px 10px',
-              borderRadius: 12,
-              border: '1px solid #d1d5db',
-              background: stateFilter.has(s) ? '#1f2937' : '#fff',
-              color: stateFilter.has(s) ? '#fff' : '#1f2937',
-              cursor: 'pointer',
-              fontSize: 12,
-            }}
-          >
-            {s}
-          </button>
-        ))}
+        <span
+          className="smallcaps"
+          style={{ color: 'var(--gray-soft)', marginRight: 4 }}
+          aria-hidden="true"
+        >
+          Filter
+        </span>
+        {FILTERABLE_STATES.map((s) => {
+          const on = stateFilter.has(s);
+          const count = rows.filter((r) => r.state === s).length;
+          return (
+            <button
+              key={s}
+              type="button"
+              data-testid={`approvals-filter-${s}`}
+              aria-pressed={on}
+              onClick={() => toggleFilter(s)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                borderRadius: 999,
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10.5,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                border: `1px solid ${on ? 'var(--ink)' : 'var(--rule)'}`,
+                background: on ? 'var(--ink)' : 'transparent',
+                color: on ? 'var(--ivory)' : 'var(--gray)',
+                cursor: 'pointer',
+                transition: 'all var(--t)',
+              }}
+            >
+              {s} <span style={{ opacity: 0.7 }}>· {count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {actionError && (
-        <p role="alert" data-testid="approvals-error" style={{ color: '#b91c1c', fontSize: 13 }}>
+        <p
+          role="alert"
+          data-testid="approvals-error"
+          style={{
+            color: 'var(--rose)',
+            fontSize: 13,
+            background: 'rgba(184,73,58,0.08)',
+            border: '1px solid rgba(184,73,58,0.25)',
+            padding: '8px 12px',
+            borderRadius: 6,
+            margin: '0 0 12px 0',
+          }}
+        >
           {actionError}
         </p>
       )}
@@ -179,31 +242,41 @@ export function ApprovalsScreen(): JSX.Element {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: 8,
-            background: '#eff6ff',
+            gap: 12,
+            padding: '10px 14px',
+            background: 'rgba(184,134,11,0.08)',
+            border: '1px solid rgba(184,134,11,0.25)',
             borderRadius: 6,
-            marginBottom: 12,
+            marginBottom: 14,
           }}
         >
-          <span data-testid="approvals-batch-summary">
-            {selected.size} selected ({batchableCount} ready to approve)
+          <span data-testid="approvals-batch-summary" style={{ fontSize: 13, color: 'var(--ink)' }}>
+            <strong>{selected.size}</strong> selected ·{' '}
+            <span style={{ color: 'var(--gray)' }}>{batchableCount} ready to approve</span>
           </span>
-          <button
-            type="button"
+          <span style={{ flex: 1 }} />
+          <Button
+            variant="primary"
             data-testid="approvals-batch-approve"
             disabled={batchableCount === 0}
             onClick={() => setConfirmOpen(true)}
+            style={{
+              minHeight: 30,
+              padding: '0 14px',
+              fontSize: 12.5,
+              opacity: batchableCount === 0 ? 0.4 : 1,
+            }}
           >
             Batch approve
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             data-testid="approvals-batch-clear"
             onClick={() => setSelected(new Set())}
+            style={{ minHeight: 30, padding: '0 12px', fontSize: 12.5 }}
           >
-            Clear selection
-          </button>
+            Clear
+          </Button>
         </div>
       )}
 
@@ -213,39 +286,61 @@ export function ApprovalsScreen(): JSX.Element {
           aria-modal="true"
           data-testid="approvals-batch-confirm"
           style={{
-            border: '1px solid #d1d5db',
-            background: '#f9fafb',
-            padding: 12,
+            border: '1px solid var(--rule-strong)',
+            background: 'var(--ivory-deep)',
+            padding: '14px 18px',
             borderRadius: 6,
-            marginBottom: 12,
+            marginBottom: 14,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            flexWrap: 'wrap',
           }}
         >
-          <p style={{ margin: '0 0 8px 0', fontSize: 13 }}>
+          <p style={{ margin: 0, flex: 1, minWidth: 240, color: 'var(--ink-soft)' }}>
             Approve {batchableCount} ready draft(s)? Approvals are final and unlock the send gate
             for each row. This action cannot be undone in batch.
           </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              data-testid="approvals-batch-confirm-btn"
-              onClick={() => void runBatchApprove()}
-            >
-              Confirm batch approve
-            </button>
-            <button
-              type="button"
-              data-testid="approvals-batch-cancel-btn"
-              onClick={() => setConfirmOpen(false)}
-            >
-              Cancel
-            </button>
-          </div>
+          <Button
+            variant="primary"
+            data-testid="approvals-batch-confirm-btn"
+            onClick={() => void runBatchApprove()}
+            style={{ minHeight: 30, padding: '0 12px', fontSize: 12.5 }}
+          >
+            Confirm batch approve
+          </Button>
+          <Button
+            variant="ghost"
+            data-testid="approvals-batch-cancel-btn"
+            onClick={() => setConfirmOpen(false)}
+            style={{ minHeight: 30, padding: '0 12px', fontSize: 12.5 }}
+          >
+            Cancel
+          </Button>
         </div>
       )}
 
-      {!loaded && <p data-testid="approvals-loading">Loading…</p>}
+      {!loaded && (
+        <p
+          data-testid="approvals-loading"
+          style={{ fontFamily: 'var(--f-display)', fontStyle: 'italic', color: 'var(--gray)' }}
+        >
+          Loading…
+        </p>
+      )}
       {loaded && visible.length === 0 && (
-        <p data-testid="approvals-empty" style={{ color: '#6b7280' }}>
+        <p
+          data-testid="approvals-empty"
+          style={{
+            padding: '48px 0',
+            textAlign: 'center',
+            color: 'var(--gray-soft)',
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            fontSize: 15,
+          }}
+        >
           No approvals match the current filter.
         </p>
       )}
