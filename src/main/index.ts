@@ -76,6 +76,12 @@ import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
 import { getOllamaModelId, setOllamaModelId } from './secrets/safeStorage';
 import { acquireSingleInstanceLock } from './single-instance';
+import { EntitlementService } from './entitlement/service';
+import { getOrCreateInstallId } from './entitlement/install-id';
+import { handleActivateDeepLink } from './entitlement/deep-link';
+import {
+  scheduleEntitlementRefresh,
+} from './entitlement/schedule';
 // Plan 07-02 Task 5.5 (REVIEWS C3): reconcileModelSwap MUST run at boot
 // AFTER openDb + runMigrations + single-instance-lock and BEFORE IndexWorker.start.
 // Wiring stub — the IndexWorker itself is started by the IPC layer (registerHandlers)
@@ -242,12 +248,65 @@ async function bootstrap(): Promise<void> {
 
   applyCsp();
   registerPowerHooks(logger);
-  registerScheduler(logger);
+  const scheduler = registerScheduler(logger);
   // Plan 03 (wave 4): registerHandlers now owns all Phase-1 IPC wiring:
   // onboarding + backup (Plan 02), secrets + ollama/diagnostics (Plan 03).
   // ASK_ARIA and DIAGNOSTICS_ROUTING_LOG remain as no-op stubs until Plan 04.
   const dbHolder = createDbHolder();
+
+  // Plan 08.1-02 — entitlement service. CRITICAL ORDERING:
+  //   1. openDb + runMigrations (happens later inside the onboarding handler
+  //      when the user unlocks)
+  //   2. EntitlementService.bootstrap() — call POST-migration, PRE-first-write
+  //   3. Only then are the 5 gated IPC surfaces allowed to invoke their
+  //      provider calls. Order is enforced by assertEntitled — see
+  //      src/main/entitlement/gate.ts and the static-grep ratchet at
+  //      tests/static/single-entitlement-gate-site.test.ts.
+  let entitlementService: EntitlementService | null = null;
   registerHandlers(ipcMain, { logger, dataDir, dbHolder });
+
+  // Lazily bootstrap entitlement once the DB is unlocked. The bootstrap
+  // method is itself idempotent and concurrency-safe.
+  const tryBootstrapEntitlement = async (): Promise<void> => {
+    if (entitlementService) return;
+    const db = dbHolder.db;
+    if (!db) return;
+    entitlementService = new EntitlementService({
+      db,
+      installIdProvider: () => getOrCreateInstallId({ logger }),
+      logger,
+    });
+    try {
+      await entitlementService.bootstrap();
+      scheduleEntitlementRefresh(entitlementService, { scheduler, logger });
+    } catch (err) {
+      logger.warn(
+        { scope: 'entitlement.boot', err: (err as Error).message },
+        'entitlement bootstrap failed; gated surfaces will be closed',
+      );
+    }
+  };
+  // Poll for DB readiness (driven by the unlock IPC). Cheap and avoids
+  // restructuring the existing onboarding wiring.
+  const bootPoll = setInterval(() => {
+    if (dbHolder.db) {
+      clearInterval(bootPoll);
+      void tryBootstrapEntitlement();
+    }
+  }, 250);
+
+  // Plan 08.1-02 — single-instance deep-link forwarder for aria://activate
+  // already registered in acquireSingleInstanceLock above; rewire onAriaUrl
+  // now that we have a service factory.
+  (globalThis as { __ariaOnAriaUrl?: (url: string) => void }).__ariaOnAriaUrl = (
+    url: string,
+  ) => {
+    void (async () => {
+      if (!entitlementService) await tryBootstrapEntitlement();
+      if (!entitlementService) return;
+      await handleActivateDeepLink(url, { service: entitlementService });
+    })();
+  };
 
   // Ollama active-model auto-pick on first connect. See autoPickOllamaModel.
   void autoPickOllamaModel({
@@ -280,7 +339,11 @@ async function bootstrap(): Promise<void> {
   });
 }
 
-acquireSingleInstanceLock({ app });
+acquireSingleInstanceLock({
+  app,
+  onAriaUrl: (url) =>
+    (globalThis as { __ariaOnAriaUrl?: (u: string) => void }).__ariaOnAriaUrl?.(url),
+});
 
 app.whenReady().then(bootstrap).catch((err) => {
   // Logger may not yet exist; fall back to console.

@@ -22,6 +22,17 @@ function buildApi(): AriaApi {
 
 const api = buildApi();
 
+// Plan 08.1-02 — entitlement-state-changed event subscription. Overrides the
+// auto-mapped `invoke`-style stub with a real `ipcRenderer.on` listener that
+// returns an unsubscribe function. The renderer calls
+// `window.aria.entitlementOnStateChanged(cb)` to subscribe.
+(api as unknown as Record<string, AnyFn | ((cb: (payload: unknown) => void) => () => void)>)
+  .entitlementOnStateChanged = (cb: (payload: unknown) => void) => {
+  const handler = (_e: unknown, payload: unknown) => cb(payload);
+  ipcRenderer.on(CHANNELS.ENTITLEMENT_STATE_CHANGED, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.ENTITLEMENT_STATE_CHANGED, handler);
+};
+
 // E2E-only escape hatches; gated by ARIA_E2E env var so production builds
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.

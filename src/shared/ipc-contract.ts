@@ -130,6 +130,13 @@ export const CHANNELS = {
   UPDATER_DOWNLOAD: 'aria:updater:download',
   UPDATER_RESTART: 'aria:updater:restart',
   UPDATER_CHANNEL: 'aria:updater:channel',
+  // Plan 08.1-02 entitlement
+  ENTITLEMENT_GET_STATE: 'aria:entitlement:get-state',
+  ENTITLEMENT_ACTIVATE: 'aria:entitlement:activate',
+  ENTITLEMENT_OPEN_CHECKOUT: 'aria:entitlement:open-checkout',
+  ENTITLEMENT_OPEN_PORTAL: 'aria:entitlement:open-portal',
+  ENTITLEMENT_REFRESH_NOW: 'aria:entitlement:refresh-now',
+  ENTITLEMENT_STATE_CHANGED: 'aria:entitlement:state-changed', // event
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -933,6 +940,23 @@ export interface AriaApi {
   updaterDownload(): Promise<{ ok: true } | { error: string } | IpcError>;
   updaterRestart(): Promise<{ ok: true } | { error: string } | IpcError>;
   updaterChannel(): Promise<{ channel: string } | IpcError>;
+
+  // Plan 08.1-02 — entitlement / paywall
+  entitlementGetState(): Promise<{ ok: true; state: unknown } | { ok: false; error: string } | IpcError>;
+  entitlementActivate(req: { license_key: string }): Promise<
+    | { ok: true; state: unknown }
+    | { ok: false; error: { code: string; message?: string } }
+    | IpcError
+  >;
+  entitlementOpenCheckout(): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+  entitlementOpenPortal(): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+  entitlementRefreshNow(): Promise<{ ok: true; state: unknown } | { ok: false; error: string } | IpcError>;
+  /**
+   * Renderer-side subscription helper — registered in preload as a true
+   * `ipcRenderer.on` listener rather than `invoke`. The build-time auto-mapper
+   * still wires this name; preload patches it to register a listener.
+   */
+  entitlementOnStateChanged(): Promise<{ ok: true } | IpcError>;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1281,4 +1305,40 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   UPDATER_DOWNLOAD: 'updaterDownload',
   UPDATER_RESTART: 'updaterRestart',
   UPDATER_CHANNEL: 'updaterChannel',
+  ENTITLEMENT_GET_STATE: 'entitlementGetState',
+  ENTITLEMENT_ACTIVATE: 'entitlementActivate',
+  ENTITLEMENT_OPEN_CHECKOUT: 'entitlementOpenCheckout',
+  ENTITLEMENT_OPEN_PORTAL: 'entitlementOpenPortal',
+  ENTITLEMENT_REFRESH_NOW: 'entitlementRefreshNow',
+  ENTITLEMENT_STATE_CHANGED: 'entitlementOnStateChanged',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Plan 08.1-02 entitlement IPC DTOs
+// ---------------------------------------------------------------------------
+
+import { z as _z_ent } from 'zod';
+
+export const EntitlementActivateRequest = _z_ent.object({
+  license_key: _z_ent.string().min(1),
+});
+export type EntitlementActivateRequest = _z_ent.infer<
+  typeof EntitlementActivateRequest
+>;
+
+export const EntitlementActivateResponse = _z_ent.union([
+  _z_ent.object({
+    ok: _z_ent.literal(true),
+    state: _z_ent.unknown(),
+  }),
+  _z_ent.object({
+    ok: _z_ent.literal(false),
+    error: _z_ent.object({
+      code: _z_ent.string(),
+      message: _z_ent.string().optional(),
+    }),
+  }),
+]);
+export type EntitlementActivateResponse = _z_ent.infer<
+  typeof EntitlementActivateResponse
+>;
