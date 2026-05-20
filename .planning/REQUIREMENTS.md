@@ -87,7 +87,7 @@
 ### Conversational Q&A / RAG (RAG)
 
 - [x] **RAG-01**: System indexes the user emails, meeting transcripts, and calendar events locally using nomic-embed-text (or equivalent)
-- [ ] **RAG-02**: User can ask natural-language questions ("what did Sarah commit to on Q3?") and get a cited answer
+- [x] **RAG-02**: User can ask natural-language questions ("what did Sarah commit to on Q3?") and get a cited answer
 - [ ] **RAG-03**: Every RAG answer cites at least one source (email / transcript / event); user can click to inspect the source
 - [ ] **RAG-04**: System uses hybrid retrieval (BM25 + vector) for accuracy on named entities
 - [x] **RAG-05**: System re-indexes incrementally when source data is updated or deleted
@@ -110,8 +110,8 @@
 - [ ] **XCUT-01**: Aria handles sleep/wake events cleanly (no cron storm on resume; missed jobs coalesced)
 - [x] **XCUT-02**: Aria persists work-in-progress (drafts being generated) across crashes without ever auto-transitioning to "sent"
 - [ ] **XCUT-03**: Application logs redact PII before write; debug logs are local-only, opt-in
-- [ ] **XCUT-04**: Auto-updater performs a pre-migration database backup; failed migrations auto-restore
-- [ ] **XCUT-05**: Application is code-signed and notarized (macOS) at v1 release. Windows OV signing applies at **GA release**; initial v1 tester build ships Windows-unsigned with documented SmartScreen warning. OV cert acquired and Windows signing wired after tester usage period (user-confirmed staged approach 2026-05-17).
+- [x] **XCUT-04**: Auto-updater performs a pre-migration database backup; failed migrations auto-restore
+- [x] **XCUT-05**: Application is code-signed and notarized (macOS) at v1 release. Windows OV signing applies at **GA release**; initial v1 tester build ships Windows-unsigned with documented SmartScreen warning. OV cert acquired and Windows signing wired after tester usage period (user-confirmed staged approach 2026-05-17).
 - [ ] **XCUT-06**: Aria provides a status panel showing sync state, queue depth, last error per integration
 - [ ] **XCUT-07**: Aria respects user time zone correctly across all integrations
 
