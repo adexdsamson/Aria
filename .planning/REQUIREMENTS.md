@@ -72,7 +72,7 @@
 ### Daily Briefing (BRIEF)
 
 - [ ] **BRIEF-01**: User receives a daily briefing at a configurable local time (default 7am)
-- [ ] **BRIEF-02**: Briefing surfaces top 3-5 priorities for the day with a rationale for each
+- [x] **BRIEF-02**: Briefing surfaces top 3-5 priorities for the day with a rationale for each
 - [ ] **BRIEF-03**: Briefing includes today calendar preview, overdue tasks, unread priority email, and external news items
 - [ ] **BRIEF-04**: User can configure news topics / interests for the briefing
 - [ ] **BRIEF-05**: User can give feedback on the briefing (more like / skip section); preferences refine over time
@@ -80,9 +80,9 @@
 
 ### Insights (INSIGHT)
 
-- [ ] **INSIGHT-01**: System computes trend insights from the user own data (calendar load week-over-week, email response-time trends, recurring meeting themes) after at least 2 weeks of history
-- [ ] **INSIGHT-02**: Insights appear in the daily briefing and weekly recap
-- [ ] **INSIGHT-03**: System never sends insight underlying data to a frontier API; insight prose generation is routed appropriately
+- [x] **INSIGHT-01**: System computes trend insights from the user own data (calendar load week-over-week, email response-time trends, recurring meeting themes) after at least 2 weeks of history
+- [x] **INSIGHT-02**: Insights appear in the daily briefing and weekly recap
+- [x] **INSIGHT-03**: System never sends insight underlying data to a frontier API; insight prose generation is routed appropriately
 
 ### Conversational Q&A / RAG (RAG)
 

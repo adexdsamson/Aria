@@ -15,7 +15,7 @@
 | 5 | Outlook Parity (email + calendar) | Aria works for an Outlook/M365 exec the same as a Google one | 3 |
 | 6 | Meeting Capture + Todoist Push | Aria turns a pasted transcript into action items in Todoist | 3 |
 | 7 | 3/3 | Complete   | 2026-05-19 |
-| 8 | Insights, Recap, Learning, Release Prep | Weekly recap shipped, insights derived, learning loop closed, app signed and shippable | 4 |
+| 8 | 1/4 | In Progress|  |
 
 ---
 
