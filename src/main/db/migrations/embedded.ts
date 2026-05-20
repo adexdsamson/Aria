@@ -1250,4 +1250,42 @@ CREATE INDEX idx_weekly_recap_section_edit_recap ON weekly_recap_section_edit(re
 PRAGMA user_version = 129;
 `,
   },
+  {
+    version: 130,
+    file: '130_phase8_learning.sql',
+    sql: `
+-- Phase 8 Stream 3 — Preference learning + briefing/QA feedback.
+
+CREATE TABLE learning_signals (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  source       TEXT    NOT NULL CHECK (source IN ('approval','briefing','recap','qa')),
+  kind         TEXT    NOT NULL,
+  payload_json TEXT    NOT NULL DEFAULT '{}',
+  occurred_at  TEXT    NOT NULL
+);
+
+CREATE INDEX idx_learning_signals_occurred ON learning_signals(occurred_at DESC);
+CREATE INDEX idx_learning_signals_source_occ ON learning_signals(source, occurred_at DESC);
+
+CREATE TABLE learned_preferences (
+  id           INTEGER PRIMARY KEY CHECK (id = 1),
+  payload_json TEXT    NOT NULL,
+  updated_at   TEXT    NOT NULL
+);
+
+CREATE TABLE briefing_feedback (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  briefing_id TEXT    NOT NULL,
+  section_key TEXT    NOT NULL,
+  thumb       INTEGER NOT NULL CHECK (thumb IN (-1, 0, 1)),
+  created_at  TEXT    NOT NULL
+);
+
+CREATE INDEX idx_briefing_feedback_briefing ON briefing_feedback(briefing_id);
+
+ALTER TABLE rag_turn ADD COLUMN thumb INTEGER NOT NULL DEFAULT 0;
+
+PRAGMA user_version = 130;
+`,
+  },
 ];
