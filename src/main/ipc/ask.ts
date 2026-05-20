@@ -43,6 +43,7 @@ import {
   hashPrompt,
   type RoutingLogInput,
 } from '../llm/routingLog';
+import { assertEntitled, EntitlementError } from '../entitlement/gate';
 
 export interface AskDeps {
   logger: Logger;
@@ -92,6 +93,19 @@ export function registerAskHandlers(ipcMain: IpcMain, deps: AskDeps): void {
   ipcMain.handle(
     CHANNELS.ASK_ARIA,
     async (_event, payload: unknown): Promise<AskResponse | IpcError> => {
+      // ENTITLEMENT GATE — must be first non-comment statement of the handler.
+      // Static-grep ratchet: tests/static/single-entitlement-gate-site.test.ts
+      const _db_for_gate = dbHolder.db;
+      if (_db_for_gate) {
+        try {
+          await assertEntitled(_db_for_gate, 'rag_ask');
+        } catch (e) {
+          if (e instanceof EntitlementError) {
+            return { error: `entitlement-${e.code}` };
+          }
+          throw e;
+        }
+      }
       const req = (payload ?? {}) as Partial<AskRequest>;
       const prompt = typeof req.prompt === 'string' ? req.prompt : '';
       const source = (req.source ?? undefined) as AskRequest['source'] | undefined;

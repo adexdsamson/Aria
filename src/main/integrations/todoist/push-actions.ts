@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { assertApproved } from '../../approvals/gate';
+import { assertEntitled } from '../../entitlement/gate';
 import type { TodoistClient } from './client';
 
 interface ActionRow {
@@ -28,6 +29,7 @@ export async function pushApprovedMeetingActions(opts: {
   now?: Date;
 }): Promise<PushApprovedActionsResult> {
   const { db, approvalId, client } = opts;
+  await assertEntitled(db, 'task_push');
   assertApproved(db, approvalId);
   const nowIso = (opts.now ?? new Date()).toISOString();
   const rows = db.prepare(

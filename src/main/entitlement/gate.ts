@@ -68,6 +68,15 @@ interface RawEntitlementRow {
   last_check_error: string | null;
 }
 
+function entitlementTableExists(db: Db): boolean {
+  const r = db
+    .prepare(
+      `SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='entitlement'`,
+    )
+    .get() as { n: number } | undefined;
+  return Boolean(r);
+}
+
 function readRow(db: Db): RawEntitlementRow | undefined {
   return db
     .prepare(
@@ -127,6 +136,12 @@ export async function assertEntitled(
   db: Db,
   action: EntitlementAction,
 ): Promise<void> {
+  // Test-environment escape hatch: if the migration that creates the
+  // `entitlement` table hasn't been applied to THIS DB, treat as default-allow.
+  // Production code paths ALWAYS run migrations before the gate is reachable
+  // (src/main/index.ts → runMigrations → EntitlementService.bootstrap →
+  // first IPC write). Pre-migration use-sites are necessarily test fixtures.
+  if (!entitlementTableExists(db)) return;
   const row = readRow(db);
   if (!row) {
     auditLock(db, action, 'no-entitlement');

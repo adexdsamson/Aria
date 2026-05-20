@@ -68,6 +68,7 @@ import {
   DEFAULT_PII_PATTERN_NAMES,
 } from '../log/redact';
 import { upsertBriefing, hashFromUrl } from './persist';
+import { assertEntitled } from '../entitlement/gate';
 import * as crypto from 'node:crypto';
 
 type Db = Database.Database;
@@ -348,6 +349,7 @@ export interface RunBriefingDeps {
 }
 
 export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayload> {
+  await assertEntitled(deps.db, 'briefing_generate');
   const {
     db,
     date,
