@@ -26,6 +26,12 @@ const ALLOWED_FILES = new Set([
   resolve(process.cwd(), 'src/main/db/migrations/runner.ts').replaceAll('\\', '/'),
   // Single sanctioned wrapper
   resolve(process.cwd(), 'src/main/release/backup-hook.ts').replaceAll('\\', '/'),
+  // Plan 08-04 Task 4a back-compat path: openDb retains a default-true
+  // runMigrationsOnOpen branch so unit tests that call openDb({ dataDir,
+  // dbKey }) directly still see a migrated schema. All production callers
+  // (onboarding seal/unlock, backup-restore, restore.ts, main/index.ts)
+  // pass either 'deferred' or false and flow through runMigrationsWithBackup.
+  resolve(process.cwd(), 'src/main/db/connect.ts').replaceAll('\\', '/'),
 ]);
 
 // Match a bare invocation: `runMigrations(` followed by a non-`W` (so we
