@@ -96,7 +96,7 @@ export function BriefingSettingsSection(): JSX.Element {
 
   return (
     <section data-testid="settings-briefing" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Daily Briefing</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>Daily Briefing</h2>
 
       <label style={{ display: 'block', marginBottom: 12 }}>
         Time (local)

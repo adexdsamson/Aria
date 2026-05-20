@@ -107,8 +107,37 @@ export function UpdatesSection(): JSX.Element {
   }, []);
 
   return (
-    <section data-testid="settings-updates">
-      <h2>Updates</h2>
+    <section
+      data-testid="settings-updates"
+      style={{ padding: 32, maxWidth: '64rem', margin: '0 auto', background: 'var(--paper)', color: 'var(--ink)' }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Settings · Account
+      </div>
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 28,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+          margin: 0,
+          marginBottom: 16,
+          borderBottom: '1px solid var(--rule)',
+          paddingBottom: 12,
+        }}
+      >
+        Updates
+      </h2>
       <div style={{ marginBottom: 12 }}>
         Channel: <strong data-testid="updates-channel">{channel}</strong>
       </div>

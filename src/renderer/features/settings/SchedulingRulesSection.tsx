@@ -190,7 +190,7 @@ export function SchedulingRulesSection(): JSX.Element {
       data-testid="settings-scheduling"
       style={{ padding: 'var(--aria-space-lg)' }}
     >
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>
         Scheduling Rules
       </h2>
 

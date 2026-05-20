@@ -72,7 +72,7 @@ export function RagDisconnectedSection(): JSX.Element {
       data-testid="rag-disconnected-section"
       style={{ padding: 'var(--aria-space-lg, 16px)', borderTop: '1px solid #e5e7eb' }}
     >
-      <h3 style={{ marginTop: 0 }}>Disconnected accounts — indexed data</h3>
+      <h3 style={{ fontFamily: 'var(--f-display)', fontSize: 18, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 8 }}>Disconnected accounts — indexed data</h3>
       <p style={{ color: 'var(--aria-muted, #64748b)', fontSize: 13 }}>
         These accounts are disconnected but still have RAG-indexed content. Citations
         from this data will continue to appear marked <em>disconnected</em>.

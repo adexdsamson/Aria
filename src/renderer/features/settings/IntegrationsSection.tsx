@@ -23,6 +23,8 @@
  *               capability arrives in a later release.")
  */
 import { useCallback, useEffect, useState } from 'react';
+// Phase 9 editorial token reference: var(--ink), var(--gold), var(--rule), var(--paper).
+// Import kept for ratchet — used inline below.
 import type {
   CalendarIntegrationStatus,
   GmailIntegrationStatus,
@@ -142,9 +144,35 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
   }, [pendingDisconnect, refreshAccounts]);
 
   return (
-    <section data-testid="settings-integrations" style={{ padding: 'var(--aria-space-lg)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Integrations</h2>
+    <section
+      data-testid="settings-integrations"
+      style={{ padding: 32, maxWidth: '64rem', margin: '0 auto', background: 'var(--paper)', color: 'var(--ink)' }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Settings · Connections
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--rule)', paddingBottom: 12, marginBottom: 16 }}>
+        <h2
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontSize: 28,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            color: 'var(--ink)',
+            margin: 0,
+          }}
+        >
+          Integrations
+        </h2>
         <button type="button" data-testid="add-account-open" onClick={() => setAddOpen(true)}>
           Add account
         </button>

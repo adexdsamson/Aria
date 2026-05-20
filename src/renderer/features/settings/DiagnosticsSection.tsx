@@ -12,7 +12,7 @@ export function DiagnosticsSection(): JSX.Element {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   return (
     <section data-testid="settings-diagnostics" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Diagnostics</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>Diagnostics</h2>
       <p style={{ color: 'var(--aria-fg-muted)' }}>
         Ask Aria a question to exercise the LLM router end-to-end. Every
         decision is logged below with its verbatim reason — that&apos;s the

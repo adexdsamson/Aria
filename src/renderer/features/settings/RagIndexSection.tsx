@@ -89,7 +89,7 @@ export function RagIndexSection(): JSX.Element {
 
   return (
     <section data-testid="settings-rag-index" style={{ padding: 'var(--aria-space-md)' }}>
-      <h2 style={{ marginTop: 0 }}>RAG Index</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>RAG Index</h2>
 
       {error && (
         <div role="alert" style={errorBanner()}>
