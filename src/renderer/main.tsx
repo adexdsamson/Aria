@@ -10,6 +10,10 @@ if (!window.aria) {
   console.error('Preload bridge missing — window.aria is undefined.');
 }
 
+// Phase 9 Plan 02 — activate editorial heading scopes (h1-h4 defaults from
+// globals.css are wrapped under :where(.editorial)). One-shot at boot.
+document.body.classList.add('editorial');
+
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Aria: #root element missing from index.html');
 
