@@ -134,6 +134,14 @@
         "deb"
       ]
     },
+    "protocols": [
+      {
+        "name": "Aria",
+        "schemes": [
+          "aria"
+        ]
+      }
+    ],
     "files": [
       "out/**/*",
       "package.json"
