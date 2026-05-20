@@ -53,6 +53,12 @@ import { registerInsightsHandlers } from './insights';
 import { registerRecapHandlers } from './recap';
 import { registerLearningHandlers } from './learning';
 import { registerUpdaterHandlers } from './updater';
+import {
+  registerEntitlementHandlers,
+  makeRendererEmitter,
+} from './entitlement';
+import type { EntitlementService } from '../entitlement/service';
+import type { BrowserWindow } from 'electron';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -70,6 +76,10 @@ export interface IpcDeps {
   ollama?: unknown;
   vault?: unknown;
   db?: unknown;
+  /** Plan 08.1-02 — optional entitlement service for paywall IPC. */
+  entitlementService?: EntitlementService;
+  /** Plan 08.1-02 — main window for ENTITLEMENT_STATE_CHANGED push events. */
+  mainWindow?: BrowserWindow | null;
 }
 
 const NOT_IMPLEMENTED = Object.freeze({ error: 'NOT_IMPLEMENTED' as const });
@@ -405,6 +415,27 @@ export function registerHandlers(
   if (!learningChannels.every((c) => skip.has(c))) {
     registerLearningHandlers(ipcMain, { logger, dbHolder });
     learningChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 08.1-02 — entitlement IPC (only when a service is provided).
+  const entitlementChannels = [
+    CHANNELS.ENTITLEMENT_GET_STATE,
+    CHANNELS.ENTITLEMENT_ACTIVATE,
+    CHANNELS.ENTITLEMENT_OPEN_CHECKOUT,
+    CHANNELS.ENTITLEMENT_OPEN_PORTAL,
+    CHANNELS.ENTITLEMENT_REFRESH_NOW,
+  ];
+  if (
+    deps.entitlementService &&
+    !entitlementChannels.every((c) => skip.has(c))
+  ) {
+    registerEntitlementHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      service: deps.entitlementService,
+      emitToRenderer: makeRendererEmitter(deps.mainWindow ?? null),
+    });
+    entitlementChannels.forEach((c) => skip.add(c));
   }
 
   // Plan 08-04 Task 5 — auto-updater IPC.
