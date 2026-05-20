@@ -1,0 +1,2 @@
+# Fontsource serves woff2 files directly from node_modules; this directory is reserved
+# for any future locally-hosted font assets that Vite must copy into the renderer bundle.
