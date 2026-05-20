@@ -257,7 +257,23 @@ async function bootstrap(): Promise<void> {
     probe: probeOllama,
   });
 
-  createMainWindow();
+  const mainWindow = createMainWindow();
+
+  // Plan 08-04 Task 5 — start electron-updater after the main window exists.
+  // Skip in dev (no auto-updates from a vite dev server). Skip on test boot
+  // (ARIA_E2E=1 — Playwright harness controls update flow explicitly).
+  if (!process.env['ELECTRON_RENDERER_URL'] && process.env['ARIA_E2E'] !== '1') {
+    void import('./release/updater')
+      .then(({ startAutoUpdater }) =>
+        startAutoUpdater({ logger, window: mainWindow }),
+      )
+      .catch((err) => {
+        logger.warn(
+          { scope: 'bootstrap', err: (err as Error).message },
+          'updater.boot.fail',
+        );
+      });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

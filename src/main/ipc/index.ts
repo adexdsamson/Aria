@@ -52,6 +52,7 @@ import { createEmbedClient } from '../rag/ollama-embeddings';
 import { registerInsightsHandlers } from './insights';
 import { registerRecapHandlers } from './recap';
 import { registerLearningHandlers } from './learning';
+import { registerUpdaterHandlers } from './updater';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -404,6 +405,18 @@ export function registerHandlers(
   if (!learningChannels.every((c) => skip.has(c))) {
     registerLearningHandlers(ipcMain, { logger, dbHolder });
     learningChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 08-04 Task 5 — auto-updater IPC.
+  const updaterChannels = [
+    CHANNELS.UPDATER_CHECK,
+    CHANNELS.UPDATER_DOWNLOAD,
+    CHANNELS.UPDATER_RESTART,
+    CHANNELS.UPDATER_CHANNEL,
+  ];
+  if (!updaterChannels.every((c) => skip.has(c))) {
+    registerUpdaterHandlers(ipcMain, { logger });
+    updaterChannels.forEach((c) => skip.add(c));
   }
 
   const transcriptChannels = [

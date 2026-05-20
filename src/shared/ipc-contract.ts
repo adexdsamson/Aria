@@ -125,6 +125,11 @@ export const CHANNELS = {
   BRIEFING_FEEDBACK: 'aria:briefing:feedback',
   BRIEFING_INSIGHT_DISMISS: 'aria:briefing:insight-dismiss',
   RAG_TURN_FEEDBACK: 'aria:rag:turn-feedback',
+  // Plan 08-04 Task 5 — auto-updater
+  UPDATER_CHECK: 'aria:updater:check',
+  UPDATER_DOWNLOAD: 'aria:updater:download',
+  UPDATER_RESTART: 'aria:updater:restart',
+  UPDATER_CHANNEL: 'aria:updater:channel',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -922,6 +927,12 @@ export interface AriaApi {
   }): Promise<{ ok: true } | IpcError>;
   briefingInsightDismiss(req: { briefingDate: string; kind: string }): Promise<{ ok: true } | IpcError>;
   ragTurnFeedback(req: { turnId: string; thumb: -1 | 0 | 1 }): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+
+  // Plan 08-04 Task 5 — auto-updater
+  updaterCheck(): Promise<{ ok: true; info: unknown | null; channel: string | null } | { error: string } | IpcError>;
+  updaterDownload(): Promise<{ ok: true } | { error: string } | IpcError>;
+  updaterRestart(): Promise<{ ok: true } | { error: string } | IpcError>;
+  updaterChannel(): Promise<{ channel: string } | IpcError>;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1266,4 +1277,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   BRIEFING_FEEDBACK: 'briefingFeedback',
   BRIEFING_INSIGHT_DISMISS: 'briefingInsightDismiss',
   RAG_TURN_FEEDBACK: 'ragTurnFeedback',
+  UPDATER_CHECK: 'updaterCheck',
+  UPDATER_DOWNLOAD: 'updaterDownload',
+  UPDATER_RESTART: 'updaterRestart',
+  UPDATER_CHANNEL: 'updaterChannel',
 } as const;
