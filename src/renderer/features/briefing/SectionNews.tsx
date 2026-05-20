@@ -7,9 +7,14 @@
  *
  * Renderer guard (T-02-04-03): href must be http(s); target="_blank" with
  * rel="noopener noreferrer".
+ *
+ * Phase 9 Plan 03 — RE-SKINNED. Editorial chrome (Playfair headlines, mono
+ * source eyebrow, outline Dismiss button). All data-testid + behaviour
+ * preserved.
  */
 import { useState } from 'react';
 import type { BriefingNewsItem } from '../../../shared/ipc-contract';
+import { Button, Card } from '../../components/editorial';
 import { AccountChip } from '../../components/AccountChip';
 
 function safeHref(url: string): string | null {
@@ -53,53 +58,139 @@ export function SectionNews({
 
   return (
     <section data-testid="briefing-section-news">
-      <h2 style={{ fontSize: 'var(--aria-type-xl)' }}>News</h2>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
+        <h2
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontSize: '1.5rem',
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            margin: 0,
+          }}
+        >
+          News
+        </h2>
+        {visible.length > 0 && (
+          <span className="smallcaps" style={{ color: 'var(--gray-soft)' }} aria-hidden="true">
+            Top {visible.length}
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontStyle: 'italic',
+          color: 'var(--gray)',
+          fontSize: 14,
+          marginBottom: 14,
+        }}
+      >
+        From your saved feeds. Dismiss anything that isn’t useful — the choice is remembered for today.
+      </div>
       {error && (
         <div
           data-testid="section-error-news"
           style={{
-            backgroundColor: '#fef3c7',
-            color: '#92400e',
-            padding: 8,
+            background: 'rgba(184,73,58,0.08)',
+            color: 'var(--rose)',
+            border: '1px solid rgba(184,73,58,0.25)',
+            padding: '10px 14px',
             borderRadius: 6,
-            marginBottom: 8,
+            marginBottom: 12,
+            fontSize: 13,
           }}
         >
           {error}
         </div>
       )}
-      {visible.length === 0 && !error && <p>No items today.</p>}
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {visible.map((it) => {
-          const href = safeHref(it.url);
-          return (
-            <li key={it.id} data-testid={`news-item-${it.id}`} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong>
-                  {href ? (
-                    <a href={href} target="_blank" rel="noopener noreferrer">
-                      {it.title}
-                    </a>
-                  ) : (
-                    it.title
-                  )}
-                </strong>
-                <AccountChip compact />
-              </div>
-              <div data-testid="rationale" style={{ color: 'var(--aria-muted-fg)' }}>
-                {it.why}
-              </div>
-              <button
-                type="button"
-                data-testid={`news-dismiss-${it.id}`}
-                onClick={() => void handleDismiss(it)}
-              >
-                Dismiss
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {visible.length === 0 && !error && (
+        <p style={{ fontStyle: 'italic', color: 'var(--gray)', margin: 0 }}>No items today.</p>
+      )}
+      {visible.length > 0 && (
+        <Card>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {visible.map((it, i) => {
+              const href = safeHref(it.url);
+              return (
+                <li
+                  key={it.id}
+                  data-testid={`news-item-${it.id}`}
+                  style={{
+                    padding: '14px 0',
+                    borderBottom:
+                      i === visible.length - 1 ? 'none' : '1px solid var(--rule)',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                      <strong
+                        style={{
+                          fontFamily: 'var(--f-display)',
+                          fontSize: '1rem',
+                          fontWeight: 500,
+                          color: 'var(--ink)',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: 'var(--ink)',
+                              textDecoration: 'none',
+                              borderBottom: '1px solid var(--rule-strong)',
+                            }}
+                          >
+                            {it.title}
+                          </a>
+                        ) : (
+                          it.title
+                        )}
+                      </strong>
+                      <AccountChip compact />
+                    </div>
+                    <div
+                      data-testid="rationale"
+                      style={{
+                        color: 'var(--gray)',
+                        fontSize: 13.5,
+                        fontStyle: 'italic',
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {it.why}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    data-testid={`news-dismiss-${it.id}`}
+                    onClick={() => void handleDismiss(it)}
+                    style={{
+                      alignSelf: 'start',
+                      minHeight: 'auto',
+                      padding: '4px 10px',
+                      fontFamily: 'var(--f-mono)',
+                      fontSize: 10,
+                      letterSpacing: '0.15em',
+                      textTransform: 'uppercase',
+                      color: 'var(--gray-soft)',
+                      border: '1px solid var(--rule)',
+                      borderRadius: 4,
+                    }}
+                  >
+                    Dismiss
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
     </section>
   );
 }
