@@ -46,6 +46,16 @@ export default defineConfig({
         test: {
           name: 'renderer',
           environment: 'jsdom',
+          // jsdom defaults to an opaque origin (about:blank), under which
+          // window.localStorage is a getter that throws "SecurityError" when
+          // accessed and exposes no methods. Pin a real URL so localStorage
+          // is a usable Storage instance (Phase 5 calendar tests + future
+          // renderer tests that touch persisted UI prefs).
+          environmentOptions: {
+            jsdom: {
+              url: 'http://localhost/',
+            },
+          },
           include: [
             'src/renderer/**/*.{test,spec}.{ts,tsx}',
             'tests/unit/renderer/**/*.{test,spec}.{ts,tsx}',

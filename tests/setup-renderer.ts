@@ -14,6 +14,49 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
+// Node 25 ships a built-in `localStorage` global that requires
+// `--localstorage-file=<path>` to function. Vitest's jsdom env inherits this
+// broken global (constructor missing, `.clear`/`.getItem`/`.setItem` undefined)
+// which crashes any renderer test that touches localStorage (Phase 5
+// RecurrenceUnsupportedPill, CalendarGrid, UnifiedCalendarScreen). Install an
+// in-memory polyfill that mirrors the Storage API surface our renderer uses.
+{
+  const store = new Map<string, string>();
+  const polyfill = {
+    get length(): number {
+      return store.size;
+    },
+    clear(): void {
+      store.clear();
+    },
+    getItem(key: string): string | null {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    setItem(key: string, value: string): void {
+      store.set(String(key), String(value));
+    },
+    removeItem(key: string): void {
+      store.delete(key);
+    },
+    key(index: number): string | null {
+      return Array.from(store.keys())[index] ?? null;
+    },
+  };
+  // Replace on globalThis AND window so both lookups hit the same store.
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: polyfill,
+    writable: true,
+    configurable: true,
+  });
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'localStorage', {
+      value: polyfill,
+      writable: true,
+      configurable: true,
+    });
+  }
+}
+
 if (typeof globalThis.ResizeObserver === 'undefined') {
   // Minimal no-op polyfill — sufficient for cmdk and shadcn primitives that
   // only construct an observer to track popover sizing.
