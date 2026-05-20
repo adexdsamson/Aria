@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { assertApproved } from '../approvals/gate';
+import { assertEntitled } from '../entitlement/gate';
 import { getApproval, transitionTo } from '../approvals/persist';
 import { logCalendarAction } from '../scheduling/audit';
 import { computeRecurringWrite, type RecurringScope } from './google/recurrence';
@@ -89,6 +90,7 @@ export async function applyCalendarChange(
   approvalId: string,
   deps: ApplyCalendarChangeDeps = {},
 ): Promise<ApplyCalendarChangeResult> {
+  await assertEntitled(db, 'calendar_change');
   assertApproved(db, approvalId);
 
   const row = getApproval(db, approvalId);

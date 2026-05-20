@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { google } from 'googleapis';
 import { assertApproved } from '../approvals/gate';
+import { assertEntitled } from '../entitlement/gate';
 import { getApproval, transitionTo, writeSendLog } from '../approvals/persist';
 import { ProviderRegistry, type ProviderRegistryDeps } from './registry';
 import type { ProviderKey } from '../../shared/provider';
@@ -141,6 +142,7 @@ export async function sendApprovedEmail(
   approvalId: string,
   deps: SendApprovedDeps = {},
 ): Promise<SendResult> {
+  await assertEntitled(db, 'email_send');
   assertApproved(db, approvalId);
 
   const row = getApproval(db, approvalId);
