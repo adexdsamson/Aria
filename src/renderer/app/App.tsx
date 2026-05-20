@@ -7,6 +7,8 @@ import { AppRoutes } from './routes';
 import { OnboardingWizard } from '../features/onboarding/OnboardingWizard';
 import { UnlockScreen } from '../features/onboarding/UnlockScreen';
 import { RestoreScreen } from '../features/onboarding/RestoreScreen';
+import { EntitlementProvider } from '../features/entitlement/EntitlementProvider';
+import { TrialBanner } from '../features/entitlement/TrialBanner';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -77,13 +79,27 @@ function AppShell(): JSX.Element {
   }
 
   return (
-    <div data-testid="gate-unlocked" style={shellStyle()}>
-      <SideNav />
-      <main style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
-        <AppRoutes />
-      </main>
-      <CommandPalette />
-    </div>
+    <EntitlementProvider>
+      <div data-testid="gate-unlocked" style={shellStyle()}>
+        <SideNav />
+        <main
+          style={{
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+          }}
+        >
+          <TrialBanner />
+          <div style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
+            <AppRoutes />
+          </div>
+        </main>
+        <CommandPalette />
+      </div>
+    </EntitlementProvider>
   );
 }
 

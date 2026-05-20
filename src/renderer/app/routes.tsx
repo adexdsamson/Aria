@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import type { ReactElement } from 'react';
 import { BriefingScreen } from '../features/briefing/BriefingScreen';
 import { ApprovalsScreen } from '../features/approvals/ApprovalsScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
@@ -9,21 +10,72 @@ import { TranscriptCaptureScreen } from '../features/meetings/TranscriptCaptureS
 import { TasksScreen } from '../features/tasks/TasksScreen';
 import { AskScreen } from '../features/ask/AskScreen';
 import { RecapScreen } from '../features/recap/RecapScreen';
+import { PaywallScreen } from '../features/entitlement/PaywallScreen';
+import { useEntitlement } from '../features/entitlement/useEntitlement';
+import { isLocked } from '../features/entitlement/types';
+
+/**
+ * Plan 08.1-03 Task 6 — Read-only allow-list for the locked-state guard.
+ *
+ * When the entitlement gate is closed (trial-locked / pro-locked) every
+ * route EXCEPT these renders <PaywallScreen/> instead of its normal content.
+ *
+ * Adding a new read-only-safe route = adding a single prefix here. Adding a
+ * new write-action route = no edit needed — paywall covers it by default.
+ */
+const READ_ONLY_ALLOW_LIST: readonly string[] = [
+  '/settings', // covers /settings/* subroutes
+  '/briefing',
+  '/transcripts',
+  '/meetings', // read-only listing only; capture is gated downstream by assertEntitled
+  '/approvals', // queue is read-only at the UI level
+  '/inbox',
+  '/calendar',
+  '/insights',
+  '/recap',
+  '/learning',
+  '/routing-log',
+  '/tasks',
+  '/ask', // read-only-from-cache; live ask gated by assertEntitled at IPC layer
+];
+
+export function isReadOnlyAllowed(pathname: string): boolean {
+  return READ_ONLY_ALLOW_LIST.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+/**
+ * Wraps a route element with the locked-state guard. When the entitlement
+ * state is locked AND the current pathname is not in the allow-list, swap
+ * the page content for <PaywallScreen/>. Otherwise render the page as-is.
+ *
+ * Centralizing the guard here means routes do NOT have to import
+ * useEntitlement themselves — adding a new route is a one-line edit.
+ */
+function LockedGuard({ children }: { children: ReactElement }): JSX.Element {
+  const { state } = useEntitlement();
+  const location = useLocation();
+  if (isLocked(state) && !isReadOnlyAllowed(location.pathname)) {
+    return <PaywallScreen />;
+  }
+  return children;
+}
 
 export function AppRoutes(): JSX.Element {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/briefing" replace />} />
-      <Route path="/briefing" element={<BriefingScreen />} />
-      <Route path="/approvals" element={<ApprovalsScreen />} />
-      <Route path="/calendar" element={<UnifiedCalendarScreen />} />
-      <Route path="/meetings" element={<TranscriptCaptureScreen />} />
-      <Route path="/tasks" element={<TasksScreen />} />
-      <Route path="/scheduling" element={<SchedulingChat />} />
-      <Route path="/ask" element={<AskScreen />} />
-      <Route path="/recap" element={<RecapScreen />} />
-      <Route path="/routing-log" element={<RoutingLogScreen />} />
-      <Route path="/settings/*" element={<SettingsScreen />} />
+      <Route path="/briefing" element={<LockedGuard><BriefingScreen /></LockedGuard>} />
+      <Route path="/approvals" element={<LockedGuard><ApprovalsScreen /></LockedGuard>} />
+      <Route path="/calendar" element={<LockedGuard><UnifiedCalendarScreen /></LockedGuard>} />
+      <Route path="/meetings" element={<LockedGuard><TranscriptCaptureScreen /></LockedGuard>} />
+      <Route path="/tasks" element={<LockedGuard><TasksScreen /></LockedGuard>} />
+      <Route path="/scheduling" element={<LockedGuard><SchedulingChat /></LockedGuard>} />
+      <Route path="/ask" element={<LockedGuard><AskScreen /></LockedGuard>} />
+      <Route path="/recap" element={<LockedGuard><RecapScreen /></LockedGuard>} />
+      <Route path="/routing-log" element={<LockedGuard><RoutingLogScreen /></LockedGuard>} />
+      <Route path="/settings/*" element={<LockedGuard><SettingsScreen /></LockedGuard>} />
       <Route path="*" element={<Navigate to="/briefing" replace />} />
     </Routes>
   );
