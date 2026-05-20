@@ -1135,4 +1135,119 @@ CREATE INDEX idx_insights_week ON insights(week_ymd DESC);
 PRAGMA user_version = 128;
 `,
   },
+  {
+    version: 129,
+    file: '129_phase8_recap.sql',
+    sql: `
+-- Phase 8 Stream 2 — Weekly Recap.
+-- VIEW action_audit_log + weekly_recap + weekly_recap_section_edit.
+
+CREATE VIEW action_audit_log AS
+
+  SELECT
+    'email_send'                                    AS kind,
+    sl.id                                           AS row_id,
+    sl.ts                                           AS occurred_at,
+    sl.provider                                     AS provider,
+    'email'                                         AS resource,
+    sl.approval_id                                  AS approval_id,
+    json_object(
+      'recipients',     json(sl.recipients_json),
+      'subject',        sl.subject,
+      'ok',             sl.ok,
+      'error',          sl.error,
+      'providerMsgId',  sl.provider_msg_id
+    )                                               AS payload_json,
+    CASE WHEN sl.ok = 1 THEN 'sent' ELSE 'failed' END AS outcome
+  FROM send_log sl
+
+  UNION ALL
+
+  SELECT
+    'calendar_change'                               AS kind,
+    cal.id                                          AS row_id,
+    cal.created_at                                  AS occurred_at,
+    'google'                                        AS provider,
+    'calendar'                                      AS resource,
+    cal.approval_id                                 AS approval_id,
+    json_object(
+      'phase',          cal.phase,
+      'eventId',        cal.event_id,
+      'recurringScope', cal.recurring_scope,
+      'before',         json(cal.before_json),
+      'after',          json(cal.after_json),
+      'googleEtag',     cal.google_etag,
+      'error',          cal.google_error
+    )                                               AS payload_json,
+    CASE
+      WHEN cal.phase = 'post_write' THEN 'applied'
+      WHEN cal.phase = 'override'   THEN 'override'
+      ELSE 'failed'
+    END                                             AS outcome
+  FROM calendar_action_log cal
+  WHERE cal.phase IN ('post_write','failed','override')
+
+  UNION ALL
+
+  SELECT
+    'task_pushed'                                   AS kind,
+    mal.action_id                                   AS row_id,
+    mal.created_at                                  AS occurred_at,
+    'todoist'                                       AS provider,
+    'tasks'                                         AS resource,
+    NULL                                            AS approval_id,
+    json_object(
+      'taskId',         mal.task_id,
+      'remoteId',       mal.remote_id,
+      'content',        tt.content,
+      'projectName',    tt.project_name
+    )                                               AS payload_json,
+    CASE WHEN tt.is_completed = 1 THEN 'completed' ELSE 'pushed' END AS outcome
+  FROM meeting_action_task_link mal
+  JOIN todoist_task tt ON tt.id = mal.task_id
+
+  UNION ALL
+
+  SELECT
+    'approval_declined'                             AS kind,
+    a.id                                            AS row_id,
+    a.updated_at                                    AS occurred_at,
+    NULL                                            AS provider,
+    a.kind                                          AS resource,
+    a.id                                            AS approval_id,
+    json_object(
+      'rejectionReason', a.rejection_reason,
+      'subject',         a.subject
+    )                                               AS payload_json,
+    'declined'                                      AS outcome
+  FROM approval a
+  WHERE a.state = 'rejected'
+;
+
+CREATE TABLE weekly_recap (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  iso_week        TEXT    NOT NULL UNIQUE,
+  week_start_ymd  TEXT    NOT NULL,
+  generated_at    TEXT    NOT NULL,
+  finalized_at    TEXT,
+  canonical_json  TEXT    NOT NULL
+);
+
+CREATE INDEX idx_weekly_recap_week_start ON weekly_recap(week_start_ymd DESC);
+
+CREATE TABLE weekly_recap_section_edit (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  recap_id    INTEGER NOT NULL REFERENCES weekly_recap(id) ON DELETE CASCADE,
+  section_key TEXT    NOT NULL,
+  before_text TEXT    NOT NULL,
+  after_text  TEXT    NOT NULL,
+  category    TEXT,
+  created_at  TEXT    NOT NULL
+);
+
+CREATE INDEX idx_weekly_recap_section_edit_recap ON weekly_recap_section_edit(recap_id);
+
+PRAGMA user_version = 129;
+`,
+  },
 ];

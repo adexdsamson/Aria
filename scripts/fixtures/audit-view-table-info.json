@@ -1,0 +1,45 @@
+{
+  "send_log": [
+    "id",
+    "ts",
+    "provider",
+    "provider_msg_id",
+    "recipients_json",
+    "subject",
+    "ok",
+    "error",
+    "approval_id"
+  ],
+  "calendar_action_log": [
+    "id",
+    "created_at",
+    "phase",
+    "event_id",
+    "recurring_scope",
+    "before_json",
+    "after_json",
+    "google_etag",
+    "google_error",
+    "approval_id"
+  ],
+  "meeting_action_task_link": [
+    "action_id",
+    "task_id",
+    "remote_id",
+    "created_at"
+  ],
+  "todoist_task": [
+    "id",
+    "content",
+    "project_name",
+    "is_completed"
+  ],
+  "approval": [
+    "id",
+    "kind",
+    "state",
+    "updated_at",
+    "subject",
+    "rejection_reason"
+  ]
+}
