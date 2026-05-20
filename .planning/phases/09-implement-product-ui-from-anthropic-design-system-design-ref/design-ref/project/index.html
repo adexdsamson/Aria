@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Aria — Design Deliverables</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .hero{
+    padding: 6rem 1.5rem 3rem;
+    text-align: center;
+  }
+  .masthead-mini{
+    display: inline-flex; flex-direction: column; align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+  .masthead-mini .top{ display: flex; align-items: center; gap: 1rem; }
+  .masthead-mini .rule{ width: 60px; height: 1px; background: var(--rule-strong); }
+  .masthead-mini .dot{ width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+  .masthead-mini .word{
+    font-family: var(--f-display); font-weight: 500; font-size: 4.5rem;
+    letter-spacing: 0.04em; line-height: 1;
+  }
+  .meta-row{
+    display: flex; justify-content: center; gap: 2rem;
+    padding-top: 1rem; margin-top: 0.5rem;
+    border-top: 1px solid var(--rule);
+    width: min(560px, 100%);
+  }
+  .meta-row > div{ display:flex; flex-direction:column; gap:0.15rem; align-items:center; }
+  .tagline{
+    font-family: var(--f-display); font-style: italic; font-weight: 400;
+    font-size: 1.5rem; color: var(--gray); margin: 2.5rem auto 0; max-width: 30rem;
+    line-height: 1.4;
+  }
+
+  .contents{
+    max-width: 64rem; margin: 4rem auto 6rem; padding: 0 1.5rem;
+  }
+  .contents-head{
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-bottom: 1.25rem; border-bottom: 2px solid var(--ink);
+    margin-bottom: 0;
+  }
+  .contents-head h2{
+    font-family: var(--f-display); font-size: 2rem; font-weight: 500; margin:0;
+  }
+  .contents-head .small{ font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gray); }
+
+  .toc-item{
+    display: grid;
+    grid-template-columns: 4rem 1fr auto;
+    align-items: baseline;
+    gap: 1.5rem;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--rule);
+    transition: all var(--t);
+    text-decoration: none; color: inherit;
+  }
+  .toc-item:hover{ padding-left: 0.5rem; }
+  .toc-item:hover .toc-title{ color: var(--gold); font-style: italic; }
+  .toc-num{
+    font-family: var(--f-display); font-size: 2.5rem; font-weight: 400;
+    color: var(--gold); line-height: 1; font-variant-numeric: oldstyle-nums;
+  }
+  .toc-title{
+    font-family: var(--f-display); font-size: 2.25rem; font-weight: 500;
+    line-height: 1.1; margin-bottom: 0.4rem; transition: all var(--t);
+  }
+  .toc-sub{ color: var(--gray); font-size: 0.95rem; max-width: 36rem; line-height: 1.5; }
+  .toc-tags{
+    display: flex; gap: 0.75rem; margin-top: 0.6rem; flex-wrap: wrap;
+  }
+  .toc-tag{
+    font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--gray-soft);
+    padding: 0.25rem 0; border-top: 1px solid var(--rule);
+    min-width: 5rem;
+  }
+  .toc-go{ font-family: var(--f-display); font-style: italic; color: var(--gold); font-size: 1.25rem; }
+
+  footer{
+    max-width: 64rem; margin: 0 auto; padding: 3rem 1.5rem 5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 2rem;
+    border-top: 1px solid var(--rule);
+    color: var(--gray-soft); font-family: var(--f-mono); font-size: 0.7rem;
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  footer .fleuron{ color: var(--gold); font-size: 1.25rem; }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="masthead-mini">
+    <div class="top">
+      <span class="rule"></span>
+      <span class="dot"></span>
+      <span class="smallcaps" style="color:var(--gold)">Established MMXXVI</span>
+      <span class="dot"></span>
+      <span class="rule"></span>
+    </div>
+    <div class="word">Aria</div>
+    <div class="meta-row">
+      <div>
+        <span class="smallcaps">Volume</span>
+        <span class="serif" style="font-style:italic">No. I</span>
+      </div>
+      <div>
+        <span class="smallcaps">Subject</span>
+        <span class="serif" style="font-style:italic">Brand &amp; Product</span>
+      </div>
+      <div>
+        <span class="smallcaps">Phase</span>
+        <span class="serif" style="font-style:italic">Through Phase 7</span>
+      </div>
+      <div>
+        <span class="smallcaps">Date</span>
+        <span class="serif" style="font-style:italic">17 May 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="tagline">
+    A chief of staff who lives on your desk, not in someone else's cloud.
+  </p>
+</section>
+
+<section class="contents">
+  <div class="contents-head">
+    <h2>Contents</h2>
+    <div class="small">Three Movements</div>
+  </div>
+
+  <a class="toc-item" href="logo.html">
+    <div class="toc-num">I</div>
+    <div>
+      <div class="toc-title">The Mark</div>
+      <div class="toc-sub">A masthead in the New Yorker manner. Four wordmark studies, a monogram, supporting lockups, and the breathing space the name asks for.</div>
+      <div class="toc-tags">
+        <span class="toc-tag">Wordmark</span>
+        <span class="toc-tag">Monogram</span>
+        <span class="toc-tag">Lockups</span>
+      </div>
+    </div>
+    <div class="toc-go">view →</div>
+  </a>
+
+  <a class="toc-item" href="app.html">
+    <div class="toc-num">II</div>
+    <div>
+      <div class="toc-title">The Product</div>
+      <div class="toc-sub">The desktop app as it stands today: <em>Briefing</em>, <em>Approvals</em>, <em>Calendar</em>, <em>Meetings</em>, <em>Tasks</em>, <em>Scheduling</em>, and <em>Ask&nbsp;Aria</em> — plus Settings, the routing log, and the first-run vault wizard. Eight primary surfaces, all shipped.</div>
+      <div class="toc-tags">
+        <span class="toc-tag">8 Shipped</span>
+        <span class="toc-tag">Cmd-K Ask</span>
+        <span class="toc-tag">macOS / Win</span>
+      </div>
+    </div>
+    <div class="toc-go">view →</div>
+  </a>
+
+  <a class="toc-item" href="landing.html">
+    <div class="toc-num">III</div>
+    <div>
+      <div class="toc-title">The Welcome</div>
+      <div class="toc-sub">The marketing site that introduces Aria to the world. Manifesto hero, the morning brief as the wedge, a quiet argument for local-first, and a roadmap that admits what hasn't shipped yet.</div>
+      <div class="toc-tags">
+        <span class="toc-tag">Hero</span>
+        <span class="toc-tag">Wedge</span>
+        <span class="toc-tag">Roadmap</span>
+      </div>
+    </div>
+    <div class="toc-go">view →</div>
+  </a>
+</section>
+
+<footer>
+  <div>© Aria · 2026</div>
+  <div class="fleuron">❦</div>
+  <div>A design study</div>
+</footer>
+
+</body>
+</html>

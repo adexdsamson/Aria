@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Aria — Desktop</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  html, body { height: 100%; background: #EDEAE4; overflow-y: auto; }
+  body::before { display: none; }   /* texture lives inside the window for the desktop */
+  /* keyframes */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse  { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+  /* Nav back */
+  .nav-back-top{
+    position: fixed; top: 14px; left: 16px; z-index: 1000;
+    font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--gray);
+    background: rgba(250,250,248,0.95);
+    padding: 6px 12px; border-radius: 4px;
+    border: 1px solid var(--rule);
+    backdrop-filter: blur(8px);
+  }
+  .nav-back-top:hover{ color: var(--gold); }
+
+  /* Custom slim scrollbar inside the window content */
+  .app-root *::-webkit-scrollbar{ width: 8px; height: 8px; }
+  .app-root *::-webkit-scrollbar-thumb{ background: var(--rule-strong); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  .app-root *::-webkit-scrollbar-thumb:hover{ background: var(--gray-soft); border: 2px solid transparent; background-clip: content-box; }
+
+  /* The "desktop wallpaper" feel behind window chrome */
+  .desktop-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 18% 12%, rgba(184,134,11,0.05), transparent 50%),
+      radial-gradient(ellipse at 92% 88%, rgba(26,26,26,0.04), transparent 50%),
+      #EDEAE4;
+  }
+  #root { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<a class="nav-back-top" href="index.html">← Contents</a>
+
+<div class="desktop-bg"></div>
+<div id="root" class="app-root"></div>
+
+<!-- React -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Tweaks panel -->
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<!-- Aria modules -->
+<script type="text/babel" src="app-icons.jsx"></script>
+<script type="text/babel" src="app-data.jsx"></script>
+
+<script type="text/babel" src="app-screen-briefing.jsx"></script>
+<script type="text/babel" src="app-entitlement.jsx"></script>
+<script type="text/babel" src="app-screen-calendar.jsx"></script>
+<script type="text/babel" src="app-screen-approvals.jsx"></script>
+<script type="text/babel" src="app-screen-ask.jsx"></script>
+<script type="text/babel" src="app-screen-meetings.jsx"></script>
+<script type="text/babel" src="app-screen-tasks.jsx"></script>
+<script type="text/babel" src="app-screen-scheduling.jsx"></script>
+<script type="text/babel" src="app-screen-diagnostics.jsx"></script>
+<script type="text/babel" src="app-screen-recap.jsx"></script>
+<script type="text/babel" src="app-screen-settings.jsx"></script>
+<script type="text/babel" src="app-screen-onboarding.jsx"></script>
+
+<script type="text/babel" src="app-shell.jsx"></script>
+
+<script type="text/babel">
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<AppShell />);
+</script>
+
+</body>
+</html>
