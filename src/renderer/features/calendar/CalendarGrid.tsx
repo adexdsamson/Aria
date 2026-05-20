@@ -1,3 +1,8 @@
+/**
+ * Phase 9 Plan 03 — RE-SKINNED. Event cards rendered with paper bg, 1px
+ * rule border, account-color left rail, Playfair title + mono time meta.
+ * Event positioning + IPC + toast wiring preserved.
+ */
 import type { CalendarEventDto, ProviderAccountDto } from '../../../shared/ipc-contract';
 import { AccountChip } from '../../components/AccountChip';
 import { RecurrenceUnsupportedPill, useRecurrenceUnsupportedToast } from './RecurrenceUnsupportedPill';
@@ -16,27 +21,48 @@ export function CalendarGrid({
 
   return (
     <div data-testid="calendar-grid" style={{ flex: '1 1 auto' }}>
-      {visible.length === 0 && <p>No events in this range.</p>}
+      {visible.length === 0 && (
+        <p style={{ fontFamily: 'var(--f-display)', fontStyle: 'italic', color: 'var(--gray)' }}>
+          No events in this range.
+        </p>
+      )}
       <div style={{ display: 'grid', gap: 10 }}>
         {visible.map((event) => {
           const account = accounts.find(
             (row) => row.providerKey === event.providerKey && row.accountId === event.accountId,
           );
-          const color = account?.displayColor || event.accountDisplayColor || '#64748b';
+          const color = account?.displayColor || event.accountDisplayColor || 'var(--gray-faint)';
           return (
             <article
               key={event.id}
               data-testid={`calendar-event-${event.id}`}
               style={{
-                border: '1px solid #e2e8f0',
-                borderLeft: `6px solid ${color}`,
-                borderRadius: 12,
-                padding: 12,
-                background: '#fff',
+                background: 'var(--paper)',
+                border: '1px solid var(--rule)',
+                borderLeft: `3px solid ${color}`,
+                borderRadius: 4,
+                padding: '12px 14px',
               }}
             >
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong>{event.summary || '(no title)'}</strong>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'baseline',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <strong
+                  style={{
+                    fontFamily: 'var(--f-display)',
+                    fontWeight: 500,
+                    fontSize: 15,
+                    color: 'var(--ink)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {event.summary || '(no title)'}
+                </strong>
                 <AccountChip
                   providerKey={event.providerKey}
                   accountId={event.accountId}
@@ -44,7 +70,15 @@ export function CalendarGrid({
                   compact
                 />
               </div>
-              <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  color: 'var(--gray-soft)',
+                }}
+              >
                 {formatEventTime(event)}
               </div>
               <div style={{ marginTop: 6 }}>

@@ -7,6 +7,11 @@
  *   - ProposeClarificationDto  → candidate buttons; clicking calls
  *                                window.aria.schedulingConfirmTarget(nl, eventId)
  *   - ProposeRefusalDto        → friendly refusal message keyed on code
+ *
+ * Phase 9 Plan 03 — RE-SKINNED. Editorial composer card with Playfair
+ * placeholder, moss/gold/rose result panes per design-ref/project/
+ * app-screen-scheduling.jsx. IPC, parsing, and assertSelfOnly behaviour
+ * preserved verbatim.
  */
 import { useState } from 'react';
 import type {
@@ -15,6 +20,7 @@ import type {
   ProposeClarificationDto,
   ProposeRefusalDto,
 } from '../../../shared/ipc-contract';
+import { Button } from '../../components/editorial';
 
 function isError(r: ProposeResponse): r is { error: string } {
   return !!r && typeof r === 'object' && 'error' in r;
@@ -75,33 +81,115 @@ export function SchedulingChat(): JSX.Element {
   return (
     <section
       data-testid="scheduling-chat"
-      style={{ padding: 'var(--aria-space-xl)', color: 'var(--aria-fg)' }}
+      style={{
+        maxWidth: 880,
+        margin: '0 auto',
+        padding: '32px 32px 80px',
+        color: 'var(--ink)',
+      }}
     >
-      <h1 style={{ fontSize: 'var(--aria-type-3xl)', margin: 0, marginBottom: 16 }}>
-        Scheduling
-      </h1>
-      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 12 }}>
-        Type a scheduling command in natural language. Aria will draft a calendar change
-        and surface it on the Approvals page for review.
-      </p>
-      <textarea
-        data-testid="scheduling-nl-input"
-        rows={3}
-        placeholder='e.g. "move my 3pm to Thursday"'
-        value={nl}
-        onChange={(e) => setNl(e.target.value)}
-        disabled={pending}
-        style={{ width: '100%', padding: 8, fontFamily: 'inherit', fontSize: 13 }}
-      />
-      <div style={{ marginTop: 8 }}>
-        <button
-          type="button"
-          data-testid="scheduling-submit"
-          disabled={pending || !nl.trim()}
-          onClick={() => void submit()}
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 14,
+          paddingBottom: 14,
+          marginBottom: 14,
+          borderBottom: '1px solid var(--rule)',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontWeight: 500,
+            fontSize: '2.25rem',
+            letterSpacing: '-0.015em',
+            margin: 0,
+          }}
         >
-          {pending ? 'Working…' : 'Submit'}
-        </button>
+          Tell Aria what to move
+        </h1>
+        <span style={{ flex: 1 }} />
+        <span
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            color: 'var(--gray)',
+            fontSize: 14,
+          }}
+        >
+          Self-only changes only. Multi-attendee in v1.x.
+        </span>
+      </header>
+      <p
+        style={{
+          fontSize: 14,
+          color: 'var(--gray)',
+          lineHeight: 1.6,
+          margin: '0 0 18px 0',
+          maxWidth: '48em',
+        }}
+      >
+        Type a scheduling command in natural language. Aria parses your intent against your
+        calendar and scheduling rules, drafts a change, and surfaces it on the Approvals page
+        for review.
+      </p>
+
+      <div
+        style={{
+          background: 'var(--paper)',
+          border: '1px solid var(--rule)',
+          borderRadius: 10,
+          padding: 16,
+          marginBottom: 14,
+        }}
+      >
+        <textarea
+          data-testid="scheduling-nl-input"
+          rows={3}
+          placeholder='e.g. "move my 3pm to Thursday"'
+          value={nl}
+          onChange={(e) => setNl(e.target.value)}
+          disabled={pending}
+          style={{
+            width: '100%',
+            border: 'none',
+            outline: 'none',
+            resize: 'vertical',
+            background: 'transparent',
+            fontFamily: 'var(--f-display)',
+            fontSize: 19,
+            lineHeight: 1.45,
+            color: 'var(--ink)',
+            letterSpacing: '-0.005em',
+            boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <Button
+            variant="primary"
+            data-testid="scheduling-submit"
+            disabled={pending || !nl.trim()}
+            onClick={() => void submit()}
+            style={{
+              minHeight: 34,
+              padding: '0 18px',
+              fontSize: 13,
+              opacity: !nl.trim() || pending ? 0.4 : 1,
+            }}
+          >
+            {pending ? 'Working…' : 'Submit'}
+          </Button>
+          <span style={{ flex: 1 }} />
+          <span
+            className="smallcaps"
+            style={{ color: 'var(--gray-soft)' }}
+            aria-hidden="true"
+          >
+            Routes through · FRONTIER claude-sonnet · NL intent parser
+          </span>
+        </div>
       </div>
 
       {result && (
@@ -110,31 +198,76 @@ export function SchedulingChat(): JSX.Element {
             <p
               data-testid="scheduling-error"
               role="alert"
-              style={{ color: '#b91c1c', fontSize: 13 }}
+              style={{
+                color: '#7A2B20',
+                background: 'rgba(184,73,58,0.08)',
+                border: '1px solid rgba(184,73,58,0.25)',
+                padding: '12px 16px',
+                borderRadius: 6,
+                fontSize: 13,
+                margin: 0,
+              }}
             >
               {result.error}
             </p>
           )}
           {isRefusal(result) && (
-            <p
-              data-testid="scheduling-refusal"
-              data-code={result.code}
+            <div
               role="alert"
               style={{
-                background: '#fef3c7',
-                color: '#92400e',
-                padding: 12,
-                borderRadius: 6,
-                fontSize: 13,
+                background: 'rgba(184,134,11,0.08)',
+                border: '1px solid rgba(184,134,11,0.30)',
+                borderRadius: 8,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
               }}
             >
-              {refusalMessage(result)}
-            </p>
+              <div style={{ flex: 1 }}>
+                <div
+                  className="smallcaps"
+                  style={{ color: 'var(--gold-deep)' }}
+                  aria-hidden="true"
+                >
+                  refused · {result.code}
+                </div>
+                <p
+                  data-testid="scheduling-refusal"
+                  data-code={result.code}
+                  style={{
+                    margin: '6px 0 0 0',
+                    color: 'var(--ink-soft)',
+                    fontSize: 13.5,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {refusalMessage(result)}
+                </p>
+              </div>
+            </div>
           )}
           {isClarification(result) && (
-            <div data-testid="scheduling-clarification">
-              <p style={{ fontSize: 13 }}>I found multiple matching events — which one?</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div
+              data-testid="scheduling-clarification"
+              style={{
+                background: 'var(--paper)',
+                border: '1px solid var(--rule)',
+                borderRadius: 8,
+                padding: '14px 18px',
+              }}
+            >
+              <p
+                style={{
+                  margin: '0 0 10px 0',
+                  fontFamily: 'var(--f-display)',
+                  fontSize: 17,
+                  color: 'var(--ink)',
+                }}
+              >
+                I found multiple matching events — which one?
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {result.candidates.map((c) => (
                   <button
                     key={c.eventId}
@@ -143,36 +276,77 @@ export function SchedulingChat(): JSX.Element {
                     disabled={pending}
                     onClick={() => void confirm(c.eventId)}
                     style={{
-                      padding: '6px 10px',
-                      border: '1px solid #d1d5db',
+                      padding: '10px 12px',
                       borderRadius: 6,
-                      background: '#fff',
+                      border: '1px solid var(--rule)',
+                      background: 'var(--ivory)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
-                    {c.summary} — {new Date(c.startUtc).toLocaleString()}
+                    <span style={{ flex: 1, fontSize: 14, color: 'var(--ink)' }}>
+                      {c.summary}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--f-mono)',
+                        fontSize: 11,
+                        color: 'var(--gray)',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {new Date(c.startUtc).toLocaleString()}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
           )}
           {!isError(result) && !isRefusal(result) && !isClarification(result) && (
-            <p
+            <div
               data-testid="scheduling-success"
               data-approval-id={(result as ProposeResultDto).approvalId}
+              className="card-accent-top"
               style={{
-                background: '#dcfce7',
-                color: '#166534',
-                padding: 12,
-                borderRadius: 6,
-                fontSize: 13,
+                background: 'rgba(91,110,58,0.10)',
+                border: '1px solid rgba(91,110,58,0.30)',
+                borderTop: '2px solid var(--gold)',
+                borderRadius: 8,
+                padding: '14px 18px',
+                fontSize: 13.5,
+                color: 'var(--ink-soft)',
+                lineHeight: 1.55,
               }}
             >
+              <div
+                style={{
+                  fontFamily: 'var(--f-display)',
+                  fontSize: 17,
+                  color: 'var(--ink)',
+                  marginBottom: 6,
+                }}
+              >
+                Proposed change ready
+              </div>
               Proposed calendar change is ready for review on{' '}
-              <a href="/approvals">the Approvals page</a>.
+              <a
+                href="/approvals"
+                style={{
+                  color: 'var(--gold-deep)',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                }}
+              >
+                the Approvals page
+              </a>
+              .{' '}
               {(result as ProposeResultDto).primaryFeasible
-                ? ' No hard conflicts detected.'
-                : ` ${(result as ProposeResultDto).conflicts.length} conflict(s) detected — see alternatives.`}
-            </p>
+                ? 'No hard conflicts detected.'
+                : `${(result as ProposeResultDto).conflicts.length} conflict(s) detected — see alternatives.`}
+            </div>
           )}
         </div>
       )}

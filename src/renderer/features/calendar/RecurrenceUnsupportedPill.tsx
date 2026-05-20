@@ -1,9 +1,18 @@
+/**
+ * Phase 9 Plan 03 — RE-SKINNED. Rose-tinted mono pill matching the
+ * design-ref read-only badge palette. Hook behaviour, toast dispatch,
+ * and localStorage key preserved.
+ */
 import { useEffect } from 'react';
 import type { CalendarEventDto } from '../../../shared/ipc-contract';
 
 const TOAST_PREFIX = 'aria:recurrence-unsupported-toast-shown:';
 
-export function RecurrenceUnsupportedPill({ event }: { event: CalendarEventDto }): JSX.Element | null {
+export function RecurrenceUnsupportedPill({
+  event,
+}: {
+  event: CalendarEventDto;
+}): JSX.Element | null {
   if (!event.recurrenceUnsupported) return null;
   const label = 'complex recurrence - see in Outlook';
   if (event.webLink) {
@@ -63,11 +72,14 @@ function pillStyle(): React.CSSProperties {
     display: 'inline-flex',
     alignItems: 'center',
     borderRadius: 999,
-    padding: '2px 8px',
-    background: '#fffbeb',
-    color: '#92400e',
-    border: '1px solid #fde68a',
-    fontSize: 11,
+    padding: '2px 10px',
+    background: 'rgba(184,73,58,0.08)',
+    color: '#7A2B20',
+    border: '1px solid rgba(184,73,58,0.25)',
+    fontFamily: 'var(--f-mono)',
+    fontSize: 10.5,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
     textDecoration: 'none',
   };
 }
