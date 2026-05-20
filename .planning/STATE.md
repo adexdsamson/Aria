@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-20T03:00:00.000Z"
+last_updated: "2026-05-20T04:00:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 30
-  completed_plans: 29
-  percent: 81
+  completed_plans: 30
+  percent: 83
 ---
 
 # State
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 8 Plan 03 complete (2026-05-20)** — Preference Learning + Briefing Feedback (Stream 3). Migration 130 (own file per H-1) adds `learning_signals` + `learned_preferences` (singleton) + `briefing_feedback` + `rag_turn.thumb`. Four signal sources with per-source emit decision tree (B-3 round-2 reversal): **approval=EMIT-AFTER-EXTERNAL-WRITE-SUCCESS** (Test 5 ordering, Test 5b zero-signal-on-throw — T-08-22 mitigation; Phase 4 silent-write architectural followup NOT subsumed); recap/briefing/qa=SAME-TRANSACTION. `signal-log.ts` redactAllPii at write (defense-in-depth). `prefs.ts` zod closed-shape with 5-path whitelist for resetField (T-08-13). `aggregate.ts` deterministic `deriveVoice` over 30d window. `schedule.ts` learning-nightly cron @ 2:30am (cronRegistry.size invariant=6); `runLearningNightly` calls aggregate THEN `purgeOldSignals(keepDays:90)` gated on `settings.learning_signals_keep_forever != 1` (M-4 round-2 fix; Test 10 + 11). 7 IPC channels. LearnedPreferencesSection reachable from SettingsScreen (L-04-04) with 3-assertion DisconnectConfirmDialog pattern on per-field + reset-all. BriefingFeedbackChips wired per section (BRIEF-05). AnswerCard thumbs → RAG_TURN_FEEDBACK. W-4 backfill: `drainAppMetaDismissBacklog` drains 08-01's app_meta dismiss-log on first boot. topEditCategories pipeline closes 08-01 deferred + 08-02 Schema dev #5. `grep:no-network-from-signals` static ratchet wired into `lint:guard` (exits 0 in-session). `src/main/sentry/beforeSend.ts` allowlist scaffold. XCUT-02 crash-persistence integration test asserts no orphan signals across simulated crash. 7 commits `094e265 … 65154b1`. LEARN-01/02/03, BRIEF-04, BRIEF-05, XCUT-02 closed in REQUIREMENTS.md. Test execution deferred under the same Electron ABI lock that affected 08-01/02; `lint:guard` exits 0 in-session. **Phase 8 plan 03/04 → 3/4 plans complete.**
 
 **Phase 8 Plan 02 complete (2026-05-20)** — Weekly Recap + `action_audit_log` VIEW. Migration 129 (own file per H-1) introduces the VIEW unioning send_log (provider preserved, H-4) + calendar_action_log (phase IN post_write/failed/override, B-1) + meeting_action_task_link+todoist_task + approval(rejected). `weekly_recap` + `weekly_recap_section_edit` tables; Monday-08:00 cron with `_lastFiredIsoWeek` dedupe; two-pass narrative cross-validation (research Pitfall 6) — narrative is truncated when an actionRef is missing from the audit ID set, `hallucinationDetected` is surfaced. `RecapCanonical` zod schema is the single shape between TipTap editor and DOCX + PDF exporters (no HTML round-trip, Pitfall 7). 8 IPC channels, `/recap` route + SideNav entry. `verify-audit-view` static ratchet + base-table column snapshot wired into `lint:guard`. 7 commits `c96127a…5a53cee`. RECAP-01..04 all closed. Test execution deferred under the same Electron ABI lock that affected 08-01; `lint:guard` exits 0 in-session.
 

@@ -74,8 +74,8 @@
 - [ ] **BRIEF-01**: User receives a daily briefing at a configurable local time (default 7am)
 - [x] **BRIEF-02**: Briefing surfaces top 3-5 priorities for the day with a rationale for each
 - [ ] **BRIEF-03**: Briefing includes today calendar preview, overdue tasks, unread priority email, and external news items
-- [ ] **BRIEF-04**: User can configure news topics / interests for the briefing
-- [ ] **BRIEF-05**: User can give feedback on the briefing (more like / skip section); preferences refine over time
+- [x] **BRIEF-04**: User can configure news topics / interests for the briefing
+- [x] **BRIEF-05**: User can give feedback on the briefing (more like / skip section); preferences refine over time
 - [ ] **BRIEF-06**: Briefing degrades gracefully if any source (email, calendar, news) is unavailable
 
 ### Insights (INSIGHT)
@@ -101,14 +101,14 @@
 
 ### Preference Learning (LEARN)
 
-- [ ] **LEARN-01**: System captures edits, rejections, and accepts on approval items and uses them to refine voice and routing over time
-- [ ] **LEARN-02**: Preference learning is local-only - no learning signal is sent off-machine
-- [ ] **LEARN-03**: User can inspect learned preferences and reset them
+- [x] **LEARN-01**: System captures edits, rejections, and accepts on approval items and uses them to refine voice and routing over time
+- [x] **LEARN-02**: Preference learning is local-only - no learning signal is sent off-machine
+- [x] **LEARN-03**: User can inspect learned preferences and reset them
 
 ### Cross-Cutting / Quality (XCUT)
 
 - [ ] **XCUT-01**: Aria handles sleep/wake events cleanly (no cron storm on resume; missed jobs coalesced)
-- [ ] **XCUT-02**: Aria persists work-in-progress (drafts being generated) across crashes without ever auto-transitioning to "sent"
+- [x] **XCUT-02**: Aria persists work-in-progress (drafts being generated) across crashes without ever auto-transitioning to "sent"
 - [ ] **XCUT-03**: Application logs redact PII before write; debug logs are local-only, opt-in
 - [ ] **XCUT-04**: Auto-updater performs a pre-migration database backup; failed migrations auto-restore
 - [ ] **XCUT-05**: Application is code-signed and notarized (macOS) and signed (Windows OV cert)
