@@ -9,7 +9,7 @@
  * Reachable via SettingsScreen.tsx (L-04-04 invariant); see the reachability
  * grep test in LearnedPreferencesSection.test.tsx.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DisconnectConfirmDialog } from '../../components/DisconnectConfirmDialog';
 import type { LearnedPreferencesDto, LearningSignalDto } from '../../../shared/ipc-contract';
 
