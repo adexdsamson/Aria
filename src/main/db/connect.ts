@@ -32,8 +32,17 @@ export interface OpenDbOptions {
   dbKey: Buffer;
   /** Override db filename (used by restore to open the temp file). */
   dbFileName?: string;
-  /** Apply numbered migrations after open. Defaults to true. */
-  runMigrationsOnOpen?: boolean;
+  /**
+   * Apply numbered migrations after open.
+   * - `true`  (default, back-compat): open + migrate in one shot.
+   * - `false`: open only, never migrate.
+   * - `'deferred'`: identical to false at open time, but signals that the
+   *   caller will explicitly invoke `runMigrationsWithBackup(db, ...)` next.
+   *   Introduced in Plan 08-04 Task 4a (B-1 round 2) to break a recursion
+   *   loop that would otherwise occur when the migration runner is wrapped
+   *   by a snapshot/rollback helper that has to reopen the DB.
+   */
+  runMigrationsOnOpen?: boolean | 'deferred';
 }
 
 const DEFAULT_DB_FILENAME = 'aria.db';
@@ -64,7 +73,12 @@ export function openDb(opts: OpenDbOptions): Db {
     db.pragma(`foreign_keys=ON`);
     // Touch the schema once so a wrong-key open fails fast (SQLITE_NOTADB).
     db.prepare('SELECT count(*) FROM sqlite_master').get();
-    if (runMigrationsOnOpen) runMigrations(db);
+    // Plan 08-04 Task 4a (B-1 round 2): `'deferred'` behaves identically to
+    // `false` at open time. Callers (boot path, onboarding seal/unlock,
+    // backup-restore) own the explicit `runMigrationsWithBackup(db, ...)`
+    // invocation so the snapshot/rollback wrapper has a single entry point
+    // and never re-enters the runner during recovery.
+    if (runMigrationsOnOpen === true) runMigrations(db);
     return db;
   } catch (err) {
     try {

@@ -30,6 +30,7 @@ import {
 } from '../vault/unlock';
 import { deriveDbKey } from '../vault/derive';
 import { openDb, closeDb, type Db } from '../db/connect';
+import { runMigrationsWithBackup } from '../release/backup-hook';
 import { reapInterruptedOnStartup } from '../approvals/persist';
 import { recoverInflightSends } from '../integrations/send';
 import { migrateLegacyGoogleTokensToProviderTokens } from '../secrets/safeStorage';
@@ -184,11 +185,27 @@ export function registerOnboardingHandlers(
       return { error: 'PASSWORD_TOO_SHORT' };
     }
     const appSalt = crypto.randomBytes(16);
-    sealVault(dailyPassword, pendingMnemonic, vaultPathOf(dataDir), appSalt);
+    // Plan 08-04 Task 4a — seal-not-atomic fix (MEMORY
+    // project_aria_seal_not_atomic): open + migrate FIRST, persist vault.json
+    // LAST. If migration throws (or any post-open step fails), vault.json is
+    // never written and the user is not stranded on UnlockScreen with no
+    // working password.
     const dbKey = await deriveDbKey(pendingMnemonic, appSalt);
+    let db: Db | null = null;
     try {
       dbHolder.close();
-      const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: true });
+      db = openDb({
+        dataDir,
+        dbKey,
+        runMigrationsOnOpen: 'deferred',
+      });
+      runMigrationsWithBackup(db, path.join(dataDir, 'aria.db'), {
+        dataDir,
+        retainCount: 5,
+        expectedDrops: {},
+      });
+      // Persist the vault AFTER a successful open+migrate — order matters.
+      sealVault(dailyPassword, pendingMnemonic, vaultPathOf(dataDir), appSalt);
       dbHolder.set(db);
       // RESEARCH Pattern 2 — convert any stale 'generating' rows BEFORE the
       // approvals IPC layer can be invoked. (IPC handlers register at boot;
@@ -197,6 +214,22 @@ export function registerOnboardingHandlers(
       await deps.onDbReady?.(db);
       logger.info({ event: 'onboarding.sealed' });
       return { ok: true };
+    } catch (err) {
+      // On any failure: close the partial handle and DO NOT persist
+      // vault.json. Surface a structured error so the renderer can show
+      // the recovery dialog.
+      if (db) {
+        try {
+          closeDb(db);
+        } catch {
+          /* best-effort */
+        }
+      }
+      logger.warn({
+        event: 'onboarding.seal.failed',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { error: 'SEAL_FAILED' };
     } finally {
       pendingMnemonic = null;
       pendingPositions = null;
@@ -212,7 +245,19 @@ export function registerOnboardingHandlers(
       const dbKey = await deriveDbKey(mnemonic, appSalt);
       try {
         dbHolder.close();
-        const db = openDb({ dataDir, dbKey, runMigrationsOnOpen: true });
+        // Plan 08-04 Task 4a — open + migrate are two explicit steps.
+        // runMigrationsWithBackup snapshots before applying, so a failing
+        // migration leaves a recoverable .ariabackup under <dataDir>/backups.
+        const db = openDb({
+          dataDir,
+          dbKey,
+          runMigrationsOnOpen: 'deferred',
+        });
+        runMigrationsWithBackup(db, path.join(dataDir, 'aria.db'), {
+          dataDir,
+          retainCount: 5,
+          expectedDrops: {},
+        });
         dbHolder.set(db);
         await runApprovalStartupRecovery(db, logger);
         await deps.onDbReady?.(db);

@@ -79,7 +79,13 @@ export function registerBackupHandlers(ipcMain: IpcMain, deps: BackupDeps): void
       const dbKey = await deriveDbKey(mnemonic, appSalt);
       try {
         dbHolder.close();
-        dbHolder.set(openDb({ dataDir, dbKey, runMigrationsOnOpen: true }));
+        // Plan 08-04 Task 4a — restored snapshots are at the prior schema
+        // version. Re-migrating here would replay whatever migration just
+        // failed and defeat the restore. Open WITHOUT migrating; the next
+        // unlock cycle will go through runMigrationsWithBackup explicitly.
+        dbHolder.set(
+          openDb({ dataDir, dbKey, runMigrationsOnOpen: false }),
+        );
       } finally {
         dbKey.fill(0);
       }
