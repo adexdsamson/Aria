@@ -19,6 +19,7 @@ import { BriefingSettingsSection } from './BriefingSettingsSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
 import { FrontierKeySection } from './FrontierKeySection';
 import { InsightsSection } from './InsightsSection';
+import { LearnedPreferencesSection } from './LearnedPreferencesSection';
 import { IntegrationsSection } from './IntegrationsSection';
 import { NewsSourcesSection } from './NewsSourcesSection';
 import { OllamaSection } from './OllamaSection';
@@ -36,6 +37,7 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'news-sources', label: 'News sources' },
   { to: 'briefing', label: 'Briefing' },
   { to: 'insights', label: 'Insights' },
+  { to: 'learned-preferences', label: 'Learned preferences' },
   { to: 'onboarding', label: 'Backup & restore' },
   { to: 'diagnostics', label: 'Diagnostics' },
 ];
@@ -96,6 +98,7 @@ export function SettingsScreen(): JSX.Element {
             }
           />
           <Route path="insights" element={<InsightsSection />} />
+          <Route path="learned-preferences" element={<LearnedPreferencesSection />} />
           <Route path="onboarding" element={<BackupRestoreSection />} />
           <Route path="diagnostics" element={<DiagnosticsSection />} />
           <Route path="*" element={<Navigate to="status" replace />} />

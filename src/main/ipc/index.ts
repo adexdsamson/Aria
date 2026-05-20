@@ -47,6 +47,7 @@ import { registerTasksHandlers } from './tasks';
 import { registerRagHandlers } from './rag';
 import { registerInsightsHandlers } from './insights';
 import { registerRecapHandlers } from './recap';
+import { registerLearningHandlers } from './learning';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -369,6 +370,21 @@ export function registerHandlers(
   if (!recapChannels.every((c) => skip.has(c))) {
     registerRecapHandlers(ipcMain, { logger, dbHolder, scheduler: deps.scheduler });
     recapChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 08-03 Learning channels (Phase 8 Stream 3).
+  const learningChannels = [
+    CHANNELS.LEARN_GET_PREFS,
+    CHANNELS.LEARN_RESET_FIELD,
+    CHANNELS.LEARN_RESET_ALL,
+    CHANNELS.LEARN_LIST_SIGNALS,
+    CHANNELS.BRIEFING_FEEDBACK,
+    CHANNELS.BRIEFING_INSIGHT_DISMISS,
+    CHANNELS.RAG_TURN_FEEDBACK,
+  ];
+  if (!learningChannels.every((c) => skip.has(c))) {
+    registerLearningHandlers(ipcMain, { logger, dbHolder });
+    learningChannels.forEach((c) => skip.add(c));
   }
 
   const transcriptChannels = [

@@ -17,19 +17,17 @@ import { SectionCalendar } from './SectionCalendar';
 import { SectionEmail } from './SectionEmail';
 import { SectionNews } from './SectionNews';
 import { InlineApprovalsPreview } from '../approvals/InlineApprovalsPreview';
+import { BriefingFeedbackChips } from './BriefingFeedbackChips';
 
-// Plan 08-01 Task 8 — dismiss helper.
-// TODO(Plan 08-03 Task 3): wire this to a BRIEFING_INSIGHT_DISMISS IPC channel
-// owned by Stream 3 (signal log + briefing_feedback table). For Stream 1 we
-// optimistically hide the row in component state via a sessionStorage flag so
-// dismiss is non-destructive but visible-during-session only. Stream 3 will
-// replace this with a backfill that writes to app_meta and then briefing_feedback.
+// Plan 08-03 Task 3 — Stream 3 wired up.
+// The 08-01 sessionStorage bridge has been replaced by BRIEFING_INSIGHT_DISMISS
+// IPC which records a learning_signals row (and any leftover sessionStorage /
+// app_meta backlog has been drained on boot by registerLearningHandlers).
 async function dismissBriefingInsight(briefingDate: string, kind: string): Promise<void> {
   try {
-    const key = `briefing-insight-dismiss:${briefingDate}:${kind}`;
-    sessionStorage.setItem(key, new Date().toISOString());
+    await window.aria.briefingInsightDismiss({ briefingDate, kind });
   } catch {
-    /* sessionStorage may be unavailable; ignore */
+    /* non-fatal — keep the optimistic UI dismiss in component state */
   }
 }
 
@@ -212,17 +210,26 @@ export function BriefingScreen(): JSX.Element {
           </ul>
         </section>
       )}
-      <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
-      <SectionEmail
-        items={payload.email}
-        error={payload.errors?.email}
-        emailEmptyStateReason={payload.emailEmptyStateReason}
-      />
-      <SectionNews
-        items={payload.news}
-        date={payload.date}
-        error={payload.errors?.news}
-      />
+      <div>
+        <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
+        <BriefingFeedbackChips briefingDate={payload.date} sectionKey="calendar" />
+      </div>
+      <div>
+        <SectionEmail
+          items={payload.email}
+          error={payload.errors?.email}
+          emailEmptyStateReason={payload.emailEmptyStateReason}
+        />
+        <BriefingFeedbackChips briefingDate={payload.date} sectionKey="email" />
+      </div>
+      <div>
+        <SectionNews
+          items={payload.news}
+          date={payload.date}
+          error={payload.errors?.news}
+        />
+        <BriefingFeedbackChips briefingDate={payload.date} sectionKey="news" />
+      </div>
     </section>
   );
 }
