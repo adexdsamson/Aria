@@ -7,6 +7,7 @@
  */
 import { useCallback, useState } from 'react';
 import { useEntitlement } from './useEntitlement';
+import { Button } from '../../components/editorial';
 import { openCustomerPortal, setToastImpl } from '../../lib/entitlement-actions';
 
 // ARIA-<26 Crockford base32 chars>-<4 hex checksum>
@@ -128,7 +129,17 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
       data-testid="activate-license-form"
       style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}
     >
-      <label htmlFor="activate-license-key" style={{ fontSize: 13, fontWeight: 500 }}>
+      <label
+        htmlFor="activate-license-key"
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--gray)',
+        }}
+      >
         License key
       </label>
       <input
@@ -142,10 +153,13 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
         spellCheck={false}
         disabled={busy}
         style={{
-          padding: '8px 10px',
-          borderRadius: 6,
-          border: '1px solid var(--aria-border, #d1d5db)',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          minHeight: 44,
+          padding: '0 12px',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--rule)',
+          background: 'var(--paper)',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-mono)',
           fontSize: 13,
         }}
       />
@@ -153,7 +167,7 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
         <p
           role="alert"
           data-testid="activate-format-hint"
-          style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}
+          style={{ color: 'var(--rose)', fontSize: 12, margin: 0, fontFamily: 'var(--f-mono)' }}
         >
           {formatHint}
         </p>
@@ -163,12 +177,13 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
           role="alert"
           data-testid={`activate-error-${error.code}`}
           style={{
-            color: '#b91c1c',
+            color: 'var(--ink)',
             fontSize: 13,
-            padding: '8px 10px',
-            border: '1px solid #fecaca',
-            background: '#fef2f2',
-            borderRadius: 6,
+            padding: '10px 12px',
+            border: '1px solid var(--rose)',
+            background: 'rgba(177,52,52,0.06)',
+            borderRadius: 'var(--radius)',
+            fontFamily: 'var(--f-body)',
           }}
         >
           <p style={{ margin: 0 }}>{error.message}</p>
@@ -187,23 +202,22 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
         </div>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button
+        <Button
           type="submit"
+          variant="primary"
           data-testid="activate-submit"
           disabled={busy}
-          style={{ padding: '8px 14px', borderRadius: 6, fontWeight: 600 }}
         >
           {busy ? 'Activating…' : 'Activate'}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           data-testid="activate-cancel"
           onClick={handleClose}
           disabled={busy}
-          style={{ padding: '8px 14px' }}
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { useEntitlement } from './useEntitlement';
 import { ActivateLicenseForm } from './ActivateLicenseForm';
 import { baseState, type EntitlementState } from './types';
+import { Button, Card } from '../../components/editorial';
 import {
   subscribe,
   openCustomerPortal,
@@ -53,63 +54,82 @@ export function PaywallScreen(props: PaywallScreenProps): JSX.Element | null {
         position: 'absolute',
         inset: 0,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: 32,
-        background: 'var(--aria-bg, #fff)',
-        color: 'var(--aria-fg)',
+        padding: 48,
+        background: 'var(--ivory-deep)',
+        color: 'var(--ink)',
         overflowY: 'auto',
+        fontFamily: 'var(--f-body)',
       }}
     >
-      <div style={{ maxWidth: 560, width: '100%' }}>
-        <h1 style={{ fontSize: 28, marginTop: 0, marginBottom: 12 }}>{heading}</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, color: '#374151' }}>{subhead}</p>
+      <Card
+        accent="top"
+        style={{
+          maxWidth: 560,
+          width: '100%',
+          padding: 36,
+          background: 'var(--paper)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 10,
+          }}
+        >
+          Subscription · Aria Pro
+        </div>
+        <h1
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontSize: 32,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            color: 'var(--ink)',
+            marginTop: 0,
+            marginBottom: 14,
+            lineHeight: 1.15,
+          }}
+        >
+          {heading}
+        </h1>
+        <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--ink-soft)', margin: 0 }}>
+          {subhead}
+        </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 24 }}>
-          <button
-            type="button"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 28 }}>
+          <Button
+            variant="primary"
             data-testid="paywall-subscribe-btn"
             onClick={() => {
               void subscribe();
             }}
-            style={{
-              padding: '12px 18px',
-              fontSize: 15,
-              fontWeight: 600,
-              borderRadius: 8,
-              background: '#0f172a',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-            }}
           >
-            Subscribe
-          </button>
-          <button
-            type="button"
+            Subscribe with Stripe
+          </Button>
+          <Button
+            variant="outline"
             data-testid="paywall-activate-toggle"
             onClick={() => setShowActivate((v) => !v)}
-            style={{
-              padding: '10px 16px',
-              fontSize: 14,
-              borderRadius: 8,
-              background: 'transparent',
-              color: 'var(--aria-fg)',
-              border: '1px solid var(--aria-border, #d1d5db)',
-              cursor: 'pointer',
-            }}
           >
             {showActivate ? 'Hide license key form' : 'I have a license key'}
-          </button>
+          </Button>
 
           {showActivate && (
             <div
               data-testid="paywall-activate-form-wrap"
               style={{
-                marginTop: 8,
-                padding: 16,
-                border: '1px solid var(--aria-border, #e5e7eb)',
-                borderRadius: 8,
+                marginTop: 4,
+                padding: 18,
+                border: '1px solid var(--rule)',
+                borderRadius: 'var(--radius)',
+                background: 'var(--ivory-deep)',
               }}
             >
               <ActivateLicenseForm onClose={() => setShowActivate(false)} />
@@ -119,53 +139,64 @@ export function PaywallScreen(props: PaywallScreenProps): JSX.Element | null {
 
         <div
           style={{
-            marginTop: 28,
-            paddingTop: 16,
-            borderTop: '1px solid var(--aria-border, #e5e7eb)',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            fontSize: 13,
+            marginTop: 32,
+            paddingTop: 18,
+            borderTop: '1px solid var(--rule)',
           }}
         >
-          {isProLocked && (
+          <div
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+              marginBottom: 10,
+            }}
+          >
+            Or continue read-only
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 13 }}>
+            {isProLocked && (
+              <button
+                type="button"
+                data-testid="paywall-portal-link"
+                onClick={() => {
+                  void openCustomerPortal();
+                }}
+                style={linkButtonStyle()}
+              >
+                Manage existing subscription
+              </button>
+            )}
+            <Link
+              to="/settings"
+              data-testid="paywall-settings-link"
+              style={{ ...linkButtonStyle(), textDecoration: 'underline' }}
+            >
+              Settings &amp; export
+            </Link>
+            <Link
+              to="/briefing"
+              data-testid="paywall-briefing-link"
+              style={{ ...linkButtonStyle(), textDecoration: 'underline' }}
+            >
+              Read existing briefings
+            </Link>
             <button
               type="button"
-              data-testid="paywall-portal-link"
+              data-testid="paywall-signout-btn"
               onClick={() => {
-                void openCustomerPortal();
+                void signOutLicense();
               }}
-              style={linkButtonStyle()}
+              style={{ ...linkButtonStyle(), color: 'var(--rose)' }}
             >
-              Manage existing subscription
+              Sign out / clear license
             </button>
-          )}
-          <Link
-            to="/settings"
-            data-testid="paywall-settings-link"
-            style={{ ...linkButtonStyle(), textDecoration: 'none' }}
-          >
-            Settings &amp; export
-          </Link>
-          <Link
-            to="/briefing"
-            data-testid="paywall-briefing-link"
-            style={{ ...linkButtonStyle(), textDecoration: 'none' }}
-          >
-            Read existing briefings
-          </Link>
-          <button
-            type="button"
-            data-testid="paywall-signout-btn"
-            onClick={() => {
-              void signOutLicense();
-            }}
-            style={{ ...linkButtonStyle(), color: '#b91c1c' }}
-          >
-            Sign out / clear license
-          </button>
+          </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -174,9 +205,10 @@ function linkButtonStyle(): React.CSSProperties {
   return {
     background: 'transparent',
     border: 'none',
-    padding: '4px 6px',
-    color: 'var(--aria-accent-fg, #2563eb)',
+    padding: '4px 0',
+    color: 'var(--ink)',
     cursor: 'pointer',
     fontSize: 13,
+    fontFamily: 'var(--f-body)',
   };
 }
