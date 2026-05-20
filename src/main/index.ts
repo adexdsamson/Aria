@@ -79,6 +79,7 @@ import { acquireSingleInstanceLock } from './single-instance';
 import { EntitlementService } from './entitlement/service';
 import { getOrCreateInstallId } from './entitlement/install-id';
 import { handleActivateDeepLink } from './entitlement/deep-link';
+import { CHANNELS } from '../shared/ipc-contract';
 import {
   scheduleEntitlementRefresh,
 } from './entitlement/schedule';
@@ -304,7 +305,31 @@ async function bootstrap(): Promise<void> {
     void (async () => {
       if (!entitlementService) await tryBootstrapEntitlement();
       if (!entitlementService) return;
-      await handleActivateDeepLink(url, { service: entitlementService });
+      await handleActivateDeepLink(url, {
+        service: entitlementService,
+        // Plan 08.1-03 — emit ENTITLEMENT_STATE_CHANGED after a successful
+        // deep-link activation so the paywall UX transitions in real time
+        // without waiting for the next ENTITLEMENT_GET_STATE call. Look up
+        // the live BrowserWindow at call time because mainWindow is created
+        // AFTER this forwarder is registered.
+        emitStateChanged: () => {
+          try {
+            const win = BrowserWindow.getAllWindows()[0];
+            if (!win || !entitlementService) return;
+            void entitlementService.getCurrentState().then((state) => {
+              try {
+                win.webContents.send(CHANNELS.ENTITLEMENT_STATE_CHANGED, {
+                  state,
+                });
+              } catch {
+                /* renderer may be torn down */
+              }
+            });
+          } catch {
+            /* best-effort notification */
+          }
+        },
+      });
     })();
   };
 
