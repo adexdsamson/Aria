@@ -1,5 +1,12 @@
+/**
+ * Phase 9 Plan 03 — RE-SKINNED. Editorial top header (Playfair title +
+ * italic subtitle), ivory background canvas. Account sidebar + grid
+ * layout preserved; IPC, range computation, localStorage hidden-set,
+ * and toggle behaviour unchanged.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import type { CalendarEventDto, ProviderAccountDto } from '../../../shared/ipc-contract';
+import { LabelRule } from '../../components/editorial';
 import { AccountVisibilityToggle } from './AccountVisibilityToggle';
 import { CalendarGrid } from './CalendarGrid';
 
@@ -52,18 +59,69 @@ export function UnifiedCalendarScreen(): JSX.Element {
   }
 
   return (
-    <section data-testid="unified-calendar-screen" style={{ padding: 'var(--aria-space-xl)' }}>
-      <h1 style={{ fontSize: 'var(--aria-type-3xl)', marginTop: 0 }}>Calendar</h1>
-      {loading && <p data-testid="calendar-loading">Loading calendar...</p>}
+    <section
+      data-testid="unified-calendar-screen"
+      style={{
+        padding: '28px 32px 80px',
+        color: 'var(--ink)',
+        background: 'var(--ivory)',
+        minHeight: '100%',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 14,
+          paddingBottom: 14,
+          marginBottom: 18,
+          borderBottom: '1px solid var(--rule)',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontWeight: 500,
+            fontSize: '2.25rem',
+            letterSpacing: '-0.015em',
+            margin: 0,
+          }}
+        >
+          Calendar
+        </h1>
+        <span style={{ flex: 1 }} />
+        <span
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            color: 'var(--gray)',
+            fontSize: 14,
+          }}
+        >
+          Next 7 days · self-only edits.
+        </span>
+      </header>
+      {loading && (
+        <p
+          data-testid="calendar-loading"
+          style={{ fontFamily: 'var(--f-display)', fontStyle: 'italic', color: 'var(--gray)' }}
+        >
+          Loading calendar…
+        </p>
+      )}
       {!loading && (
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <>
+          <LabelRule label="Week ahead" align="left" />
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginTop: 14 }}>
           <AccountVisibilityToggle
             accounts={accounts}
             hiddenAccountIds={hiddenAccountIds}
             onToggle={toggle}
           />
           <CalendarGrid events={events} accounts={accounts} hiddenAccountIds={hiddenAccountIds} />
-        </div>
+          </div>
+        </>
       )}
     </section>
   );
