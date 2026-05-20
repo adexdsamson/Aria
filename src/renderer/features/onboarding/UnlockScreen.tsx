@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppLogo, Button } from '../../components/editorial';
 
 const MAX_FAILURES = 5;
 
@@ -40,8 +41,45 @@ export function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Element {
   }
 
   return (
-    <section data-testid="unlock-screen" style={{ padding: 24, maxWidth: 480 }}>
-      <h1 style={{ marginTop: 0 }}>Unlock Aria</h1>
+    <section
+      data-testid="unlock-screen"
+      style={{
+        padding: 32,
+        maxWidth: 480,
+        margin: '0 auto',
+        color: 'var(--ink)',
+        fontFamily: 'var(--f-body)',
+        background: 'var(--paper)',
+      }}
+    >
+      <div style={{ marginBottom: 18 }}>
+        <AppLogo variant="header" />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Daily unlock
+      </div>
+      <h1
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 32,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+          marginTop: 0,
+          marginBottom: 14,
+        }}
+      >
+        Unlock Aria
+      </h1>
       <input
         type="password"
         data-testid="unlock-input"
@@ -50,21 +88,44 @@ export function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Element {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && password.length > 0 && !busy) void submit();
         }}
-        style={{ width: '100%', padding: 8, fontSize: 16 }}
+        style={{
+          width: '100%',
+          minHeight: 44,
+          padding: '0 12px',
+          fontSize: 16,
+          border: '1px solid var(--rule)',
+          borderRadius: 'var(--radius)',
+          background: 'var(--paper)',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-body)',
+          boxSizing: 'border-box',
+        }}
       />
       {error && (
-        <p data-testid="unlock-error" style={{ color: 'crimson' }}>
+        <p
+          data-testid="unlock-error"
+          style={{
+            color: 'var(--rose)',
+            marginTop: 12,
+            padding: 10,
+            background: 'rgba(177,52,52,0.06)',
+            border: '1px solid var(--rose)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
           {error} ({failures}/{MAX_FAILURES})
         </p>
       )}
-      <button
-        data-testid="unlock-submit"
-        onClick={submit}
-        disabled={busy || password.length === 0}
-        style={{ marginTop: 16, padding: '8px 16px' }}
-      >
-        {busy ? 'Unlocking…' : 'Unlock'}
-      </button>
+      <div style={{ marginTop: 16 }}>
+        <Button
+          variant="primary"
+          data-testid="unlock-submit"
+          onClick={submit}
+          disabled={busy || password.length === 0}
+        >
+          {busy ? 'Unlocking…' : 'Unlock'}
+        </Button>
+      </div>
       {failures >= MAX_FAILURES && (
         <p style={{ marginTop: 24 }}>
           <a
@@ -74,6 +135,7 @@ export function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Element {
               e.preventDefault();
               navigate('/restore');
             }}
+            style={{ color: 'var(--ink)', textDecoration: 'underline' }}
           >
             Forgot password? Restore from backup
           </a>

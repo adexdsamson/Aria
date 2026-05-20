@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { MnemonicShow } from './MnemonicShow';
 import { MnemonicConfirm } from './MnemonicConfirm';
 import { CountrySectorPicker } from './CountrySectorPicker';
+import { AppLogo, Button, Card } from '../../components/editorial';
 
 type Step = 'loading' | 'show' | 'confirm' | 'news-picker' | 'password' | 'sealing' | 'done';
 
@@ -108,10 +109,47 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
   }
   if (step === 'password' || step === 'sealing') {
     return (
-      <section data-testid="onboarding-password" style={{ padding: 24, maxWidth: 480 }}>
-        <h1 style={{ marginTop: 0 }}>Choose your daily password</h1>
-        <p>
-          You'll type this every day to unlock Aria. Minimum 8 characters. If you
+      <section
+        data-testid="onboarding-password"
+        style={{
+          padding: 32,
+          maxWidth: 560,
+          margin: '0 auto',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-body)',
+          background: 'var(--paper)',
+        }}
+      >
+        <div style={{ marginBottom: 18 }}>
+          <AppLogo variant="header" />
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 6,
+          }}
+        >
+          Step 4 of 4 · seal your vault
+        </div>
+        <h1
+          style={{
+            fontFamily: 'var(--f-display)',
+            fontSize: 32,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            color: 'var(--ink)',
+            marginTop: 0,
+            marginBottom: 12,
+          }}
+        >
+          Choose your daily password
+        </h1>
+        <p style={{ color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.55 }}>
+          You&apos;ll type this every day to unlock Aria. Minimum 8 characters. If you
           forget it, you can recover with your 12-word phrase.
         </p>
         <input
@@ -119,21 +157,74 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
           data-testid="password-input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ width: '100%', padding: 8, fontSize: 16 }}
+          disabled={step === 'sealing'}
+          style={{
+            width: '100%',
+            minHeight: 44,
+            padding: '0 12px',
+            fontSize: 16,
+            border: '1px solid var(--rule)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--paper)',
+            color: 'var(--ink)',
+            fontFamily: 'var(--f-body)',
+            marginTop: 8,
+            boxSizing: 'border-box',
+          }}
         />
-        {error && (
-          <p data-testid="password-error" style={{ color: 'crimson' }}>
-            {error}
-          </p>
+        {step === 'sealing' && (
+          <div
+            data-testid="onboarding-sealing"
+            style={{
+              marginTop: 16,
+              padding: 14,
+              background: 'var(--ivory-deep)',
+              border: '1px solid var(--rule)',
+              borderTop: '2px solid var(--gold)',
+              borderRadius: 'var(--radius)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--f-display)',
+                fontStyle: 'italic',
+                fontSize: 18,
+                color: 'var(--ink)',
+                marginBottom: 4,
+              }}
+            >
+              Sealing your vault…
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--gray)',
+              }}
+            >
+              5–15 seconds on this machine
+            </div>
+          </div>
         )}
-        <button
-          data-testid="password-submit"
-          disabled={password.length < 8 || step === 'sealing'}
-          onClick={seal}
-          style={{ marginTop: 16, padding: '8px 16px' }}
-        >
-          {step === 'sealing' ? 'Sealing…' : 'Finish setup'}
-        </button>
+        {error && (
+          <Card style={{ marginTop: 16, padding: 14, borderTop: '2px solid var(--rose)' }}>
+            <p data-testid="password-error" style={{ color: 'var(--rose)', margin: 0, fontFamily: 'var(--f-body)' }}>
+              {error}
+            </p>
+          </Card>
+        )}
+        <div style={{ marginTop: 20 }}>
+          <Button
+            variant="primary"
+            data-testid="password-submit"
+            disabled={password.length < 8 || step === 'sealing'}
+            onClick={seal}
+          >
+            {step === 'sealing' ? 'Sealing…' : 'Finish setup'}
+          </Button>
+        </div>
       </section>
     );
   }

@@ -13,6 +13,7 @@
  * persisting via `newsSetBundle` AFTER the seal succeeds.
  */
 import { useState } from 'react';
+import { AppLogo, Button } from '../../components/editorial';
 
 export const COUNTRIES: ReadonlyArray<{ code: string; label: string; hasBundle: boolean }> = [
   { code: 'NG', label: 'Nigeria', hasBundle: true },
@@ -50,15 +51,64 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
   }
 
   return (
-    <section data-testid="onboarding-news-picker" style={{ padding: 24, maxWidth: 520 }}>
-      <h1 style={{ marginTop: 0 }}>Pick your news sources</h1>
-      <p>
-        Aria's daily briefing will surface up to three news items each morning. Tell
+    <section
+      data-testid="onboarding-news-picker"
+      style={{
+        padding: 32,
+        maxWidth: 560,
+        margin: '0 auto',
+        color: 'var(--ink)',
+        fontFamily: 'var(--f-body)',
+        background: 'var(--paper)',
+      }}
+    >
+      <div style={{ marginBottom: 18 }}>
+        <AppLogo variant="header" />
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Step 3 of 4 · personalise your briefing
+      </div>
+      <h1
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 32,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+          marginTop: 0,
+          marginBottom: 14,
+        }}
+      >
+        Pick your news sources
+      </h1>
+      <p style={{ color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.55 }}>
+        Aria&apos;s daily briefing will surface up to three news items each morning. Tell
         Aria which country and which sectors you care about; you can change this any
         time in Settings.
       </p>
 
-      <label htmlFor="news-country" style={{ display: 'block', marginTop: 16, fontWeight: 600 }}>
+      <label
+        htmlFor="news-country"
+        style={{
+          display: 'block',
+          marginTop: 16,
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--gray)',
+          fontWeight: 500,
+        }}
+      >
         Country
       </label>
       <select
@@ -66,7 +116,18 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
         data-testid="news-country-select"
         value={country}
         onChange={(e) => setCountry(e.target.value)}
-        style={{ width: '100%', padding: 8, fontSize: 16 }}
+        style={{
+          width: '100%',
+          minHeight: 44,
+          padding: '0 12px',
+          fontSize: 14,
+          marginTop: 6,
+          border: '1px solid var(--rule)',
+          borderRadius: 'var(--radius)',
+          background: 'var(--paper)',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-body)',
+        }}
       >
         {COUNTRIES.map((c) => (
           <option key={c.code} value={c.code}>
@@ -81,7 +142,18 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
       )}
 
       <fieldset style={{ marginTop: 16, border: 0, padding: 0 }}>
-        <legend style={{ fontWeight: 600 }}>Sectors of interest</legend>
+        <legend
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--gray)',
+            fontWeight: 500,
+          }}
+        >
+          Sectors of interest
+        </legend>
         {SECTORS.map((s) => (
           <label
             key={s.id}
@@ -98,13 +170,11 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
         ))}
       </fieldset>
 
-      <button
-        data-testid="news-picker-submit"
-        onClick={submit}
-        style={{ marginTop: 16, padding: '8px 16px' }}
-      >
-        Continue
-      </button>
+      <div style={{ marginTop: 16 }}>
+        <Button variant="primary" data-testid="news-picker-submit" onClick={submit}>
+          Continue
+        </Button>
+      </div>
     </section>
   );
 }
