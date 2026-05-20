@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-20T12:55:00.000Z"
+last_updated: "2026-05-20T13:15:00.000Z"
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 39
-  completed_plans: 38
-  percent: 90
+  completed_plans: 39
+  percent: 92
 ---
 
 # State
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 9 Plan 06 complete (2026-05-20) — code-complete, milestone gated on human walkthrough.** Visual QA + reachability ratchet + UAT scaffold. 3 atomic commits: `9675367` (Task 1 reachability spec — 4 assertions: editorial-barrel-importers / no-google-fonts-cdn / legacy-token-ratchet at 250 / per-feature editorial-import; passes with documented `KNOWN_ORPHAN_PRIMITIVES`={MonogramSquare, StatusDot, Input, Modal} + `KNOWN_NAKED_FEATURES`={diagnostics, email} allowlist surfaced to 09-UAT.md Test 9 for human routing decision per orchestrator constraint "don't auto-decide orphans"), `577e63b` (Task 2 Playwright `_electron` visual walkthrough scaffolded as `.skip` mirroring Phase 8 `phase8-happy-path.spec.ts` precedent — 14 routes + 4 entitlement states + un-skip checklist in header gated on packaged-build harness), `7e377a6` (Task 4 09-UAT.md scaffold — 12 test items in Phase 7 UAT structure: cold start smoke / per-screen design-ref comparison / Cmd+K from 3 triggers / DisconnectConfirmDialog destructive flows / onboarding seal copy / /ask styling / Recap export DOCX+PDF / 14 Settings tabs / reachability ratchet routing / snapshot delta / TrialBanner 4 states / core flow regression; plus design-ref screenshot table for briefing.png ×3, D-01..D-17 criteria checklist with D-11 pre-populated, BLOCKER→loop/MAJOR→09.1/MINOR→backlog rubric). Task 3 = `checkpoint:human-verify` AWAITING USER — pixel-diff against `design-ref/project/screenshots/` (3 briefing PNGs) + side-by-side vs JSX prototypes (`app-screen-*.jsx`) is human eyeball work per pre-authorized Option 2 + orchestrator's "don't pixel-diff yourself". Reachability spec runs in <2s via `npx vitest run tests/integration/phase-9-reachability.spec.ts` (4/4 green). Closes Phase 4 verifier-blindspot (`feedback_verifier_blindspot_ui_wiring`). **Phase 9 plan 06/06 → 6/6 plans code-complete. Phase 9 milestone NOT auto-closed — user owns the close commit per orchestrator critical_constraints.**
 
 **Phase 9 Plan 05 complete (2026-05-20)** — System surfaces re-skin: Settings shell + 17 section components (Task 1, `4f19a9b`), RoutingLogScreen + 4 Entitlement components (TrialBanner / PaywallScreen / ActivateLicenseForm / RestoreLicenseSection) + DisconnectConfirmDialog (Task 2, `1c98c2b`), Onboarding 4-step wizard + UnlockScreen + RestoreScreen + BackupRestoreSection (Task 3, `04c55f7`) = 30 files modified across 3 atomic commits. RE-SKIN ONLY per pre-authorized Option-2 envelope — zero IPC signature changes, zero state-shape changes, zero hook signature changes. SettingsScreen regrouped into 4 NavSections (Status / Connections / Behaviour / Account) with gold left-rail active state; 14 tab labels + `settings-nav-{slug}` testids verbatim. DisconnectConfirmDialog: paper card with 2px rose top-accent + mono "DESTRUCTIVE ACTION" eyebrow + Playfair heading + editorial Button cancel/confirm; role=dialog, aria-modal, all 3 testids, wipe-copy, Escape-key all verbatim (D-12). TrialBanner 3 editorial tones (info=paper, warn=ivory-deep+gold rule, urgent=rose-tinted+rose rule) mapped from existing 5-state band machine; no state changes. PaywallScreen wrapped in `Card accent="top"` with mono eyebrow + Playfair display + editorial Button primary "Subscribe with Stripe" + ivory-deep nested ActivateLicenseForm card + rule-divider "Or continue read-only" link grid. OnboardingWizard seal step now renders an explicit Playfair-italic "Sealing your vault…" + mono "5–15 seconds on this machine" card (addresses perceived-hang per memory `project_aria_onboarding_seal_ux.md`); BIP39 + scrypt + 3-position cryptographic challenge untouched. MnemonicShow: 12-word grid in ivory-deep cards with mono index + Playfair word + rose-top-accent "IMPORTANT" callout. 3 documented deviations: (1) DisconnectConfirmDialog test file required by W-5 grep does not exist in the repo — dialog behavioural contract preserved verbatim; (2) PaywallScreen "plan card + 5-bullet feature list + price" omitted as net-new product content outside re-skin envelope (Phase 08.1 chose minimal lock card); (3) RoutingLogScreen 4-KPI strip omitted as net-new aggregation outside re-skin envelope. Targeted vitest: 5/5 settings + 27/27 entitlement+diagnostics + 6/6 onboarding = 38/38 pass unmodified. **Phase 9 plan 05/06 → 5/6 plans complete.**
 
