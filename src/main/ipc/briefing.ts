@@ -38,6 +38,8 @@ import {
   hashFromUrl,
 } from '../briefing/persist';
 import { scheduleBriefing, computeLocalYmd } from '../briefing/schedule';
+import { readLatestInsights } from './insights';
+import { weekStartYmdFor } from '../insights/aggregate';
 import {
   getOAuth2Client,
 } from '../integrations/google/auth';
@@ -186,7 +188,30 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     const date = payload?.date ?? computeLocalYmd(tz, new Date());
     try {
       const row = readBriefing(db, date);
-      return row ?? { error: 'no-briefing', lastOkDate: lastOkDate(db) };
+      if (!row) return { error: 'no-briefing', lastOkDate: lastOkDate(db) };
+      // Plan 08-01 — enrich with "This week" insights.
+      try {
+        const weekYmd = weekStartYmdFor(new Date(), tz);
+        const ins = readLatestInsights(db, weekYmd);
+        if (ins.state === 'unlocked') {
+          row.thisWeekInsights = {
+            state: 'unlocked',
+            rows: ins.rows.map((r) => ({ id: r.id, kind: r.kind, sentences: r.sentences })),
+          };
+        } else if (ins.state === 'locked') {
+          row.thisWeekInsights = {
+            state: 'locked',
+            daysRemaining: ins.daysRemaining,
+            blockedKinds: ins.blockedKinds,
+          };
+        } // 'empty-unlocked' → leave undefined (section omitted)
+      } catch (err) {
+        logger.warn(
+          { scope: 'briefing-today-insights', err: (err as Error).message },
+          'failed to enrich briefing with insights',
+        );
+      }
+      return row;
     } catch (err) {
       return { error: (err as Error).message };
     }

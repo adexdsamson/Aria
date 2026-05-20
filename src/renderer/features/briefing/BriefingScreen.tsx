@@ -18,6 +18,21 @@ import { SectionEmail } from './SectionEmail';
 import { SectionNews } from './SectionNews';
 import { InlineApprovalsPreview } from '../approvals/InlineApprovalsPreview';
 
+// Plan 08-01 Task 8 — dismiss helper.
+// TODO(Plan 08-03 Task 3): wire this to a BRIEFING_INSIGHT_DISMISS IPC channel
+// owned by Stream 3 (signal log + briefing_feedback table). For Stream 1 we
+// optimistically hide the row in component state via a sessionStorage flag so
+// dismiss is non-destructive but visible-during-session only. Stream 3 will
+// replace this with a backfill that writes to app_meta and then briefing_feedback.
+async function dismissBriefingInsight(briefingDate: string, kind: string): Promise<void> {
+  try {
+    const key = `briefing-insight-dismiss:${briefingDate}:${kind}`;
+    sessionStorage.setItem(key, new Date().toISOString());
+  } catch {
+    /* sessionStorage may be unavailable; ignore */
+  }
+}
+
 function isPayload(v: unknown): v is BriefingPayload {
   return !!v && typeof v === 'object' && 'date' in (v as object) && 'sections' in (v as object) === false
     && 'calendar' in (v as object);
@@ -164,6 +179,34 @@ export function BriefingScreen(): JSX.Element {
             {payload.openActions.map((item) => (
               <li key={item.id}>
                 <strong>{item.title}</strong> — {item.why}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {payload.thisWeekInsights?.state === 'locked' && (
+        <section data-testid="briefing-insights-locked" style={{ marginBottom: 18 }}>
+          <h2 style={{ fontSize: 'var(--aria-type-xl)' }}>This week</h2>
+          <p style={{ fontSize: 13 }}>
+            Insights unlock in <strong>{payload.thisWeekInsights.daysRemaining}</strong> day{payload.thisWeekInsights.daysRemaining === 1 ? '' : 's'}.
+          </p>
+        </section>
+      )}
+      {payload.thisWeekInsights?.state === 'unlocked' && payload.thisWeekInsights.rows.length > 0 && (
+        <section data-testid="briefing-insights" style={{ marginBottom: 18 }}>
+          <h2 style={{ fontSize: 'var(--aria-type-xl)' }}>This week</h2>
+          <ul>
+            {payload.thisWeekInsights.rows.slice(0, 3).map((r) => (
+              <li key={r.id} data-testid={`briefing-insight-${r.kind}`}>
+                {r.sentences[0] ?? '(insight ready — open Settings → Insights)'}
+                <button
+                  type="button"
+                  data-testid={`briefing-insight-dismiss-${r.kind}`}
+                  onClick={() => void dismissBriefingInsight(payload.date, r.kind)}
+                  style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px' }}
+                >
+                  Dismiss
+                </button>
               </li>
             ))}
           </ul>

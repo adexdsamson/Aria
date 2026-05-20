@@ -105,6 +105,9 @@ export const CHANNELS = {
   RAG_THREAD_DELETE: 'aria:rag:thread-delete',
   RAG_OPEN_SOURCE: 'aria:rag:open-source',
   RAG_ACCOUNT_CHUNK_COUNTS: 'aria:rag:account-chunk-counts',
+  // Plan 08-01 Insights (Phase 8 Stream 1)
+  INSIGHTS_LATEST: 'aria:insights:latest',
+  INSIGHTS_RECOMPUTE: 'aria:insights:recompute',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -438,6 +441,23 @@ export interface BriefingPayload {
   route: Route;
   reason: string;
   model: string;
+  /**
+   * Plan 08-01 — "This week" insights section. Populated by the BRIEFING_TODAY
+   * read path (NOT by runBriefing). One of:
+   *   - { state: 'unlocked', rows: [...] } — up to 3 insight rows for current week
+   *   - { state: 'locked', daysRemaining, blockedKinds } — 14d gate not yet met
+   *   - undefined — empty-unlocked (between cron fires; section omitted)
+   */
+  thisWeekInsights?:
+    | { state: 'unlocked'; rows: BriefingInsightRow[] }
+    | { state: 'locked'; daysRemaining: number; blockedKinds: InsightKindDto[] };
+}
+
+/** Renderer-facing minimal shape for the "This week" cards. */
+export interface BriefingInsightRow {
+  id: number;
+  kind: InsightKindDto;
+  sentences: string[];
 }
 
 export interface BriefingSummary {
@@ -849,7 +869,53 @@ export interface AriaApi {
     charEnd: number;
   }): Promise<{ ok: true } | IpcError>;
   ragAccountChunkCounts(): Promise<{ rows: Array<{ providerKey: string; accountId: string; count: number }> } | IpcError>;
+
+  // Plan 08-01 Insights
+  insightsLatest(): Promise<InsightsLatestResult | IpcError>;
+  insightsRecompute(): Promise<{ ok: true; written: number; skipped: string[] } | { ok: false; error: string } | IpcError>;
 }
+
+// Plan 08-01 Insights DTOs --------------------------------------------------
+
+export type InsightKindDto =
+  | 'calendar_load'
+  | 'response_time'
+  | 'recurring_themes'
+  | 'approval_edits';
+
+export interface InsightRowDto {
+  id: number;
+  kind: InsightKindDto;
+  weekYmd: string;
+  computedAt: string;
+  /** Parsed payload_json — shape depends on `kind`. */
+  payload: unknown;
+  /** Convenience: top sentences from payload.sentences, capped at 3. */
+  sentences: string[];
+  dismissed: boolean;
+}
+
+export interface InsightsUnlockedResult {
+  state: 'unlocked';
+  weekYmd: string;
+  rows: InsightRowDto[];
+}
+
+export interface InsightsLockedResult {
+  state: 'locked';
+  daysRemaining: number;
+  blockedKinds: InsightKindDto[];
+}
+
+export interface InsightsEmptyResult {
+  state: 'empty-unlocked';
+  weekYmd: string;
+}
+
+export type InsightsLatestResult =
+  | InsightsUnlockedResult
+  | InsightsLockedResult
+  | InsightsEmptyResult;
 
 // Plan 07-03 RAG Q&A DTOs ---------------------------------------------------
 
@@ -1076,4 +1142,6 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RAG_THREAD_DELETE: 'ragThreadDelete',
   RAG_OPEN_SOURCE: 'ragOpenSource',
   RAG_ACCOUNT_CHUNK_COUNTS: 'ragAccountChunkCounts',
+  INSIGHTS_LATEST: 'insightsLatest',
+  INSIGHTS_RECOMPUTE: 'insightsRecompute',
 } as const;
