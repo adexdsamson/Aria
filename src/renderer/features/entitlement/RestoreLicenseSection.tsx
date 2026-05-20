@@ -13,9 +13,36 @@ const HELP_URL = 'https://aria.app/help/restore';
 
 export function RestoreLicenseSection(): JSX.Element {
   return (
-    <section data-testid="restore-license-section" style={{ padding: 'var(--aria-space-xl)' }}>
-      <h2 style={{ marginTop: 0 }}>Restore from email</h2>
-      <p style={{ fontSize: 13, color: '#374151', maxWidth: 640 }}>
+    <section
+      data-testid="restore-license-section"
+      style={{ padding: 32, maxWidth: '64rem', margin: '0 auto', background: 'var(--paper)', color: 'var(--ink)' }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Settings · Account
+      </div>
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 28,
+          fontWeight: 500,
+          color: 'var(--ink)',
+          marginTop: 0,
+          borderBottom: '1px solid var(--rule)',
+          paddingBottom: 12,
+        }}
+      >
+        Restore from email
+      </h2>
+      <p style={{ fontSize: 14, color: 'var(--ink-soft)', maxWidth: 640, fontFamily: 'var(--f-body)' }}>
         Check your email for a message from Aria with the subject "Your Aria
         license key". The key starts with <code>ARIA-</code>. Paste it below
         to activate Pro on this device.
@@ -23,7 +50,7 @@ export function RestoreLicenseSection(): JSX.Element {
       <div style={{ marginTop: 12 }}>
         <ActivateLicenseForm />
       </div>
-      <p style={{ marginTop: 16, fontSize: 12, color: '#6b7280' }}>
+      <p style={{ marginTop: 16, fontSize: 12, color: 'var(--gray)', fontFamily: 'var(--f-body)' }}>
         Didn't get the email?{' '}
         <a
           href={HELP_URL}
@@ -42,7 +69,7 @@ export function RestoreLicenseSection(): JSX.Element {
               window.location.href = HELP_URL;
             }
           }}
-          style={{ color: 'var(--aria-accent-fg, #2563eb)' }}
+          style={{ color: 'var(--ink)', textDecoration: 'underline' }}
         >
           Open the restore help page
         </a>

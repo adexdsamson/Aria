@@ -84,10 +84,27 @@ function formatExpiry(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// Editorial tones (Phase 9): info = paper + thin gold rule; warn = ivory-deep
+// + gold top rule; urgent = rose-tinted + rose top rule. Refs --paper / --ink
+// / --gold / --rule tokens per 09-DESIGN-TOKENS.md.
 const TONE_STYLES: Record<BannerSpec['tone'], React.CSSProperties> = {
-  info: { background: '#fef3c7', borderBottom: '1px solid #fcd34d', color: '#78350f' },
-  warn: { background: '#fed7aa', borderBottom: '1px solid #fb923c', color: '#7c2d12' },
-  urgent: { background: '#fecaca', borderBottom: '1px solid #f87171', color: '#7f1d1d' },
+  info: {
+    background: 'var(--paper)',
+    borderBottom: '1px solid var(--rule)',
+    color: 'var(--ink)',
+  },
+  warn: {
+    background: 'var(--ivory-deep)',
+    borderTop: '2px solid var(--gold)',
+    borderBottom: '1px solid var(--rule)',
+    color: 'var(--ink)',
+  },
+  urgent: {
+    background: 'rgba(177,52,52,0.06)',
+    borderTop: '2px solid var(--rose)',
+    borderBottom: '1px solid var(--rule)',
+    color: 'var(--ink)',
+  },
 };
 
 export function TrialBanner(props: TrialBannerProps): JSX.Element | null {
@@ -107,13 +124,27 @@ export function TrialBanner(props: TrialBannerProps): JSX.Element | null {
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '8px 16px',
+        padding: '10px 20px',
         fontSize: 13,
         fontWeight: 500,
+        fontFamily: 'var(--f-body)',
         ...TONE_STYLES[spec.tone],
       }}
     >
-      <span style={{ flex: 1 }}>{spec.text}</span>
+      <span
+        aria-hidden="true"
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: spec.tone === 'urgent' ? 'var(--rose)' : 'var(--gold)',
+          fontWeight: 600,
+        }}
+      >
+        Trial
+      </span>
+      <span style={{ flex: 1, fontFamily: 'var(--f-body)' }}>{spec.text}</span>
       {spec.showSubscribe && (
         <button
           type="button"
