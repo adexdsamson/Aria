@@ -108,6 +108,15 @@ export const CHANNELS = {
   // Plan 08-01 Insights (Phase 8 Stream 1)
   INSIGHTS_LATEST: 'aria:insights:latest',
   INSIGHTS_RECOMPUTE: 'aria:insights:recompute',
+  // Plan 08-02 Recap (Phase 8 Stream 2)
+  RECAP_LIST: 'aria:recap:list',
+  RECAP_GET: 'aria:recap:get',
+  RECAP_REGENERATE: 'aria:recap:regenerate',
+  RECAP_SAVE_EDITS: 'aria:recap:save-edits',
+  RECAP_FINALIZE: 'aria:recap:finalize',
+  RECAP_EXPORT_DOCX: 'aria:recap:export-docx',
+  RECAP_EXPORT_PDF: 'aria:recap:export-pdf',
+  RECAP_LIST_AUDIT: 'aria:recap:list-audit',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -873,6 +882,62 @@ export interface AriaApi {
   // Plan 08-01 Insights
   insightsLatest(): Promise<InsightsLatestResult | IpcError>;
   insightsRecompute(): Promise<{ ok: true; written: number; skipped: string[] } | { ok: false; error: string } | IpcError>;
+
+  // Plan 08-02 Recap
+  recapList(req?: { limit?: number }): Promise<{ rows: RecapRowDto[] } | IpcError>;
+  recapGet(req: { isoWeek: string }): Promise<{ recap: RecapRowDto | null } | IpcError>;
+  recapRegenerate(req: { isoWeek: string; weekStartYmd: string }): Promise<
+    { ok: true; recap: RecapRowDto | null; hallucinationDetected: boolean } | { ok: false; error: string } | IpcError
+  >;
+  recapSaveEdits(req: { canonical: unknown }): Promise<{ ok: true; recap: RecapRowDto | null } | IpcError>;
+  recapFinalize(req: {
+    isoWeek: string;
+    sectionEdits: Array<{ sectionKey: string; beforeText: string; afterText: string; category?: string | null }>;
+  }): Promise<{ ok: true; recapId: number; editsWritten: number } | IpcError>;
+  recapExportDocx(req: { isoWeek: string }): Promise<{ ok: true; path: string } | IpcError>;
+  recapExportPdf(req: { isoWeek: string }): Promise<{ ok: true; path: string } | IpcError>;
+  recapListAudit(req?: { fromIso?: string; toIso?: string; limit?: number }): Promise<{ rows: RecapActionAuditRowDto[] } | IpcError>;
+}
+
+// Plan 08-02 Recap DTOs -----------------------------------------------------
+
+export type RecapKindDto = 'email_send' | 'calendar_change' | 'task_pushed' | 'approval_declined';
+
+export interface RecapActionAuditRowDto {
+  kind: RecapKindDto;
+  /** Stable id `${kind}:${row_id}`. */
+  id: string;
+  occurredAt: string;
+  provider: string | null;
+  resource: string;
+  approvalId: string | null;
+  payload: unknown;
+  outcome: string;
+}
+
+/** Mirrors RecapCanonical (zod-validated). Renderer treats it as opaque JSON. */
+export type RecapCanonicalDto = {
+  isoWeek: string;
+  weekStartYmd: string;
+  meetings: { heading: string; blocks: Array<{ kind: string; text?: string; items?: string[] }> };
+  actions: { heading: string; blocks: Array<{ kind: string; text?: string; items?: string[] }> };
+  wins: { heading: string; blocks: Array<{ kind: string; text?: string; items?: string[] }> };
+  upcoming: { heading: string; blocks: Array<{ kind: string; text?: string; items?: string[] }> };
+  whatAriaDid: {
+    heading: string;
+    narrative: string;
+    auditRowRefs: string[];
+    blocks: Array<{ kind: string; text?: string; items?: string[] }>;
+  };
+};
+
+export interface RecapRowDto {
+  id: number;
+  isoWeek: string;
+  weekStartYmd: string;
+  generatedAt: string;
+  finalizedAt: string | null;
+  canonical: RecapCanonicalDto;
 }
 
 // Plan 08-01 Insights DTOs --------------------------------------------------
@@ -1144,4 +1209,12 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RAG_ACCOUNT_CHUNK_COUNTS: 'ragAccountChunkCounts',
   INSIGHTS_LATEST: 'insightsLatest',
   INSIGHTS_RECOMPUTE: 'insightsRecompute',
+  RECAP_LIST: 'recapList',
+  RECAP_GET: 'recapGet',
+  RECAP_REGENERATE: 'recapRegenerate',
+  RECAP_SAVE_EDITS: 'recapSaveEdits',
+  RECAP_FINALIZE: 'recapFinalize',
+  RECAP_EXPORT_DOCX: 'recapExportDocx',
+  RECAP_EXPORT_PDF: 'recapExportPdf',
+  RECAP_LIST_AUDIT: 'recapListAudit',
 } as const;

@@ -46,6 +46,7 @@ import { registerTodoistHandlers } from './todoist';
 import { registerTasksHandlers } from './tasks';
 import { registerRagHandlers } from './rag';
 import { registerInsightsHandlers } from './insights';
+import { registerRecapHandlers } from './recap';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
 import {
   startSyncOrchestrator,
@@ -352,6 +353,22 @@ export function registerHandlers(
   if (!insightsChannels.every((c) => skip.has(c))) {
     registerInsightsHandlers(ipcMain, { logger, dbHolder, scheduler: deps.scheduler });
     insightsChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 08-02 Recap channels (Phase 8 Stream 2).
+  const recapChannels = [
+    CHANNELS.RECAP_LIST,
+    CHANNELS.RECAP_GET,
+    CHANNELS.RECAP_REGENERATE,
+    CHANNELS.RECAP_SAVE_EDITS,
+    CHANNELS.RECAP_FINALIZE,
+    CHANNELS.RECAP_EXPORT_DOCX,
+    CHANNELS.RECAP_EXPORT_PDF,
+    CHANNELS.RECAP_LIST_AUDIT,
+  ];
+  if (!recapChannels.every((c) => skip.has(c))) {
+    registerRecapHandlers(ipcMain, { logger, dbHolder, scheduler: deps.scheduler });
+    recapChannels.forEach((c) => skip.add(c));
   }
 
   const transcriptChannels = [
