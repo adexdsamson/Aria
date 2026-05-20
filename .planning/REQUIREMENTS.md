@@ -94,10 +94,10 @@
 
 ### Weekly Recap (RECAP)
 
-- [ ] **RECAP-01**: System auto-generates a weekly recap covering meetings held, actions closed/open, wins, and what is coming
-- [ ] **RECAP-02**: Recap includes an "audit log" of Aria actions for the week (drafts sent, meetings moved, action items created)
-- [ ] **RECAP-03**: User can edit the recap before finalizing; edits feed preference learning
-- [ ] **RECAP-04**: User can export the recap as PDF or DOCX
+- [x] **RECAP-01**: System auto-generates a weekly recap covering meetings held, actions closed/open, wins, and what is coming
+- [x] **RECAP-02**: Recap includes an "audit log" of Aria actions for the week (drafts sent, meetings moved, action items created)
+- [x] **RECAP-03**: User can edit the recap before finalizing; edits feed preference learning
+- [x] **RECAP-04**: User can export the recap as PDF or DOCX
 
 ### Preference Learning (LEARN)
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-20T01:18:17.572Z"
+last_updated: "2026-05-20T03:00:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 30
-  completed_plans: 27
-  percent: 78
+  completed_plans: 29
+  percent: 81
 ---
 
 # State
@@ -21,6 +21,9 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 8 Plan 02 complete (2026-05-20)** — Weekly Recap + `action_audit_log` VIEW. Migration 129 (own file per H-1) introduces the VIEW unioning send_log (provider preserved, H-4) + calendar_action_log (phase IN post_write/failed/override, B-1) + meeting_action_task_link+todoist_task + approval(rejected). `weekly_recap` + `weekly_recap_section_edit` tables; Monday-08:00 cron with `_lastFiredIsoWeek` dedupe; two-pass narrative cross-validation (research Pitfall 6) — narrative is truncated when an actionRef is missing from the audit ID set, `hallucinationDetected` is surfaced. `RecapCanonical` zod schema is the single shape between TipTap editor and DOCX + PDF exporters (no HTML round-trip, Pitfall 7). 8 IPC channels, `/recap` route + SideNav entry. `verify-audit-view` static ratchet + base-table column snapshot wired into `lint:guard`. 7 commits `c96127a…5a53cee`. RECAP-01..04 all closed. Test execution deferred under the same Electron ABI lock that affected 08-01; `lint:guard` exits 0 in-session.
+
 
 **IPC schema-drift fix (2026-05-19, commit f44ffd4)** — Settings → Integrations Gmail block was rendering `Could not connect: no such table: gmail_account` because `GMAIL_CONNECT` still INSERT-OR-REPLACEd the legacy singleton table dropped by migration 014. Routed Gmail + Calendar IPC writes to `provider_account` (capability-merging UPSERT preserves SC3 per-kind disconnect scope) + `provider_sync_state`. Reads now use the legacy `gmail_account_view` / `calendar_account_view` (designed as compat shims by migration 014). Also fixed the symmetric `getUserEmail` SELECT in scheduling handler. Deferred: `sync-gmail.ts` / `sync-calendar.ts` still SELECT/UPDATE the dropped base tables for cursor advance — caught by `runTick` try/catch and surfaces as a non-fatal "Last sync" line in the UI; deeper cursor-pathway lift is a follow-up.
 
