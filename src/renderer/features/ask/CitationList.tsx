@@ -1,13 +1,14 @@
 /**
- * Plan 07-03 Task 7 — Citation list with TZ-correct timestamps + account chips.
+ * Plan 07-03 Task 7 + Phase 9 re-skin — Citation list with TZ-correct
+ * timestamps + account chips.
  *
  * Each citation row:
- *   - Source-kind icon + denormalized `title` (C8/C12)
- *   - Snippet
- *   - Account chip (from IPC payload — `disconnected: boolean` flows through
- *     RagCitation.accountChip — no second renderer query, REVIEWS C8 echo)
- *   - Timestamp formatted via Intl.DateTimeFormat(timeZone: userIanaTz)
- *   - Click → ragOpenSource(sourceKind, sourceId, charStart, charEnd)
+ *   - Source-kind tag (mono uppercase)
+ *   - denormalized `title` (C8/C12) underlined editorially
+ *   - snippet
+ *   - account chip (REVIEWS C8 echo — `disconnected` flows from IPC payload)
+ *   - timestamp via Intl.DateTimeFormat(timeZone: userIanaTz)
+ *   - click → ragOpenSource(sourceKind, sourceId, charStart, charEnd)
  */
 import type { RagCitationDto } from '../../../shared/ipc-contract';
 
@@ -17,11 +18,11 @@ export interface CitationListProps {
   onOpen?: (c: RagCitationDto) => void;
 }
 
-const ICONS: Record<RagCitationDto['sourceKind'], string> = {
-  email: '✉',
-  event: '📅',
-  note: '📝',
-  action: '✓',
+const KIND_LABELS: Record<RagCitationDto['sourceKind'], string> = {
+  email: 'Email',
+  event: 'Calendar',
+  note: 'Meeting',
+  action: 'Task',
 };
 
 function formatTimestamp(iso: string | undefined, tz: string): string {
@@ -42,16 +43,25 @@ export function CitationList({ citations, userIanaTz, onOpen }: CitationListProp
   return (
     <ol
       data-testid="citation-list"
-      style={{ listStyle: 'decimal inside', padding: 0, marginTop: 8 }}
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: '6px 0 0',
+        borderTop: '1px solid var(--rule)',
+      }}
     >
       {citations.map((c) => (
         <li
           key={`${c.sourceKind}:${c.sourceId}:${c.index}`}
           data-testid={`citation-${c.index}`}
           style={{
-            padding: 8,
-            borderBottom: '1px solid var(--aria-border, #e5e7eb)',
+            padding: '10px 0',
+            borderBottom: '1px solid var(--rule)',
             cursor: onOpen ? 'pointer' : 'default',
+            fontFamily: 'var(--f-body)',
+            fontSize: 13.5,
+            lineHeight: 1.55,
+            color: 'var(--ink-soft)',
           }}
           onClick={() => {
             if (onOpen) onOpen(c);
@@ -63,47 +73,82 @@ export function CitationList({ citations, userIanaTz, onOpen }: CitationListProp
             });
           }}
         >
-          <span aria-hidden style={{ marginRight: 6 }}>
-            {ICONS[c.sourceKind]}
-          </span>
-          <strong>{c.title}</strong>
-          <span
+          <div
             style={{
-              marginLeft: 8,
-              color: 'var(--aria-muted, #64748b)',
-              fontWeight: 'normal',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 10,
+              flexWrap: 'wrap',
             }}
           >
-            {c.snippet}
-          </span>
-          {c.accountChip && (
             <span
-              data-testid={`citation-chip-${c.index}`}
-              data-disconnected={c.accountChip.disconnected ? 'true' : 'false'}
+              aria-hidden
               style={{
-                marginLeft: 8,
-                fontSize: 11,
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--gold-deep)',
                 padding: '1px 6px',
-                borderRadius: 999,
-                background: c.accountChip.disconnected ? '#fef2f2' : '#f1f5f9',
-                color: c.accountChip.disconnected ? '#991b1b' : '#334155',
-                border: '1px solid #cbd5e1',
+                border: '1px solid var(--rule-strong)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--ivory-deep)',
               }}
-              title={c.accountChip.email}
             >
-              {c.accountChip.provider === 'microsoft' ? 'M' : 'G'} {c.accountChip.email}
-              {c.accountChip.disconnected ? ' (disconnected)' : ''}
+              {KIND_LABELS[c.sourceKind]}
             </span>
-          )}
-          {c.occurredAt && (
-            <time
-              data-testid={`citation-time-${c.index}`}
-              dateTime={c.occurredAt}
-              style={{ marginLeft: 8, fontSize: 11, color: 'var(--aria-muted, #94a3b8)' }}
+            <strong
+              style={{
+                color: 'var(--ink)',
+                fontWeight: 600,
+                textDecoration: 'underline',
+                textDecorationColor: 'var(--rule-strong)',
+                textUnderlineOffset: 3,
+              }}
             >
-              {formatTimestamp(c.occurredAt, userIanaTz)}
-            </time>
-          )}
+              {c.title}
+            </strong>
+            {c.accountChip && (
+              <span
+                data-testid={`citation-chip-${c.index}`}
+                data-disconnected={c.accountChip.disconnected ? 'true' : 'false'}
+                style={{
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  padding: '1px 6px',
+                  borderRadius: 999,
+                  background: c.accountChip.disconnected
+                    ? 'rgba(184,73,58,0.08)'
+                    : 'var(--ivory-deep)',
+                  color: c.accountChip.disconnected ? 'var(--rose)' : 'var(--gray)',
+                  border: `1px solid ${
+                    c.accountChip.disconnected ? 'var(--rose)' : 'var(--rule)'
+                  }`,
+                }}
+                title={c.accountChip.email}
+              >
+                {c.accountChip.provider === 'microsoft' ? 'M' : 'G'} {c.accountChip.email}
+                {c.accountChip.disconnected ? ' (disconnected)' : ''}
+              </span>
+            )}
+            {c.occurredAt && (
+              <time
+                data-testid={`citation-time-${c.index}`}
+                dateTime={c.occurredAt}
+                style={{
+                  marginLeft: 'auto',
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  color: 'var(--gray-soft)',
+                }}
+              >
+                {formatTimestamp(c.occurredAt, userIanaTz)}
+              </time>
+            )}
+          </div>
+          <p style={{ margin: '4px 0 0', color: 'var(--gray)' }}>{c.snippet}</p>
         </li>
       ))}
     </ol>
