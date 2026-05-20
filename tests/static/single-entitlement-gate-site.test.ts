@@ -53,7 +53,7 @@ function stripComments(src: string): string {
 }
 
 const CALLSITE_RE =
-  /(?:^|[^A-Za-z0-9_])assertEntitled\s*\(\s*[A-Za-z_$][\w$]*\s*,\s*['"]([a-z_]+)['"]\s*\)/m;
+  /(?:^|[^A-Za-z0-9_])assertEntitled\s*\(\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\s*,\s*['"]([a-z_]+)['"]\s*\)/m;
 
 describe('XCUT-08 single entitlement-gate-site enforcer', () => {
   for (const site of GATED_SITES) {
@@ -61,7 +61,7 @@ describe('XCUT-08 single entitlement-gate-site enforcer', () => {
       const fullPath = path.resolve(__dirname, '../..', site.file);
       const src = stripComments(fs.readFileSync(fullPath, 'utf8'));
       const re = new RegExp(
-        String.raw`assertEntitled\s*\(\s*[A-Za-z_$][\w$]*\s*,\s*['"]` +
+        String.raw`assertEntitled\s*\(\s*(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?)\s*,\s*['"]` +
           site.action +
           String.raw`['"]\s*\)`,
       );

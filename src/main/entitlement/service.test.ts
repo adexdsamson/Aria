@@ -4,9 +4,28 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { SignJWT, generateKeyPair } from 'jose';
+
+const testKeyHolder = vi.hoisted(() => ({
+  publicKey: null as unknown,
+}));
+
+vi.mock('./jwt-verify', async () => {
+  const real = (await vi.importActual('./jwt-verify')) as typeof import('./jwt-verify');
+  return {
+    ...real,
+    verifyEntitlementJwt: async (jwt: string) =>
+      real.verifyEntitlementJwt(jwt, {
+        publicKey: testKeyHolder.publicKey as Parameters<
+          typeof real.verifyEntitlementJwt
+        >[1] extends { publicKey?: infer P } | undefined
+          ? P
+          : never,
+      }),
+  };
+});
+
 import { EntitlementService } from './service';
 import { LicenseServerClient, LicenseServerError } from './license-server-client';
-import * as jwtVerifyMod from './jwt-verify';
 
 type Db = Database.Database;
 
@@ -88,20 +107,12 @@ describe('EntitlementService', () => {
   beforeEach(async () => {
     db = freshDb();
     ({ privateKey, publicKey } = await makeKey());
-    vi.spyOn(jwtVerifyMod, 'verifyEntitlementJwt').mockImplementation(
-      async (jwt) => {
-        const real = (await vi.importActual(
-          './jwt-verify',
-        )) as typeof jwtVerifyMod;
-        return real.verifyEntitlementJwt(jwt, { publicKey });
-      },
-    );
+    testKeyHolder.publicKey = publicKey;
     installIdProvider = vi.fn(async () => 'install-test');
   });
 
   afterEach(() => {
     db.close();
-    vi.restoreAllMocks();
   });
 
   it('first-launch bootstrap calls startTrial once and seeds the row', async () => {

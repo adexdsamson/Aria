@@ -255,8 +255,8 @@ async function bootstrap(): Promise<void> {
   const dbHolder = createDbHolder();
 
   // Plan 08.1-02 — entitlement service. CRITICAL ORDERING:
-  //   1. openDb + runMigrations (happens later inside the onboarding handler
-  //      when the user unlocks)
+  //   1. openDb + (migrations applied) happens later inside the onboarding
+  //      handler when the user unlocks
   //   2. EntitlementService.bootstrap() — call POST-migration, PRE-first-write
   //   3. Only then are the 5 gated IPC surfaces allowed to invoke their
   //      provider calls. Order is enforced by assertEntitled — see

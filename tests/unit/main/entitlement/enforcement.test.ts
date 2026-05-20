@@ -44,6 +44,8 @@ function freshGatedDb(): Db {
 
 describe('entitlement enforcement at the 5 gated surfaces', () => {
   it('sendApprovedEmail: gate-throw never reaches the gmail send', async () => {
+    // Use a longer timeout because `googleapis` (transitively imported by
+    // src/main/integrations/send.ts) is heavy to load in the test process.
     const { sendApprovedEmail } = await import(
       '../../../../src/main/integrations/send'
     );
@@ -59,7 +61,7 @@ describe('entitlement enforcement at the 5 gated surfaces', () => {
     ).rejects.toBeInstanceOf(EntitlementError);
     expect(send).not.toHaveBeenCalled();
     expect(buildGmailClient).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it('applyCalendarChange: gate-throw never reaches the calendar writer', async () => {
     const { applyCalendarChange } = await import(

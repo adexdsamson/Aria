@@ -8,8 +8,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { SignJWT, generateKeyPair, exportJWK } from 'jose';
+
+// Hoisted: store the test public key so the mocked verifier can use it.
+const testKeyHolder = vi.hoisted(() => ({
+  publicKey: null as unknown,
+}));
+
+// Replace the verifier with a test-key-bound implementation. Must come BEFORE
+// the gate import so the SUT picks up the mocked module.
+vi.mock('./jwt-verify', async () => {
+  const real = (await vi.importActual('./jwt-verify')) as typeof import('./jwt-verify');
+  return {
+    ...real,
+    verifyEntitlementJwt: async (jwt: string) =>
+      real.verifyEntitlementJwt(jwt, {
+        publicKey: testKeyHolder.publicKey as Parameters<
+          typeof real.verifyEntitlementJwt
+        >[1] extends { publicKey?: infer P } | undefined
+          ? P
+          : never,
+      }),
+  };
+});
+
 import { assertEntitled, EntitlementError } from './gate';
-import * as jwtVerify from './jwt-verify';
 
 type Db = Database.Database;
 
@@ -116,25 +138,11 @@ describe('assertEntitled', () => {
   beforeEach(async () => {
     db = freshDb();
     ({ privateKey, publicKey } = await makeKey());
-    // Stub the verifier to use our test public key, since the embedded
-    // production key is for the deployed license server (we don't have its
-    // secret seed in tests).
-    vi.spyOn(jwtVerify, 'verifyEntitlementJwt').mockImplementation(
-      (jwt) =>
-        // delegate to the real implementation with our test publicKey
-        (vi as unknown as { actual?: typeof jwtVerify }).actual
-          ?.verifyEntitlementJwt?.(jwt, { publicKey }) ??
-        (async () => {
-          // re-import lazily because vi.spyOn intercepts the export
-          const real = (await vi.importActual('./jwt-verify')) as typeof jwtVerify;
-          return real.verifyEntitlementJwt(jwt, { publicKey });
-        })(),
-    );
+    testKeyHolder.publicKey = publicKey;
   });
 
   afterEach(() => {
     db.close();
-    vi.restoreAllMocks();
   });
 
   it('throws no-entitlement when no row exists', async () => {
