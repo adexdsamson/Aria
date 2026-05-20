@@ -4,6 +4,10 @@
  * Wires BRIEF-05: each click writes a briefing_feedback row + a learning_signal
  * in one transaction (same-txn pattern per Task 3 decision tree). Visual
  * state is optimistic — local state flips immediately; IPC error reverts.
+ *
+ * Phase 9 Plan 03 — RE-SKINNED. ▲/▼ glyphs replace emoji thumbs; gold-tinted
+ * active state matches the design-ref BriefingFeedbackChips. data-testid and
+ * IPC call wiring are unchanged.
  */
 import { useState } from 'react';
 
@@ -35,7 +39,8 @@ export function BriefingFeedbackChips(props: BriefingFeedbackChipsProps): JSX.El
   return (
     <span
       data-testid={`briefing-feedback-${props.sectionKey}`}
-      style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}
+      style={{ display: 'inline-flex', gap: 4, marginLeft: 8, marginTop: 8, verticalAlign: 'middle' }}
+      title="Helps Aria learn what matters in your briefing"
     >
       <button
         type="button"
@@ -44,7 +49,7 @@ export function BriefingFeedbackChips(props: BriefingFeedbackChipsProps): JSX.El
         onClick={() => void fire(1)}
         style={chipStyle(picked === 1)}
       >
-        👍
+        ▲
       </button>
       <button
         type="button"
@@ -53,7 +58,7 @@ export function BriefingFeedbackChips(props: BriefingFeedbackChipsProps): JSX.El
         onClick={() => void fire(-1)}
         style={chipStyle(picked === -1)}
       >
-        👎
+        ▼
       </button>
     </span>
   );
@@ -61,11 +66,18 @@ export function BriefingFeedbackChips(props: BriefingFeedbackChipsProps): JSX.El
 
 function chipStyle(active: boolean): React.CSSProperties {
   return {
-    background: active ? '#dbeafe' : 'transparent',
-    border: `1px solid ${active ? '#1d4ed8' : '#d1d5db'}`,
-    borderRadius: 12,
+    width: 26,
+    height: 22,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
     fontSize: 12,
-    padding: '2px 8px',
+    background: active ? 'rgba(184,134,11,0.10)' : 'transparent',
+    color: active ? 'var(--gold-deep)' : 'var(--gray-soft)',
+    border: `1px solid ${active ? 'var(--gold)' : 'var(--rule)'}`,
     cursor: 'pointer',
+    padding: 0,
+    fontFamily: 'var(--f-mono)',
   };
 }

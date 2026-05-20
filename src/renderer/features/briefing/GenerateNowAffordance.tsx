@@ -5,8 +5,12 @@
  * date (e.g. user slept through the cron, just installed, or the cron has
  * not yet fired). Copy is locked to acceptance criterion 'No briefing yet
  * for today'.
+ *
+ * Phase 9 Plan 03 — RE-SKINNED. Editorial empty state with Playfair italic
+ * copy and a primary editorial button. data-testid and IPC call preserved.
  */
 import { useState } from 'react';
+import { Button } from '../../components/editorial';
 
 export const GENERATE_NOW_COPY = 'No briefing yet for today — generate now?';
 
@@ -36,23 +40,52 @@ export function GenerateNowAffordance({ onDone }: { onDone: () => void }): JSX.E
     <div
       data-testid="generate-now-affordance"
       style={{
-        padding: 'var(--aria-space-lg)',
-        border: '1px dashed var(--aria-border)',
+        padding: '28px 32px',
+        border: '1px solid var(--rule)',
+        background: 'var(--paper)',
         borderRadius: 8,
         maxWidth: 640,
       }}
     >
-      <p style={{ marginTop: 0 }}>{GENERATE_NOW_COPY}</p>
-      <button
-        type="button"
-        data-testid="generate-now-btn"
-        onClick={() => void onClick()}
-        disabled={busy}
+      <p
+        style={{
+          margin: '0 0 18px 0',
+          fontFamily: 'var(--f-display)',
+          fontStyle: 'italic',
+          fontSize: '1.125rem',
+          color: 'var(--gray)',
+          lineHeight: 1.55,
+        }}
       >
-        {busy ? 'Generating…' : 'Generate'}
-      </button>
+        {GENERATE_NOW_COPY}
+      </p>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Button
+          variant="primary"
+          data-testid="generate-now-btn"
+          onClick={() => void onClick()}
+          disabled={busy}
+        >
+          {busy ? 'Generating…' : 'Generate now'}
+        </Button>
+        <span
+          className="smallcaps"
+          style={{ color: 'var(--gray-soft)' }}
+          aria-hidden="true"
+        >
+          Routes through the LLM router · 2–4 seconds
+        </span>
+      </div>
       {error && (
-        <p data-testid="generate-now-error" style={{ color: 'var(--aria-error-fg, #b91c1c)' }}>
+        <p
+          data-testid="generate-now-error"
+          style={{
+            color: 'var(--rose)',
+            fontSize: 13,
+            marginTop: 12,
+            marginBottom: 0,
+          }}
+        >
           Failed: {error}
         </p>
       )}
