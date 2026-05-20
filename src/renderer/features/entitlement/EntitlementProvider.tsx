@@ -62,13 +62,18 @@ export function EntitlementProvider(props: ProviderProps): JSX.Element {
     props.initialState ?? null,
   );
   const [loading, setLoading] = useState<boolean>(props.initialState == null);
+  // Whether the caller pre-seeded state — if so, skip the initial getState
+  // fetch entirely. This keeps tests deterministic when they pass an
+  // initialState that differs from the mocked window.aria.entitlementGetState.
+  const skipInitialFetchRef = useRef(props.initialState != null);
 
   // Avoid stale closures inside the once-only subscription effect.
   const setStateRef = useRef(setState);
   setStateRef.current = setState;
 
-  // Initial fetch — runs ONCE on mount.
+  // Initial fetch — runs ONCE on mount (skipped when initialState was given).
   useEffect(() => {
+    if (skipInitialFetchRef.current) return undefined;
     let cancelled = false;
     void (async () => {
       try {
