@@ -45,6 +45,10 @@ import { registerTranscriptHandlers } from './transcripts';
 import { registerTodoistHandlers } from './todoist';
 import { registerTasksHandlers } from './tasks';
 import { registerRagHandlers } from './rag';
+import { createAnswerServiceFactory } from '../rag/answer-service-factory';
+import { makeAnswerLlmInvocation } from '../rag/answer-llm';
+import { getVectorStore } from '../rag/vector-store';
+import { createEmbedClient } from '../rag/ollama-embeddings';
 import { registerInsightsHandlers } from './insights';
 import { registerRecapHandlers } from './recap';
 import { registerLearningHandlers } from './learning';
@@ -342,7 +346,22 @@ export function registerHandlers(
     CHANNELS.RAG_ACCOUNT_CHUNK_COUNTS,
   ];
   if (!ragChannels.every((c) => skip.has(c))) {
-    registerRagHandlers(ipcMain, { logger, dbHolder });
+    // Plan 08-04 Task 2 (B-2 round 2) — factory hoisted out of the closure.
+    // The factory itself is cheap; the AnswerService is lazily constructed
+    // on first .get() after dbHolder.db becomes non-null. Construction emits
+    // the cross-process pino log line asserted by rag-ask-smoke Mode A.
+    const answerServiceFactory = createAnswerServiceFactory({
+      logger,
+      dbHolder,
+      llm: makeAnswerLlmInvocation(),
+      openVectorStore: (db) => getVectorStore(db),
+      makeEmbedClient: () => createEmbedClient(),
+    });
+    registerRagHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      getAnswerService: () => answerServiceFactory.get(),
+    });
     ragChannels.forEach((c) => skip.add(c));
   }
 
