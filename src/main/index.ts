@@ -71,6 +71,7 @@ import { redactObject } from './log/redact';
 import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
+import { registerEntitlementHandlers, makeRendererEmitter } from './ipc/entitlement';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
@@ -280,6 +281,19 @@ async function bootstrap(): Promise<void> {
     try {
       await entitlementService.bootstrap();
       scheduleEntitlementRefresh(entitlementService, { scheduler, logger });
+      // Plan 08.1-02 — register the 5 entitlement IPC handlers now that the
+      // service is live. registerHandlers() runs BEFORE the DB unlocks, so
+      // the entitlement block there is skipped (no service yet). Without
+      // this call the renderer hits "No handler registered for
+      // 'aria:entitlement:get-state'" the moment EntitlementProvider mounts.
+      registerEntitlementHandlers(ipcMain, {
+        logger,
+        dbHolder,
+        service: entitlementService,
+        emitToRenderer: makeRendererEmitter(
+          BrowserWindow.getAllWindows()[0] ?? null,
+        ),
+      });
     } catch (err) {
       logger.warn(
         { scope: 'entitlement.boot', err: (err as Error).message },
