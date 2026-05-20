@@ -17,6 +17,7 @@ const ITEMS: ReadonlyArray<{ to: string; label: string; testid: string }> = [
   { to: '/tasks', label: 'Tasks', testid: 'sidenav-tasks' },
   { to: '/scheduling', label: 'Scheduling', testid: 'sidenav-scheduling' },
   { to: '/ask', label: 'Ask Aria', testid: 'sidenav-ask' },
+  { to: '/recap', label: 'Weekly Recap', testid: 'sidenav-recap' },
   { to: '/settings', label: 'Settings', testid: 'sidenav-settings' },
 ];
 
