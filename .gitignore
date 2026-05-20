@@ -10,3 +10,4 @@ userData/
 *.ariabackup
 .env
 .env.*
+!.env.example

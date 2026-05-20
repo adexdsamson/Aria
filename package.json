@@ -20,7 +20,10 @@
     "postinstall": "node scripts/postinstall.mjs",
     "rebuild:native": "node scripts/build-native-dual.mjs",
     "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3-multiple-ciphers",
-    "rebuild:native:node": "node scripts/build-native-dual.mjs --node-only"
+    "rebuild:native:node": "node scripts/build-native-dual.mjs --node-only",
+    "release": "electron-builder --publish github",
+    "release:mac": "electron-builder --mac --publish github",
+    "release:win": "electron-builder --win --publish github"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
@@ -83,12 +86,44 @@
     "vitest": "^4.0.0"
   },
   "build": {
+    "appId": "com.aria.desktop",
+    "productName": "Aria",
     "asarUnpack": [
       "**/node_modules/sqlite-vec/dist/native/**",
       "**/node_modules/sqlite-vec-darwin-x64/**",
       "**/node_modules/sqlite-vec-darwin-arm64/**",
       "**/node_modules/sqlite-vec-linux-x64/**",
-      "**/node_modules/sqlite-vec-windows-x64/**"
+      "**/node_modules/sqlite-vec-windows-x64/**",
+      "**/node_modules/better-sqlite3-multiple-ciphers/**"
+    ],
+    "publish": {
+      "provider": "github"
+    },
+    "mac": {
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": {
+        "teamId": "${env.APPLE_TEAM_ID}"
+      },
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
     ]
   }
 }

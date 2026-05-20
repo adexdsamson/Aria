@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Plan 08-04 Task 6 — Aria macOS entitlements.
+
+  hardenedRuntime + notarization requires explicit entitlements for any
+  capability the app uses. Aria needs:
+
+  * com.apple.security.cs.allow-jit:           V8 JIT (required by Electron's
+                                               Chromium renderer).
+  * com.apple.security.cs.allow-unsigned-executable-memory:
+                                               required when JIT is enabled
+                                               under hardened runtime.
+  * com.apple.security.network.client:         outbound HTTPS to Google /
+                                               Microsoft / Anthropic / OpenAI /
+                                               GitHub Releases / Ollama
+                                               localhost.
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+  </dict>
+</plist>
