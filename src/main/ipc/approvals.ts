@@ -21,6 +21,12 @@ import {
   insertApproval,
 } from '../approvals/persist';
 import { applyCalendarChange, type ApplyCalendarChangeDeps } from '../integrations/write-event';
+import {
+  emitApprovalAccept,
+  emitApprovalEdit,
+  emitApprovalReject,
+  categorizeBodyEdit,
+} from '../learning/sources/approval';
 
 export interface ApprovalsDeps {
   logger: Logger;
@@ -221,10 +227,46 @@ export function registerApprovalsHandlers(
             id: r.id,
             error: err instanceof Error ? err.message : String(err),
           });
+          // T-08-22 mitigation (Plan 08-03 Task 3): NO learning signal is
+          // emitted when the external write throws. Phase 4 silent-write
+          // followup owns the state-rollback; this handler only ensures no
+          // orphan signal is recorded.
           return {
             error: `calendar-apply:${err instanceof Error ? err.message : String(err)}`,
           };
         }
+      }
+      // Stream 3 (Plan 08-03 Task 3) — EMIT-AFTER-EXTERNAL-WRITE-SUCCESS.
+      // For calendar_change rows, applyCalendarChange has resolved without
+      // throwing by the time we reach here. For email_send / task_batch the
+      // external Gmail / Todoist write is a separate IPC; we mirror the same
+      // "approved → signal" boundary that those handlers already represent.
+      // See doc-block in src/main/learning/sources/approval.ts.
+      try {
+        const editedBody = r.edited?.body ?? null;
+        const originalBody = approvedRow?.body_original ?? null;
+        if (editedBody !== null && originalBody !== null && editedBody !== originalBody) {
+          emitApprovalEdit(db, {
+            approvalKind: approvedRow!.kind,
+            hasEdits: true,
+            editCategory: categorizeBodyEdit(originalBody, editedBody),
+            bodyLenBefore: originalBody.length,
+            bodyLenAfter: editedBody.length,
+          });
+        }
+        if (approvedRow) {
+          emitApprovalAccept(db, {
+            approvalKind: approvedRow.kind,
+            approvalId: approvedRow.id,
+          });
+        }
+      } catch (err) {
+        // Signal-emit failures MUST NOT poison the approve IPC return.
+        logger.warn({
+          event: 'approvals.signal-emit.failed',
+          id: r.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       return { ok: true };
     } catch (err) {
@@ -246,6 +288,21 @@ export function registerApprovalsHandlers(
       transitionTo(db, r.id, 'rejected', {
         rejection_reason: r.reason ?? null,
       });
+      const rejectedRow = getApproval(db, r.id);
+      if (rejectedRow) {
+        try {
+          emitApprovalReject(db, {
+            approvalKind: rejectedRow.kind,
+            reason: r.reason ?? null,
+          });
+        } catch (err) {
+          logger.warn({
+            event: 'approvals.signal-emit.failed',
+            id: r.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
       logger.info({ event: 'approvals.reject', id: r.id });
       return { ok: true };
     } catch (err) {

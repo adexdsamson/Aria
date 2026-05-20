@@ -117,6 +117,14 @@ export const CHANNELS = {
   RECAP_EXPORT_DOCX: 'aria:recap:export-docx',
   RECAP_EXPORT_PDF: 'aria:recap:export-pdf',
   RECAP_LIST_AUDIT: 'aria:recap:list-audit',
+  // Plan 08-03 Learning (Phase 8 Stream 3)
+  LEARN_GET_PREFS: 'aria:learn:get-prefs',
+  LEARN_RESET_FIELD: 'aria:learn:reset-field',
+  LEARN_RESET_ALL: 'aria:learn:reset-all',
+  LEARN_LIST_SIGNALS: 'aria:learn:list-signals',
+  BRIEFING_FEEDBACK: 'aria:briefing:feedback',
+  BRIEFING_INSIGHT_DISMISS: 'aria:briefing:insight-dismiss',
+  RAG_TURN_FEEDBACK: 'aria:rag:turn-feedback',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -897,6 +905,40 @@ export interface AriaApi {
   recapExportDocx(req: { isoWeek: string }): Promise<{ ok: true; path: string } | IpcError>;
   recapExportPdf(req: { isoWeek: string }): Promise<{ ok: true; path: string } | IpcError>;
   recapListAudit(req?: { fromIso?: string; toIso?: string; limit?: number }): Promise<{ rows: RecapActionAuditRowDto[] } | IpcError>;
+
+  // Plan 08-03 Learning
+  learnGetPrefs(): Promise<{ preferences: LearnedPreferencesDto; signalsCount: number; lastUpdatedAt: string | null } | IpcError>;
+  learnResetField(req: { fieldPath: string }): Promise<{ ok: true } | IpcError>;
+  learnResetAll(): Promise<{ ok: true } | IpcError>;
+  learnListSignals(req?: {
+    limit?: number;
+    offset?: number;
+    source?: 'approval' | 'briefing' | 'recap' | 'qa';
+  }): Promise<{ rows: LearningSignalDto[] } | IpcError>;
+  briefingFeedback(req: {
+    briefingDate: string;
+    sectionKey: string;
+    thumb: -1 | 0 | 1;
+  }): Promise<{ ok: true } | IpcError>;
+  briefingInsightDismiss(req: { briefingDate: string; kind: string }): Promise<{ ok: true } | IpcError>;
+  ragTurnFeedback(req: { turnId: string; thumb: -1 | 0 | 1 }): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+}
+
+// Plan 08-03 Learning DTOs --------------------------------------------------
+
+export interface LearnedPreferencesDto {
+  voice: { terseness: number; formality: number };
+  briefing: { sectionOrder: string[] };
+  scheduling: { preferredMeetingLength: number };
+  triage: { vipDomains: string[] };
+}
+
+export interface LearningSignalDto {
+  id: number;
+  source: 'approval' | 'briefing' | 'recap' | 'qa';
+  kind: string;
+  payload: unknown;
+  occurredAt: string;
 }
 
 // Plan 08-02 Recap DTOs -----------------------------------------------------
@@ -1217,4 +1259,11 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RECAP_EXPORT_DOCX: 'recapExportDocx',
   RECAP_EXPORT_PDF: 'recapExportPdf',
   RECAP_LIST_AUDIT: 'recapListAudit',
+  LEARN_GET_PREFS: 'learnGetPrefs',
+  LEARN_RESET_FIELD: 'learnResetField',
+  LEARN_RESET_ALL: 'learnResetAll',
+  LEARN_LIST_SIGNALS: 'learnListSignals',
+  BRIEFING_FEEDBACK: 'briefingFeedback',
+  BRIEFING_INSIGHT_DISMISS: 'briefingInsightDismiss',
+  RAG_TURN_FEEDBACK: 'ragTurnFeedback',
 } as const;
