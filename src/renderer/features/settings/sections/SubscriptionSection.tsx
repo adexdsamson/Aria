@@ -49,7 +49,7 @@ export function SubscriptionSection(): JSX.Element {
   if (!state) {
     return (
       <section data-testid="settings-subscription" style={sectionStyle()}>
-        <h2 style={{ marginTop: 0 }}>Subscription</h2>
+        <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>Subscription</h2>
         <p style={{ fontSize: 13, color: '#6b7280' }}>Loading subscription state…</p>
       </section>
     );

@@ -93,7 +93,7 @@ export function RoutingLogPanel({
 
   return (
     <section data-testid="routing-log-panel">
-      <h3 style={{ fontSize: 'var(--aria-type-lg)', marginTop: 0 }}>
+      <h3 style={{ fontFamily: 'var(--f-display)', fontSize: 22, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 8 }}>
         {showFilters ? 'Routing log' : 'Routing log (last 100)'}
       </h3>
 

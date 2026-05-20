@@ -76,7 +76,7 @@ export function NewsSourcesSection(): JSX.Element {
 
   return (
     <section data-testid="settings-news-sources" style={{ padding: 16 }}>
-      <h2 style={{ marginTop: 0 }}>News sources</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>News sources</h2>
       <p style={{ opacity: 0.85 }}>
         Aria's daily briefing pulls news candidates from these sources. Hacker
         News and your country bundle are pre-configured; add additional RSS

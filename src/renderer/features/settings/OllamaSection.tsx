@@ -85,7 +85,7 @@ export function OllamaSection(): JSX.Element {
 
   return (
     <section data-testid="settings-ollama" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Local model (Ollama)</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>Local model (Ollama)</h2>
       {status === null && <p>Checking Ollama…</p>}
       {status?.reachable && (
         <div>

@@ -7,6 +7,7 @@
  * `secretsHasFrontierKey` (boolean).
  */
 import { useEffect, useState } from 'react';
+import { Button, Card, LabelRule } from '../../components/editorial';
 import type { ProviderId } from '../../../shared/ipc-contract';
 
 const PROVIDERS: ReadonlyArray<{ id: ProviderId; label: string }> = [
@@ -95,9 +96,39 @@ export function FrontierKeySection(): JSX.Element {
   }
 
   return (
-    <section data-testid="settings-frontier-key" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Frontier API key</h2>
-      <p style={{ marginTop: 0, color: 'var(--aria-fg-muted)' }}>
+    <section
+      data-testid="settings-frontier-key"
+      style={{ padding: 32, maxWidth: '64rem', margin: '0 auto', background: 'var(--paper)', color: 'var(--ink)' }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Settings · Connections
+      </div>
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 28,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+          margin: 0,
+          marginBottom: 18,
+          borderBottom: '1px solid var(--rule)',
+          paddingBottom: 12,
+        }}
+      >
+        Frontier API key
+      </h2>
+      <p style={{ marginTop: 0, color: 'var(--ink-soft)', fontFamily: 'var(--f-body)' }}>
         Keys are encrypted by your OS keychain (DPAPI on Windows, Keychain on macOS,
         libsecret on Linux) and never written to disk in plaintext.
       </p>
@@ -134,14 +165,17 @@ export function FrontierKeySection(): JSX.Element {
         />
       </label>
 
+      <Card style={{ padding: 0, marginBottom: 12 }}>
+        <LabelRule label="Actions" align="left" />
+      </Card>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={() => void onSave()}>
+        <Button variant="primary" onClick={() => void onSave()}>
           Save {provider} key
-        </button>
+        </Button>
         {hasKey[provider] && (
-          <button type="button" onClick={() => void onClear(provider)}>
+          <Button variant="outline" onClick={() => void onClear(provider)}>
             Clear {provider} key
-          </button>
+          </Button>
         )}
       </div>
 

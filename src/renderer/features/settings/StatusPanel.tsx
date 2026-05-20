@@ -7,6 +7,7 @@
  * exact D-10 phrasing (`Frontier disabled — add an API key in Settings.`).
  */
 import { useEffect, useState } from 'react';
+import { Card, LabelRule } from '../../components/editorial';
 import type {
   CalendarIntegrationStatus,
   DiagnosticsStatus,
@@ -100,8 +101,43 @@ export function StatusPanel(): JSX.Element {
   }, []);
 
   return (
-    <section data-testid="settings-status" style={{ padding: 'var(--aria-space-lg)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Status</h2>
+    <section
+      data-testid="settings-status"
+      style={{
+        padding: 32,
+        maxWidth: '64rem',
+        margin: '0 auto',
+        color: 'var(--ink)',
+        background: 'var(--paper)',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 6,
+        }}
+      >
+        Settings · Status
+      </div>
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 28,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: 'var(--ink)',
+          margin: 0,
+          marginBottom: 18,
+        }}
+      >
+        Status
+      </h2>
+      <LabelRule label="Providers" align="left" />
       {status?.mode === 'LOCAL_ONLY' && (
         <div role="status" data-testid="banner-local-only" style={{ marginBottom: 'var(--aria-space-md)' }}>
           {LOCAL_ONLY_BANNER}
@@ -118,7 +154,8 @@ export function StatusPanel(): JSX.Element {
         </div>
       )}
       {status && (
-        <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 8 }}>
+        <Card style={{ padding: 16, marginTop: 12 }}>
+        <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 8, margin: 0, fontFamily: 'var(--f-body)' }}>
           <dt>Ollama</dt>
           <dd>
             {status.ollama.reachable
@@ -151,6 +188,7 @@ export function StatusPanel(): JSX.Element {
             <IntegrationStatusRow kind="calendar" />
           </dd>
         </dl>
+        </Card>
       )}
     </section>
   );

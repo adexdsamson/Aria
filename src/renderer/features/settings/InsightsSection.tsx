@@ -70,7 +70,7 @@ export function InsightsSection(): JSX.Element {
 
   return (
     <section data-testid="settings-insights" style={{ padding: 'var(--aria-space-xl)' }}>
-      <h2 style={{ fontSize: 'var(--aria-type-xl)', marginTop: 0 }}>Insights</h2>
+      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>Insights</h2>
       <p style={{ fontSize: 13, color: 'var(--aria-fg-muted, #6b7280)', maxWidth: 640 }}>
         Aria derives weekly insights from your own data only — calendar load,
         response time, recurring themes, and draft-edit patterns. Numeric

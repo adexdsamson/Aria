@@ -78,7 +78,7 @@ export function AskAriaBox({ onAnswered }: AskAriaBoxProps): JSX.Element {
 
   return (
     <section data-testid="ask-aria-box" style={{ marginBottom: 'var(--aria-space-xl)' }}>
-      <h3 style={{ fontSize: 'var(--aria-type-lg)', marginTop: 0 }}>Ask Aria</h3>
+      <h3 style={{ fontFamily: 'var(--f-display)', fontSize: 22, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 8 }}>Ask Aria</h3>
       <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label htmlFor="ask-prompt" style={{ fontSize: 'var(--aria-type-sm)' }}>
           Prompt
