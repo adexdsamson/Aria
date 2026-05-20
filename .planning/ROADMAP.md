@@ -210,6 +210,16 @@ Plans:
 4. Auto-updater installs a new version, runs schema migration, and restores from backup if migration fails (verified in test)
 5. macOS build passes notarization; Windows build is OV-signed and installs cleanly past SmartScreen reputation seed *at GA release*. Initial v1 tester build ships Windows-unsigned (amended per CONTEXT 2026-05-17 staged signing decision).
 
+### Phase 08.1: Subscription and 60-Day Trial — Stripe Billing integration with Customer Portal and webhooks; license-key entitlement with periodic online check, offline grace period, and signed entitlement cached locally; 60-day trial starts on first launch with no card required, trial state persisted in encrypted SQLite; paywall UX on trial expiry with restore-license flow (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 08.1 to break down)
+
 ### Phase 9: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA — fetch design file + README, apply to product UI, integrate logo; landing page out of scope)
 
 **Goal:** [To be planned]

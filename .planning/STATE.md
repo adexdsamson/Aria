@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-20T02:34:23Z"
+last_updated: "2026-05-20T04:25:19.439Z"
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 8
-  total_plans: 31
-  completed_plans: 31
-  percent: 89
+  total_plans: 33
+  completed_plans: 30
+  percent: 80
 ---
 
 # State
@@ -62,6 +62,7 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 ### Roadmap Evolution
 
 - Phase 9 added: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA) — fetch design + README, apply to product UI, integrate logo; landing page out of scope
+- Phase 08.1 inserted after Phase 8: Subscription + 60-day trial (Stripe, license-key + periodic online check, no-card trial on first launch) — inserted before Phase 9 UI so paywall ships on new design system (URGENT)
 
 ### Phase 7 Followups
 
