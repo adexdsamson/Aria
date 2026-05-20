@@ -26,6 +26,8 @@ import { OllamaSection } from './OllamaSection';
 import { RagIndexSection } from './RagIndexSection';
 import { SchedulingRulesSection } from './SchedulingRulesSection';
 import { StatusPanel } from './StatusPanel';
+import { SubscriptionSection } from './sections/SubscriptionSection';
+import { RestoreLicenseSection } from '../entitlement/RestoreLicenseSection';
 import { UpdatesSection } from './UpdatesSection';
 
 const TABS: ReadonlyArray<{ to: string; label: string }> = [
@@ -39,6 +41,8 @@ const TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: 'briefing', label: 'Briefing' },
   { to: 'insights', label: 'Insights' },
   { to: 'learned-preferences', label: 'Learned preferences' },
+  { to: 'subscription', label: 'Subscription' },
+  { to: 'restore-license', label: 'Restore license' },
   { to: 'onboarding', label: 'Backup & restore' },
   { to: 'updates', label: 'Updates' },
   { to: 'diagnostics', label: 'Diagnostics' },
@@ -101,6 +105,8 @@ export function SettingsScreen(): JSX.Element {
           />
           <Route path="insights" element={<InsightsSection />} />
           <Route path="learned-preferences" element={<LearnedPreferencesSection />} />
+          <Route path="subscription" element={<SubscriptionSection />} />
+          <Route path="restore-license" element={<RestoreLicenseSection />} />
           <Route path="onboarding" element={<BackupRestoreSection />} />
           <Route path="updates" element={<UpdatesSection />} />
           <Route path="diagnostics" element={<DiagnosticsSection />} />
