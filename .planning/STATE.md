@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-20T11:40:00.000Z"
+last_updated: "2026-05-20T10:53:05.711Z"
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 39
-  completed_plans: 35
-  percent: 90
+  completed_plans: 36
+  percent: 92
 ---
 
 # State
@@ -21,6 +21,8 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Phase
+
+**Phase 9 Plan 02 complete (2026-05-20)** — Shell re-skin: SideNav + Topbar + Layout chrome + CommandPalette overlay + SidebarStatus. 3 tasks / 3 atomic commits (`7cc0523` Topbar+Layout, `a12bc2c` SideNav+SidebarStatus, `fa47842` CommandPalette). W-2 chrome-suppression: **Branch A** (App.tsx owns onboarding/locked gate; Layout.tsx adds no `useLocation` check) — ratchet `node -e ... onboarding|unlock` reports `app=true lay=false` after comment stripping. Topbar.tsx is a thin presentational pathname→title-pair mapper mirroring `app-shell.jsx` lines 233-245 verbatim (`Intl.DateTimeFormat` "weekday/day/month" briefing date, ISO-week label for calendar, 10 routes + briefing fallback); right cluster = cmdK trigger (dispatches `aria:cmdk-toggle` CustomEvent) + decorative bell SVG (D-06) + `Avatar`. SideNav.tsx composed top-to-bottom from `AppLogo(variant="sidebar")` → ⌘K button → `NavSection "Workspace"` (8 NavLinks) → `NavSection "System"` (2 NavLinks) → spacer → footer `SidebarStatus`. NavItem active style = `ivory-deep` bg + 2px gold left rail + gold icon + ink text fw500. Approvals badge (gold) reads `approvalsList()` pending count; Tasks badge (neutral) reads `tasksList({ completed:false })` length; both swallow IPC errors. New `editorial/SidebarStatus.tsx` (data-bound, not re-exported from `editorial/index.ts` per 09-01 leaf-purity rule): 4 rows (Ollama/Frontier/Gmail/Calendar) — Gmail+Calendar derive from `providerAccountsList()` IPC; `ProviderStatusTray.tsx` left intact for `StatusPanel` back-compat. CommandPalette: backdrop `rgba(26,26,26,0.45)` + 2px blur, ivory card + rule-strong border + 30/80 shadow, gold 18px search SVG, Playfair 20px input, KbdHint chips, smallcaps "Try" idle + italic Playfair queries, mono uppercase gold "Searching" + italic "BM25 + nomic-embed-text v1.5…" loading, mono uppercase "Answer" + `RoutingTag` chip + Source-Sans body + editorial citation rows + `<Button variant="primary">` Expand-to-chat. **IPC plumbing untouched** — `ragAsk` (transient), `ragThreadCreate`, citation decoding, hotkey, navigate. Added `aria:cmdk-toggle` CustomEvent listener alongside existing keydown handler (Topbar + SideNav button bridge). main.tsx: single new line `document.body.classList.add('editorial')` activates 09-01 `:where(.editorial)` heading scopes globally. Targeted vitest: 5/5 Topbar + 9/9 primitives + 8/8 existing CommandPalette tests pass. `pnpm typecheck` shows only the 2 pre-existing Phase 8 errors. Editorial vars in CommandPalette: 15 hits. Auto-fix (Rule 1): block-comment `onboarding/unlock` token leak in initial Layout JSDoc — neutralized to "pre-auth gate states" so ratchet passes. **Phase 9 plan 02/06 → 2/6 plans complete.**
 
 **Phase 9 Plan 01 complete (2026-05-20)** — Editorial design-system foundation. `pnpm add @fontsource/playfair-display@5.2.8 @fontsource/source-sans-3@5.2.9 @fontsource/ibm-plex-mono@5.2.7` as runtime deps; 14 weight-specific `@import` lines at top of `globals.css` (no Google Fonts CDN). Editorial palette (`--ivory/--ink/--gold/--rose/--moss/--rule/--paper/...` + type/layout/motion vars) added alongside `--aria-*` per D-13 (dark-mode override on `--aria-*` untouched — editorial palette is single light theme). Primitive classes ported verbatim from `design-ref/project/shared.css`: `.smallcaps[/-gold/-ink]`, `.label-rule` (+ descendants), `.btn[/-primary/-outline/-ghost]`, `.card[/-accent-top/-hover]`, `.dropcap`, `.fleuron`, `.container[/-wide]`, scrollbar + `::selection`. `h1`–`h4` defaults scoped under `:where(.editorial)` until 09-02 sets the editorial class on `<body>`. 11 React primitives under `src/renderer/components/editorial/`: MonogramSquare, Avatar, StatusDot (`data-status-kind` attr + per-kind rgba halo since `${var(--moss)}1A` is invalid CSS), RouteBadge, KbdHint, LabelRule, Card, Button, Input (forwardRef + label/hint/error), Modal (createPortal, role=dialog, aria-modal, Esc+backdrop close — used by 09-05 DisconnectConfirmDialog re-skin per D-12), AppLogo (sidebar/header/splash from Logo Studies III/V/II), barrel `index.ts`. 9/9 primitives tests pass. Auto-fixes (Rule 1): dropped unused `import React` from 6 leaf components (TS strict + `jsx: react-jsx`), added `@testing-library/jest-dom/vitest` import to test file, hardcoded StatusDot halo as explicit rgba per kind. Out-of-scope deferred per envelope: pre-existing TS errors in `features/recap/RecapScreen.tsx` + `features/settings/SchedulingRulesSection.tsx`. 2 commits `3ef4281` (tokens + fonts) + `9f26dbf` (primitives + tests). **Phase 9 plan 01/06 → 1/6 plans complete.**
 
