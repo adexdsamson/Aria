@@ -111,7 +111,7 @@
 - [x] **XCUT-02**: Aria persists work-in-progress (drafts being generated) across crashes without ever auto-transitioning to "sent"
 - [ ] **XCUT-03**: Application logs redact PII before write; debug logs are local-only, opt-in
 - [ ] **XCUT-04**: Auto-updater performs a pre-migration database backup; failed migrations auto-restore
-- [ ] **XCUT-05**: Application is code-signed and notarized (macOS) and signed (Windows OV cert)
+- [ ] **XCUT-05**: Application is code-signed and notarized (macOS) at v1 release. Windows OV signing applies at **GA release**; initial v1 tester build ships Windows-unsigned with documented SmartScreen warning. OV cert acquired and Windows signing wired after tester usage period (user-confirmed staged approach 2026-05-17).
 - [ ] **XCUT-06**: Aria provides a status panel showing sync state, queue depth, last error per integration
 - [ ] **XCUT-07**: Aria respects user time zone correctly across all integrations
 

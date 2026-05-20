@@ -208,7 +208,7 @@ Plans:
 2. After two weeks of use, briefing includes at least one insight derived from the user own data
 3. Drafts after week two are observably closer to the user voice than week one (manual eval)
 4. Auto-updater installs a new version, runs schema migration, and restores from backup if migration fails (verified in test)
-5. macOS build passes notarization; Windows build is OV-signed and installs cleanly past SmartScreen reputation seed
+5. macOS build passes notarization; Windows build is OV-signed and installs cleanly past SmartScreen reputation seed *at GA release*. Initial v1 tester build ships Windows-unsigned (amended per CONTEXT 2026-05-17 staged signing decision).
 
 ### Phase 9: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA — fetch design file + README, apply to product UI, integrate logo; landing page out of scope)
 

@@ -103,7 +103,7 @@ Final v1 phase. Delivers:
   - Before any migration, copy SQLCipher DB file to `userData/backups/{timestamp}-{prevSchemaVersion}.db`. Keep last 5.
   - Migration runner records expected row counts per critical table pre-migration; verifies post-migration counts match (allowing schema changes that intentionally drop columns but not rows).
   - On count mismatch or migration error: restore from snapshot, show recovery dialog, surface backup file location.
-  - Auto-updater wraps this: pre-update snapshot, post-migration verify, rollback path runs the previous installer if needed.
+  - Auto-updater wraps this: pre-update snapshot, post-migration verify. Rollback path restores the DB from the snapshot via `runMigrationsWithBackup` + `restoreFromBackup`. NOTE: electron-updater does not retain previous installers; if the new binary's migration is unrecoverable, the user must manually download a prior release from GitHub Releases and reinstall. RELEASE-RUNBOOK §9 documents this path.
 - **Final integration tests (Playwright `_electron`):** Full happy-path E2E covering:
   1. Connect Google + Outlook accounts
   2. Ingest mail; briefing renders
