@@ -89,10 +89,8 @@ export function RecapScreen(): JSX.Element {
       const week = 1 + Math.round((thursday.getTime() - firstThu.getTime()) / (7 * 86400000));
       const isoWeek = `${isoYear}-W${String(week).padStart(2, '0')}`;
       const res = await window.aria.recapRegenerate({ isoWeek, weekStartYmd });
-      if ('error' in res || ('ok' in res && res.ok === false)) {
-        setError(
-          'error' in res && typeof res.error === 'string' ? res.error : 'regenerate-failed',
-        );
+      if ('error' in res) {
+        setError(typeof res.error === 'string' ? res.error : 'regenerate-failed');
       }
       await refresh();
     } finally {

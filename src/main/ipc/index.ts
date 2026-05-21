@@ -491,8 +491,10 @@ export function registerHandlers(
         logger,
         db,
       });
+      // Only poison skip-set after successful registration; if db is null
+      // (pre-unlock call), leave channels out of skip so bootPoll re-registers.
+      knowledgeChannels.forEach((c) => skip.add(c));
     }
-    knowledgeChannels.forEach((c) => skip.add(c));
   }
 
   // Plan 08-04 Task 5 — auto-updater IPC.
