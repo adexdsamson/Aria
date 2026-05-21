@@ -13,6 +13,7 @@ export const CHANNELS = {
   ONBOARDING_SEAL: 'aria:onboarding:seal',
   ONBOARDING_UNLOCK: 'aria:onboarding:unlock',
   ONBOARDING_STATUS: 'aria:onboarding:status',
+  ONBOARDING_LOCK: 'aria:onboarding:lock',
   SECRETS_SET_FRONTIER_KEY: 'aria:secrets:set',
   SECRETS_HAS_FRONTIER_KEY: 'aria:secrets:has',
   SECRETS_CLEAR_FRONTIER_KEY: 'aria:secrets:clear',
@@ -729,6 +730,7 @@ export interface AriaApi {
   onboardingSeal(req: OnboardingSealRequest): Promise<{ ok: boolean } | IpcError>;
   onboardingUnlock(req: OnboardingUnlockRequest): Promise<{ ok: boolean } | IpcError>;
   onboardingStatus(): Promise<OnboardingStatus | IpcError>;
+  onboardingLock(): Promise<{ ok: boolean } | IpcError>;
 
   secretsSetFrontierKey(req: { provider: ProviderId; key: string }): Promise<{ ok: boolean } | IpcError>;
   secretsHasFrontierKey(req: { provider: ProviderId }): Promise<{ present: boolean } | IpcError>;
@@ -1205,6 +1207,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   ONBOARDING_SEAL: 'onboardingSeal',
   ONBOARDING_UNLOCK: 'onboardingUnlock',
   ONBOARDING_STATUS: 'onboardingStatus',
+  ONBOARDING_LOCK: 'onboardingLock',
   SECRETS_SET_FRONTIER_KEY: 'secretsSetFrontierKey',
   SECRETS_HAS_FRONTIER_KEY: 'secretsHasFrontierKey',
   SECRETS_CLEAR_FRONTIER_KEY: 'secretsClearFrontierKey',

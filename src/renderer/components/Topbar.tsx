@@ -9,7 +9,13 @@
  * CommandPalette listens for in addition to its native keydown handler.
  */
 import { useLocation } from 'react-router-dom';
-import { KbdHint, Avatar } from './editorial';
+import { KbdHint } from './editorial';
+import { AvatarMenu } from './AvatarMenu';
+
+export interface TopbarProps {
+  /** Fired after the user logs out via the avatar menu. */
+  onLocked?: () => void;
+}
 
 interface TitlePair {
   eyebrow: string;
@@ -31,13 +37,15 @@ function formatTodayLong(now: Date = new Date()): string {
 }
 
 function isoWeekLabel(now: Date = new Date()): string {
-  // ISO 8601 week number — Monday-first, weeks 1..53.
-  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `Week ${weekNo}`;
+  // "Week of 17 May" — matches the design-ref calendar masthead.
+  try {
+    return `Week of ${new Intl.DateTimeFormat(undefined, {
+      day: 'numeric',
+      month: 'long',
+    }).format(now)}`;
+  } catch {
+    return 'This week';
+  }
 }
 
 function titleForPath(pathname: string): TitlePair {
@@ -65,7 +73,7 @@ export function emitCmdKToggle(): void {
   window.dispatchEvent(new CustomEvent('aria:cmdk-toggle'));
 }
 
-export function Topbar(): JSX.Element {
+export function Topbar({ onLocked }: TopbarProps = {}): JSX.Element {
   const location = useLocation();
   const { eyebrow, title } = titleForPath(location.pathname);
 
@@ -166,7 +174,7 @@ export function Topbar(): JSX.Element {
         />
       </span>
 
-      <Avatar initials="EV" size={30} />
+      <AvatarMenu initials="EV" onLocked={onLocked} />
     </div>
   );
 }

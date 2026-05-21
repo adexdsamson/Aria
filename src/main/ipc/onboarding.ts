@@ -283,6 +283,21 @@ export function registerOnboardingHandlers(
     }
   });
 
+  ipcMain.handle(CHANNELS.ONBOARDING_LOCK, async () => {
+    // User-initiated logout: close the db handle so the renderer gate falls
+    // back to 'locked' on next status check, requiring the daily password
+    // again. We do NOT touch vault.json — the vault stays sealed on disk and
+    // the user can unlock with the same password.
+    try {
+      dbHolder.close();
+      logger.info({ event: 'onboarding.locked' });
+      return { ok: true };
+    } catch (err) {
+      logger.warn({ event: 'onboarding.lock.failed', err: String(err) });
+      return { ok: false, error: 'lock-failed' };
+    }
+  });
+
   ipcMain.handle(CHANNELS.ONBOARDING_STATUS, async () => {
     return {
       vaultPresent: isVaultPresent(vaultPathOf(dataDir)),
