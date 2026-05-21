@@ -26,7 +26,7 @@ export function SectionCalendar({
         <h2
           style={{
             fontFamily: 'var(--f-display)',
-            fontSize: '1.5rem',
+            fontSize: 'clamp(1.5rem, 2.5vw, 1.75rem)',
             fontWeight: 500,
             letterSpacing: '-0.01em',
             margin: 0,

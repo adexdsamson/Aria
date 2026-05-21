@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NewsSourceRow, IpcError } from '../../../shared/ipc-contract';
 import { Modal } from '../../components/editorial/Modal';
+import { SkeletonRoot, SkeletonLine } from '../../components/Skeleton';
 import CATALOG_RAW from '../../assets/news-catalog.json';
 
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
@@ -207,9 +208,30 @@ export function NewsSourcesSection(): JSX.Element {
       </div>
 
       {rows === null && (
-        <p style={{ fontFamily: 'var(--f-display)', fontStyle: 'italic', color: 'var(--gray)' }}>
-          Loading…
-        </p>
+        <SkeletonRoot style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '16px 1fr auto auto',
+                gap: 14,
+                alignItems: 'center',
+                padding: '14px 8px',
+                borderTop: '1px solid var(--rule)',
+                borderBottom: i === 3 ? '1px solid var(--rule)' : 'none',
+              }}
+            >
+              <SkeletonLine width={8} height={8} style={{ borderRadius: '50%' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <SkeletonLine width={`${50 + i * 12}%`} height={14} />
+                <SkeletonLine width={`${30 + i * 8}%`} height={10} />
+              </div>
+              <SkeletonLine width={38} height={22} style={{ borderRadius: 4 }} />
+              <SkeletonLine width={48} height={22} style={{ borderRadius: 4 }} />
+            </div>
+          ))}
+        </SkeletonRoot>
       )}
 
       {rows !== null && rows.length === 0 && (

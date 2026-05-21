@@ -8,7 +8,15 @@ import { NoteView } from './NoteView';
  * MEET-06 no-bot guardrail copy preserved verbatim.
  * All IPC (transcriptIngest, transcriptGetNote) untouched.
  */
-export function TranscriptCaptureScreen(): JSX.Element {
+export function TranscriptCaptureScreen({
+  onIngested,
+}: {
+  /**
+   * Optional callback fired after a successful ingest. Used by MeetingsScreen
+   * to refresh the Recent list and switch back to the populated 3-pane view.
+   */
+  onIngested?: (noteId: string) => void;
+} = {}): JSX.Element {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [sourceKind, setSourceKind] = useState<TranscriptSourceKind>('paste');
@@ -36,6 +44,7 @@ export function TranscriptCaptureScreen(): JSX.Element {
       const noteRes = await window.aria.transcriptGetNote({ noteId: res.noteId });
       if ('error' in noteRes) setError(noteRes.error);
       else setNote(noteRes.note);
+      onIngested?.(res.noteId);
     } finally {
       setBusy(false);
     }

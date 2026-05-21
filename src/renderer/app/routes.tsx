@@ -6,7 +6,7 @@ import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { RoutingLogScreen } from '../features/diagnostics/RoutingLogScreen';
 import { SchedulingChat } from '../features/scheduling/SchedulingChat';
 import { UnifiedCalendarScreen } from '../features/calendar/UnifiedCalendarScreen';
-import { TranscriptCaptureScreen } from '../features/meetings/TranscriptCaptureScreen';
+import { MeetingsScreen } from '../features/meetings/MeetingsScreen';
 import { TasksScreen } from '../features/tasks/TasksScreen';
 import { AskScreen } from '../features/ask/AskScreen';
 import { RecapScreen } from '../features/recap/RecapScreen';
@@ -71,7 +71,7 @@ export function AppRoutes(): JSX.Element {
       <Route path="/briefing" element={<LockedGuard><BriefingScreen /></LockedGuard>} />
       <Route path="/approvals" element={<LockedGuard><ApprovalsScreen /></LockedGuard>} />
       <Route path="/calendar" element={<LockedGuard><UnifiedCalendarScreen /></LockedGuard>} />
-      <Route path="/meetings" element={<LockedGuard><TranscriptCaptureScreen /></LockedGuard>} />
+      <Route path="/meetings" element={<LockedGuard><MeetingsScreen /></LockedGuard>} />
       <Route path="/tasks" element={<LockedGuard><TasksScreen /></LockedGuard>} />
       <Route path="/scheduling" element={<LockedGuard><SchedulingChat /></LockedGuard>} />
       <Route path="/ask" element={<LockedGuard><AskScreen /></LockedGuard>} />

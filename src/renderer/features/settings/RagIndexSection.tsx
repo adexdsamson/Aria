@@ -1,17 +1,18 @@
 /**
- * Plan 07-02 Task 7 — Settings → RAG Index section.
+ * RagIndexSection — Settings → RAG index ("Personal index" per design-ref).
  *
- * Surfaces:
- *   - vector backend (sqlite-vec / fallback) + active model id + dim
- *   - indexing progress (X / Y embedded), rebuild banner if rebuild_in_progress
- *   - estimated storage (chunks × 4 KB)
- *   - backfill state + live ETA + Build now / Later buttons
- *   - capacity banner at 200k (warn) / 250k (red) for fallback mode (C2 Option D)
- *   - "Wipe RAG data for disconnected account" (per RESEARCH §11)
- *   - Distinct Ollama-down error copy (L-04-03) — NOT the refusal copy
+ * Phase 9 design-ref `app-screen-settings.jsx > RagIndex` parity pass:
+ *   - "SETTING · VI" gold mono eyebrow + h1 "Personal index"
+ *   - Playfair italic body: "Embeddings over your mail and meetings. Local-only —
+ *     nothing leaves the device."
+ *   - KPI strip card: 4 columns (Backend / Model / Dimensions / Estimated) with
+ *     Playfair display values + mono uppercase labels
+ *   - Indexed-chunks progress bar + last-indexed mono subline
+ *   - Backfill card: heading + body explainer + Build now / Later buttons
+ *     (only when state=pending)
+ *   - Capacity banners (warn/hard) when fallback backend nears caps
  *
- * The section MUST be imported and mounted by SettingsScreen.tsx — the test
- * spec greps that file to enforce reachability (L-04-04).
+ * IPC + state + data-testids preserved verbatim.
  */
 import { useEffect, useState } from 'react';
 import type {
@@ -19,6 +20,7 @@ import type {
   RagIndexStatusDto,
 } from '../../../shared/ipc-contract';
 
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
 const POLL_MS = 5_000;
 const WARN_CAP = 200_000;
 const HARD_CAP = 250_000;
@@ -85,84 +87,293 @@ export function RagIndexSection(): JSX.Element {
   }
 
   const ollamaDown = !!status?.lastErrorKind && status.lastErrorKind === 'connection_refused';
-  const estStorage = status ? status.aliveChunkCount * 4096 : 0;
+  const estStorageBytes = status ? status.aliveChunkCount * 4096 : 0;
+  const embedded = status ? status.aliveChunkCount - status.dirtyChunkCount : 0;
+  const total = status?.aliveChunkCount ?? 0;
+  const progressPct = total > 0 ? Math.min(100, Math.round((embedded / total) * 100)) : 0;
 
   return (
-    <section data-testid="settings-rag-index" style={{ padding: 'var(--aria-space-md)' }}>
-      <h2 style={{ fontFamily: 'var(--f-display)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 12 }}>RAG Index</h2>
+    <section
+      data-testid="settings-rag-index"
+      style={{
+        padding: '32px 40px 80px',
+        maxWidth: '64rem',
+        margin: '0 auto',
+        background: 'var(--paper)',
+        color: 'var(--ink)',
+        minHeight: '100%',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--gold)',
+          marginBottom: 8,
+        }}
+      >
+        Setting · VI
+      </div>
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 30,
+          fontWeight: 500,
+          letterSpacing: '-0.02em',
+          color: 'var(--ink)',
+          margin: 0,
+          marginBottom: 14,
+          lineHeight: 1.05,
+        }}
+      >
+        Personal index
+      </h2>
+      <p
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontStyle: 'italic',
+          fontSize: 15,
+          color: 'var(--ink-soft)',
+          margin: '0 0 32px 0',
+          maxWidth: '52em',
+          lineHeight: 1.6,
+        }}
+      >
+        Embeddings over your mail and meetings. Local-only — nothing leaves the device.
+      </p>
 
-      {error && (
-        <div role="alert" style={errorBanner()}>
-          {error}
-        </div>
-      )}
-
+      {error && <BannerNote tone="block">{error}</BannerNote>}
       {ollamaDown && (
-        <div role="alert" data-testid="rag-ollama-down" style={errorBanner()}>
+        <BannerNote tone="block" testId="rag-ollama-down">
           Aria couldn&apos;t reach the local model — please check Ollama is running.
-        </div>
+        </BannerNote>
       )}
-
       {status?.vectorBackend === 'fallback' && status.aliveChunkCount >= HARD_CAP && (
-        <div role="alert" data-testid="rag-capacity-hard" style={errorBanner()}>
-          Fallback index at capacity ({status.aliveChunkCount.toLocaleString()}/250,000 chunks). Indexing
-          is paused. Reinstall Aria from a build that ships sqlite-vec native binaries.
-        </div>
+        <BannerNote tone="block" testId="rag-capacity-hard">
+          Fallback index at capacity ({status.aliveChunkCount.toLocaleString()}/250,000 chunks).
+          Indexing is paused. Reinstall Aria from a build that ships sqlite-vec native binaries.
+        </BannerNote>
       )}
-
       {status?.vectorBackend === 'fallback' &&
         status.aliveChunkCount >= WARN_CAP &&
         status.aliveChunkCount < HARD_CAP && (
-          <div role="alert" data-testid="rag-capacity-warn" style={warnBanner()}>
+          <BannerNote tone="warn" testId="rag-capacity-warn">
             Fallback index approaching capacity ({status.aliveChunkCount.toLocaleString()}/250,000
             chunks). Consider reinstalling Aria from a build that ships sqlite-vec.
-          </div>
+          </BannerNote>
         )}
 
       {status && (
-        <dl style={dlStyle()}>
-          <dt>Backend</dt>
-          <dd data-testid="rag-backend">{status.vectorBackend}</dd>
-          <dt>Active embedding model</dt>
-          <dd data-testid="rag-active-model">
-            {status.activeModelId} ({status.activeModelDim}-dim)
-          </dd>
-          <dt>Indexed chunks</dt>
-          <dd data-testid="rag-chunk-count">
-            {(status.aliveChunkCount - status.dirtyChunkCount).toLocaleString()} /{' '}
-            {status.aliveChunkCount.toLocaleString()} embedded
-          </dd>
-          <dt>Estimated storage</dt>
-          <dd>{bytesToHuman(estStorage)}</dd>
-          {status.rebuildInProgress && (
-            <>
-              <dt>Rebuild</dt>
-              <dd data-testid="rag-rebuild">
-                Rebuilding for {status.rebuildTargetModelId} —{' '}
-                {status.rebuildProgressDone}/{status.rebuildProgressTotal}
-              </dd>
-            </>
-          )}
-        </dl>
+        <>
+          {/* KPI strip card */}
+          <div
+            style={{
+              padding: '20px 24px',
+              background: 'var(--paper)',
+              border: '1px solid var(--rule)',
+              borderRadius: 'var(--radius-lg)',
+              marginBottom: 22,
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 20,
+                marginBottom: 22,
+              }}
+            >
+              <KpiCell label="Backend" value={status.vectorBackend} testid="rag-backend" />
+              <KpiCell
+                label="Model"
+                value={status.activeModelId}
+                testid="rag-active-model"
+                size="sm"
+              />
+              <KpiCell label="Dimensions" value={`${status.activeModelDim}d`} />
+              <KpiCell label="Estimated" value={bytesToHuman(estStorageBytes)} />
+            </div>
+
+            {/* Progress */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  color: 'var(--gray)',
+                }}
+              >
+                Indexed chunks
+              </span>
+              <span
+                data-testid="rag-chunk-count"
+                style={{
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  color: 'var(--ink)',
+                  fontWeight: 600,
+                }}
+              >
+                {embedded.toLocaleString()} / {total.toLocaleString()}
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                background: 'var(--ivory-deep)',
+                borderRadius: 999,
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${progressPct}%`,
+                  height: '100%',
+                  background: 'var(--gold)',
+                  borderRadius: 999,
+                  transition: 'width 320ms cubic-bezier(0.23, 1, 0.32, 1)',
+                }}
+              />
+            </div>
+
+            {/* Last-indexed mono subline */}
+            <div
+              style={{
+                marginTop: 10,
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10,
+                color: 'var(--gray-soft)',
+                letterSpacing: '0.06em',
+              }}
+            >
+              {status.rebuildInProgress
+                ? `Rebuilding for ${status.rebuildTargetModelId ?? 'new model'} — ${status.rebuildProgressDone}/${status.rebuildProgressTotal}`
+                : status.dirtyChunkCount > 0
+                  ? `${status.dirtyChunkCount.toLocaleString()} dirty chunks · ${status.perMinute}/min throughput`
+                  : 'No backfill running'}
+            </div>
+          </div>
+        </>
       )}
 
+      {/* Backfill card */}
       {backfill && (
-        <div style={{ marginTop: 'var(--aria-space-md)' }}>
-          <h3>Backfill</h3>
-          <p>State: {backfill.state}</p>
-          <p>ETA remaining: {fmtEta(backfill.etaSecondsRemaining)}</p>
+        <div
+          style={{
+            padding: '20px 24px',
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            borderRadius: 'var(--radius-lg)',
+            marginBottom: 22,
+          }}
+        >
+          <h3
+            style={{
+              fontFamily: 'var(--f-display)',
+              fontSize: 19,
+              fontWeight: 500,
+              color: 'var(--ink)',
+              margin: '0 0 10px 0',
+              lineHeight: 1.2,
+            }}
+          >
+            Backfill
+          </h3>
+          <p
+            style={{
+              margin: '0 0 14px 0',
+              fontSize: 14,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.6,
+              maxWidth: '52em',
+            }}
+          >
+            {backfill.state === 'pending' ? (
+              <>
+                On first run Aria walks your historical mail and meetings to build the embedding
+                index. Average time on Apple Silicon is ~6 min per 10k items; expect to leave this
+                overnight on first run.
+              </>
+            ) : backfill.state === 'in_progress' ? (
+              <>
+                Backfill running — ETA {fmtEta(backfill.etaSecondsRemaining)} ·{' '}
+                {backfill.dirtyRemaining.toLocaleString()} items remaining.
+              </>
+            ) : backfill.state === 'done' ? (
+              <>Backfill complete. New mail and meeting notes are indexed incrementally.</>
+            ) : (
+              <>Backfill skipped — only new content will be indexed going forward.</>
+            )}
+          </p>
+
           {backfill.state === 'pending' && (
-            <>
-              <p>
-                Aria can build a search index over your existing mail, calendar, and meeting notes.
-              </p>
-              <button onClick={onStartBackfill} disabled={starting} data-testid="rag-backfill-start">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                data-testid="rag-backfill-start"
+                onClick={() => void onStartBackfill()}
+                disabled={starting}
+                style={{
+                  padding: '9px 18px',
+                  fontFamily: 'var(--f-body)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--paper)',
+                  background: starting ? 'var(--rule-strong)' : 'var(--gold)',
+                  border: 'none',
+                  borderRadius: 'var(--radius)',
+                  cursor: starting ? 'not-allowed' : 'pointer',
+                  transition: `background 200ms ease, transform 140ms ${EASE_OUT}`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+                onMouseEnter={(e) => {
+                  if (!starting) e.currentTarget.style.background = 'var(--gold-deep)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!starting) e.currentTarget.style.background = 'var(--gold)';
+                }}
+                onMouseDown={(e) => {
+                  if (!starting) e.currentTarget.style.transform = 'scale(0.97)';
+                }}
+                onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
                 {starting ? 'Starting…' : 'Build now'}
-              </button>{' '}
-              <button onClick={onSkipBackfill} data-testid="rag-backfill-skip">
+              </button>
+              <button
+                type="button"
+                data-testid="rag-backfill-skip"
+                onClick={() => void onSkipBackfill()}
+                style={{
+                  padding: '9px 16px',
+                  fontFamily: 'var(--f-body)',
+                  fontSize: 13,
+                  color: 'var(--ink-soft)',
+                  background: 'transparent',
+                  border: '1px solid var(--rule-strong)',
+                  borderRadius: 'var(--radius)',
+                  cursor: 'pointer',
+                  transition: 'border-color 180ms ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--gold-light)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--rule-strong)')}
+              >
                 Later
               </button>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -170,26 +381,82 @@ export function RagIndexSection(): JSX.Element {
   );
 }
 
-function errorBanner(): React.CSSProperties {
-  return {
-    padding: 'var(--aria-space-sm)',
-    backgroundColor: 'var(--aria-error-bg, #fee)',
-    color: 'var(--aria-error-fg, #900)',
-    borderRadius: 6,
-    marginBottom: 'var(--aria-space-sm)',
-  };
+function KpiCell({
+  label,
+  value,
+  testid,
+  size,
+}: {
+  label: string;
+  value: string;
+  testid?: string;
+  size?: 'sm';
+}): JSX.Element {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--gray)',
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        {...(testid ? { 'data-testid': testid } : {})}
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: size === 'sm' ? 18 : 24,
+          fontWeight: 500,
+          color: 'var(--ink)',
+          lineHeight: 1.1,
+          letterSpacing: '-0.015em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+        title={value}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
-function warnBanner(): React.CSSProperties {
-  return {
-    padding: 'var(--aria-space-sm)',
-    backgroundColor: 'var(--aria-warn-bg, #fff8e1)',
-    color: 'var(--aria-warn-fg, #7a5d00)',
-    borderRadius: 6,
-    marginBottom: 'var(--aria-space-sm)',
-  };
-}
-
-function dlStyle(): React.CSSProperties {
-  return { display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 12, rowGap: 6 };
+function BannerNote({
+  tone,
+  testId,
+  children,
+}: {
+  tone: 'block' | 'warn';
+  testId?: string;
+  children: React.ReactNode;
+}): JSX.Element {
+  const colors =
+    tone === 'block'
+      ? { fg: 'var(--rose)', bg: 'rgba(184,73,58,0.06)', border: 'var(--rose)' }
+      : { fg: 'var(--gold-deep)', bg: 'rgba(184,134,11,0.08)', border: 'var(--gold)' };
+  return (
+    <div
+      role={tone === 'block' ? 'alert' : 'status'}
+      {...(testId ? { 'data-testid': testId } : {})}
+      style={{
+        marginBottom: 16,
+        padding: '10px 14px',
+        background: colors.bg,
+        color: colors.fg,
+        borderLeft: `2px solid ${colors.border}`,
+        borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+        fontSize: 13.5,
+        lineHeight: 1.5,
+      }}
+    >
+      {children}
+    </div>
+  );
 }

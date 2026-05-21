@@ -14,6 +14,7 @@
  * preserved verbatim.
  */
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type {
   ProposeResponse,
   ProposeResultDto,
@@ -21,6 +22,17 @@ import type {
   ProposeRefusalDto,
 } from '../../../shared/ipc-contract';
 import { Button } from '../../components/editorial';
+import { frontierModelDisplay } from '../../../shared/frontier-labels';
+import { useFrontierProvider } from '../../lib/useFrontierProvider';
+
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+const TRY_EXAMPLES = [
+  'move my 3pm to Thursday',
+  'push board prep to 4pm Friday',
+  'find me 30 min with james before EOD',
+  'decline the engineering standup tomorrow',
+];
 
 function isError(r: ProposeResponse): r is { error: string } {
   return !!r && typeof r === 'object' && 'error' in r;
@@ -48,10 +60,12 @@ const REFUSAL_COPY: Record<ProposeRefusalDto['code'], string> = {
 };
 
 export function SchedulingChat(): JSX.Element {
+  const activeFrontierProvider = useFrontierProvider();
   const [nl, setNl] = useState('');
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ProposeResponse | null>(null);
   const [lastNl, setLastNl] = useState('');
+  const navigate = useNavigate();
 
   async function submit(): Promise<void> {
     if (!nl.trim() || pending) return;
@@ -127,12 +141,34 @@ export function SchedulingChat(): JSX.Element {
           fontSize: 14,
           color: 'var(--gray)',
           lineHeight: 1.6,
-          margin: '0 0 18px 0',
+          margin: '0 0 22px 0',
           maxWidth: '48em',
         }}
       >
         Type a scheduling command in natural language. Aria parses your intent against your
-        calendar and scheduling rules, drafts a change, and surfaces it on the Approvals page
+        calendar and scheduling rules, drafts a change, and surfaces it on{' '}
+        <a
+          href="#"
+          data-testid="scheduling-approvals-link"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate('/approvals');
+          }}
+          style={{
+            color: 'var(--ink)',
+            textDecoration: 'none',
+            backgroundImage: 'linear-gradient(to right, var(--gold), var(--gold))',
+            backgroundSize: '100% 1px',
+            backgroundPosition: '0 100%',
+            backgroundRepeat: 'no-repeat',
+            paddingBottom: 1,
+            transition: 'color 160ms ease',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gold-deep)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink)')}
+        >
+          the Approvals page
+        </a>{' '}
         for review.
       </p>
 
@@ -187,9 +223,72 @@ export function SchedulingChat(): JSX.Element {
             style={{ color: 'var(--gray-soft)' }}
             aria-hidden="true"
           >
-            Routes through · FRONTIER claude-sonnet · NL intent parser
+            {`Routes through · FRONTIER ${frontierModelDisplay(activeFrontierProvider)} · NL intent parser`}
           </span>
         </div>
+      </div>
+
+      {/* "Try" example chips — click populates the input. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          marginBottom: 28,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gray-soft)',
+            marginRight: 4,
+          }}
+        >
+          Try
+        </span>
+        {TRY_EXAMPLES.map((example) => (
+          <button
+            key={example}
+            type="button"
+            data-testid={`scheduling-try-${example.slice(0, 16).replace(/\s+/g, '-')}`}
+            disabled={pending}
+            onClick={() => setNl(example)}
+            style={{
+              padding: '6px 14px',
+              fontFamily: 'var(--f-display)',
+              fontStyle: 'italic',
+              fontSize: 13.5,
+              color: 'var(--ink-soft)',
+              background: 'var(--paper)',
+              border: '1px solid var(--rule-strong)',
+              borderRadius: 999,
+              cursor: pending ? 'not-allowed' : 'pointer',
+              transition: `background 180ms ease, color 180ms ease, border-color 180ms ease, transform 140ms ${EASE_OUT}`,
+            }}
+            onMouseEnter={(e) => {
+              if (!pending) {
+                e.currentTarget.style.background = 'rgba(184,134,11,0.05)';
+                e.currentTarget.style.borderColor = 'var(--gold-light)';
+                e.currentTarget.style.color = 'var(--ink)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!pending) {
+                e.currentTarget.style.background = 'var(--paper)';
+                e.currentTarget.style.borderColor = 'var(--rule-strong)';
+                e.currentTarget.style.color = 'var(--ink-soft)';
+              }
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            "{example}"
+          </button>
+        ))}
       </div>
 
       {result && (
@@ -350,6 +449,49 @@ export function SchedulingChat(): JSX.Element {
           )}
         </div>
       )}
+
+      {/* "How this works" explainer — design-ref shows a quiet
+          editorial block teaching the proposal-review flow. */}
+      <aside
+        data-testid="scheduling-how-it-works"
+        aria-labelledby="scheduling-how-it-works-title"
+        style={{
+          marginTop: 40,
+          padding: '20px 24px',
+          background: 'var(--ivory-deep)',
+          border: '1px solid var(--rule)',
+          borderRadius: 'var(--radius-lg)',
+        }}
+      >
+        <div
+          id="scheduling-how-it-works-title"
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 10,
+          }}
+        >
+          How this works
+        </div>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14,
+            color: 'var(--ink-soft)',
+            lineHeight: 1.65,
+            maxWidth: '52em',
+            textWrap: 'pretty' as const,
+          }}
+        >
+          Aria parses your sentence, matches it against your real calendar, evaluates conflicts
+          against your scheduling rules (focus blocks, no-meeting windows, buffers), and proposes
+          one or more alternative slots. Nothing is sent until you approve the change.
+        </p>
+      </aside>
     </section>
   );
 }

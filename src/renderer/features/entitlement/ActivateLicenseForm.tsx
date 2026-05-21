@@ -127,7 +127,7 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
     <form
       onSubmit={onSubmit}
       data-testid="activate-license-form"
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <label
         htmlFor="activate-license-key"
@@ -135,7 +135,7 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
           fontFamily: 'var(--f-mono)',
           fontSize: 10,
           fontWeight: 500,
-          letterSpacing: '0.18em',
+          letterSpacing: '0.2em',
           textTransform: 'uppercase',
           color: 'var(--gray)',
         }}
@@ -153,15 +153,22 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
         spellCheck={false}
         disabled={busy}
         style={{
+          width: '100%',
           minHeight: 44,
-          padding: '0 12px',
+          padding: '0 14px',
           borderRadius: 'var(--radius)',
           border: '1px solid var(--rule)',
           background: 'var(--paper)',
           color: 'var(--ink)',
           fontFamily: 'var(--f-mono)',
           fontSize: 13,
+          letterSpacing: '0.04em',
+          boxSizing: 'border-box',
+          outline: 'none',
+          transition: 'border-color 0.15s',
         }}
+        onFocus={e => { e.currentTarget.style.borderColor = 'var(--gold)'; }}
+        onBlur={e => { e.currentTarget.style.borderColor = 'var(--rule)'; }}
       />
       {formatHint && (
         <p
@@ -179,7 +186,7 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
           style={{
             color: 'var(--ink)',
             fontSize: 13,
-            padding: '10px 12px',
+            padding: '10px 14px',
             border: '1px solid var(--rose)',
             background: 'rgba(177,52,52,0.06)',
             borderRadius: 'var(--radius)',
@@ -191,17 +198,15 @@ export function ActivateLicenseForm(props: ActivateLicenseFormProps): JSX.Elemen
             <button
               type="button"
               data-testid="activate-error-portal-link"
-              onClick={() => {
-                void openCustomerPortal();
-              }}
-              style={{ marginTop: 6 }}
+              onClick={() => { void openCustomerPortal(); }}
+              style={{ marginTop: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gold)', textDecoration: 'underline', fontSize: 13 }}
             >
               Open Customer Portal
             </button>
           )}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <Button
           type="submit"
           variant="primary"

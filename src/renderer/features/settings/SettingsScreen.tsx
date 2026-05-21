@@ -82,19 +82,22 @@ export function SettingsScreen(): JSX.Element {
   return (
     <div style={containerStyle()}>
       <aside style={tabsStyle()} aria-label="Settings sections">
-        <h1
+        {/* "Settings" h1 lives in the Topbar (SETTINGS / Preferences & status);
+            don't duplicate it here. Section groupings provide structure. */}
+        <div
           style={{
-            fontFamily: 'var(--f-display)',
-            fontSize: 28,
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
             fontWeight: 500,
-            letterSpacing: '-0.01em',
-            color: 'var(--ink)',
-            margin: 0,
-            marginBottom: 18,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 16,
+            paddingLeft: 10,
           }}
         >
-          Settings
-        </h1>
+          Preferences
+        </div>
         {SECTIONS.map((sec) => (
           <div key={sec.title} style={{ marginBottom: 18 }}>
             <div

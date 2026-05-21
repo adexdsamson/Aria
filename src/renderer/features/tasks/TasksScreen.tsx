@@ -1,26 +1,76 @@
+/**
+ * TasksScreen — unified task list across Todoist + meeting actions.
+ *
+ * Phase 9 design-ref `app-screen-tasks.jsx` parity pass:
+ *   - Topbar owns the "TASKS / Todoist + meeting actions" eyebrow+title — do
+ *     NOT duplicate them here.
+ *   - In-content H1 "Tasks" + inline count line "N OPEN · M OVERDUE" (mono)
+ *   - Right side: "Todoist connected" status indicator (when applicable)
+ *   - Source filter pills with icons; "All" selected = dark ink fill, others
+ *     paper with subtle border
+ *   - "Show completed" toggle right-aligned
+ *   - Empty state free-floating italic, NO card wrapper
+ *
+ * IPC + state + data-testids preserved verbatim.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TaskRowDto } from '../../../shared/ipc-contract';
-import { Card } from '../../components/editorial';
 import { TaskRow } from './TaskRow';
 
 function isErr(v: unknown): v is { error: string } {
   return !!v && typeof v === 'object' && 'error' in (v as object);
 }
 
-const SOURCE_LABELS: Record<'all' | 'todoist' | 'aria', string> = {
-  all: 'All',
-  todoist: 'Todoist',
-  aria: 'Meeting actions',
-};
+function isOverdue(dueIso: string | null): boolean {
+  if (!dueIso) return false;
+  try {
+    return new Date(dueIso).getTime() < Date.now();
+  } catch {
+    return false;
+  }
+}
 
-/**
- * Phase 9 re-skin: Tasks screen. IPC (tasksList) and all test-ids preserved.
- */
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+type Source = 'all' | 'todoist' | 'aria';
+
+const SOURCE_OPTIONS: { value: Source; label: string; icon: React.ReactNode }[] = [
+  {
+    value: 'all',
+    label: 'All',
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    ),
+  },
+  {
+    value: 'todoist',
+    label: 'Todoist',
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    value: 'aria',
+    label: 'Meeting actions',
+    icon: (
+      <span style={{ fontSize: 11, color: 'var(--gold)', lineHeight: 1 }}>✶</span>
+    ),
+  },
+];
+
 export function TasksScreen(): JSX.Element {
   const [rows, setRows] = useState<TaskRowDto[]>([]);
-  const [source, setSource] = useState<'all' | 'todoist' | 'aria'>('all');
+  const [source, setSource] = useState<Source>('all');
   const [showCompleted, setShowCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [todoistConnected, setTodoistConnected] = useState<boolean>(false);
 
   const load = useCallback(async () => {
     const result = await window.aria.tasksList({
@@ -36,18 +86,52 @@ export function TasksScreen(): JSX.Element {
     setError(null);
   }, [showCompleted, source]);
 
+  // Detect Todoist connection — any row with source 'todoist' OR the
+  // todoistStatus IPC reports a connected token. Cheap proxy via tasksList.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const fn = (window as { aria?: { todoistStatus?: () => Promise<unknown> } }).aria
+          ?.todoistStatus;
+        if (fn) {
+          const res = await fn();
+          if (cancelled) return;
+          const ok =
+            !!res &&
+            typeof res === 'object' &&
+            'connected' in (res as object) &&
+            (res as { connected: boolean }).connected === true;
+          setTodoistConnected(ok);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      // Fallback: infer from any todoist row present
+      const probe = await window.aria.tasksList({ source: 'todoist' });
+      if (cancelled) return;
+      if (!isErr(probe) && probe.rows.length > 0) setTodoistConnected(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
 
-  const openCount = useMemo(() => rows.filter((row) => !row.isCompleted).length, [rows]);
+  const openRows = useMemo(() => rows.filter((r) => !r.isCompleted), [rows]);
+  const openCount = openRows.length;
+  const overdueCount = useMemo(() => openRows.filter((r) => isOverdue(r.dueIso)).length, [openRows]);
 
   return (
     <section
       data-testid="tasks-screen"
       style={{
-        padding: '2.5rem 2rem 4rem',
-        maxWidth: 'var(--container)',
+        padding: '32px 40px 80px',
+        maxWidth: 'var(--container, 1120px)',
         margin: '0 auto',
         background: 'var(--ivory)',
         color: 'var(--ink)',
@@ -56,55 +140,95 @@ export function TasksScreen(): JSX.Element {
     >
       <header
         style={{
-          marginBottom: 22,
-          borderBottom: '1px solid var(--rule)',
-          paddingBottom: 18,
           display: 'flex',
-          alignItems: 'baseline',
-          gap: 14,
+          alignItems: 'flex-end',
+          gap: 18,
+          marginBottom: 28,
+          flexWrap: 'wrap',
         }}
       >
-        <div>
-          <div className="smallcaps" style={{ color: 'var(--gray-soft)', marginBottom: 8 }}>
-            Tasks
-          </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, flex: 1, minWidth: 0 }}>
           <h1
             style={{
               margin: 0,
               fontFamily: 'var(--f-display)',
               fontWeight: 500,
-              fontSize: '2rem',
-              letterSpacing: '-0.01em',
+              fontSize: 'clamp(2rem, 4vw, 2.5rem)',
+              letterSpacing: '-0.02em',
+              lineHeight: 1,
             }}
           >
-            Open work
+            Tasks
           </h1>
+          <span
+            data-testid="tasks-count"
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+            }}
+          >
+            {openCount} open
+            {overdueCount > 0 && (
+              <>
+                {' · '}
+                <span data-testid="tasks-overdue-count" style={{ color: 'var(--rose)' }}>
+                  {overdueCount} overdue
+                </span>
+              </>
+            )}
+          </span>
         </div>
-        <span style={{ flex: 1 }} />
-        <span
-          data-testid="tasks-count"
-          style={{
-            fontFamily: 'var(--f-mono)',
-            fontSize: 11,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            color: 'var(--gray)',
-          }}
-        >
-          {openCount} open
-        </span>
+
+        {todoistConnected && (
+          <span
+            data-testid="tasks-todoist-status"
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 10,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--moss)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{ width: 6, height: 6, borderRadius: 50, background: 'var(--moss)' }}
+            />
+            Todoist connected
+          </span>
+        )}
       </header>
 
+      {/* Source filter row */}
       <div
         style={{
           display: 'flex',
-          gap: 10,
-          marginBottom: 18,
+          gap: 8,
+          marginBottom: 24,
           flexWrap: 'wrap',
           alignItems: 'center',
         }}
       >
-        {(['all', 'todoist', 'aria'] as const).map((value) => {
+        <span
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--gray-soft)',
+            marginRight: 8,
+          }}
+        >
+          Source
+        </span>
+
+        {SOURCE_OPTIONS.map(({ value, label, icon }) => {
           const active = source === value;
           return (
             <button
@@ -113,22 +237,40 @@ export function TasksScreen(): JSX.Element {
               data-testid={`tasks-source-${value}`}
               aria-pressed={active}
               onClick={() => setSource(value)}
-              style={chipStyle(active)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '7px 14px',
+                fontFamily: 'var(--f-body)',
+                fontSize: 13,
+                fontWeight: active ? 600 : 500,
+                color: active ? 'var(--paper)' : 'var(--ink-soft)',
+                background: active ? 'var(--ink)' : 'var(--paper)',
+                border: `1px solid ${active ? 'var(--ink)' : 'var(--rule-strong)'}`,
+                borderRadius: 999,
+                cursor: 'pointer',
+                transition: `background 180ms ease, color 180ms ease, transform 140ms ${EASE_OUT}`,
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              {SOURCE_LABELS[value]}
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                {icon}
+              </span>
+              {label}
             </button>
           );
         })}
+
         <label
           style={{
             marginLeft: 'auto',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            fontFamily: 'var(--f-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
+            fontSize: 13,
             color: 'var(--gray)',
             cursor: 'pointer',
           }}
@@ -138,7 +280,7 @@ export function TasksScreen(): JSX.Element {
             data-testid="tasks-show-completed"
             checked={showCompleted}
             onChange={(event) => setShowCompleted(event.currentTarget.checked)}
-            style={{ accentColor: 'var(--gold)' }}
+            style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
           />
           Show completed
         </label>
@@ -152,28 +294,37 @@ export function TasksScreen(): JSX.Element {
             fontSize: 12,
             color: 'var(--rose)',
             letterSpacing: '0.08em',
+            margin: '0 0 16px 0',
+            padding: '8px 12px',
+            background: 'rgba(184,73,58,0.06)',
+            borderLeft: '2px solid var(--rose)',
+            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
           }}
         >
           {error}
         </p>
       )}
+
       {rows.length === 0 && !error && (
-        <Card>
-          <p
-            data-testid="tasks-empty"
-            style={{
-              margin: 0,
-              fontFamily: 'var(--f-display)',
-              fontStyle: 'italic',
-              fontSize: '1.125rem',
-              color: 'var(--gray)',
-              textAlign: 'center',
-            }}
-          >
-            No tasks yet.
-          </p>
-        </Card>
+        <div
+          data-testid="tasks-empty"
+          style={{
+            padding: '56px 32px',
+            textAlign: 'center',
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            fontSize: '1.125rem',
+            color: 'var(--gray)',
+          }}
+        >
+          {source === 'todoist' && !todoistConnected
+            ? 'Connect Todoist in Settings → Integrations to see tasks here.'
+            : source === 'aria'
+              ? 'No meeting actions yet. Paste a transcript in Meetings to extract some.'
+              : 'No tasks yet.'}
+        </div>
       )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {rows.map((task) => (
           <TaskRow key={task.id} task={task} />
@@ -181,20 +332,4 @@ export function TasksScreen(): JSX.Element {
       </div>
     </section>
   );
-}
-
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    fontFamily: 'var(--f-mono)',
-    fontSize: 11,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    padding: '6px 14px',
-    borderRadius: 999,
-    border: `1px solid ${active ? 'var(--gold)' : 'var(--rule-strong)'}`,
-    background: active ? 'rgba(184,134,11,0.10)' : 'var(--paper)',
-    color: active ? 'var(--gold-deep)' : 'var(--gray)',
-    cursor: 'pointer',
-    transition: 'all var(--t)',
-  };
 }

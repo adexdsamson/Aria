@@ -167,6 +167,19 @@ export function InlineApprovalsPreview(): JSX.Element | null {
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {r.subject ?? '(no subject)'}
             </span>
+            <span
+              aria-hidden="true"
+              style={{
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                color: 'var(--gray-soft)',
+                whiteSpace: 'nowrap',
+                marginLeft: 'auto',
+              }}
+            >
+              {r.kind.replace('_', ' ')}
+            </span>
           </li>
         ))}
       </ul>

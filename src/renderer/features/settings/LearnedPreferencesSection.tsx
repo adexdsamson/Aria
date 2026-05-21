@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DisconnectConfirmDialog } from '../../components/DisconnectConfirmDialog';
 import type { LearnedPreferencesDto, LearningSignalDto } from '../../../shared/ipc-contract';
+import { SkeletonRoot, SkeletonLine } from '../../components/Skeleton';
 
 interface PrefsRow {
   preferences: LearnedPreferencesDto;
@@ -71,8 +72,35 @@ export function LearnedPreferencesSection(): JSX.Element {
 
   if (!row) {
     return (
-      <section data-testid="settings-learned-preferences" style={{ padding: 'var(--aria-space-xl)' }}>
-        <p>Loading…</p>
+      <section
+        data-testid="settings-learned-preferences"
+        style={{ padding: '32px 40px', maxWidth: '52rem' }}
+      >
+        <SkeletonRoot style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <SkeletonLine width={140} height={10} style={{ marginBottom: 12 }} />
+          <SkeletonLine width="55%" height={30} style={{ marginBottom: 18, borderRadius: 5 }} />
+          <SkeletonLine width="70%" height={13} style={{ marginBottom: 32 }} />
+          {FIELDS.map((f, i) => (
+            <div
+              key={f.path}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: 14,
+                alignItems: 'center',
+                padding: '16px 8px',
+                borderTop: '1px solid var(--rule)',
+                borderBottom: i === FIELDS.length - 1 ? '1px solid var(--rule)' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <SkeletonLine width={`${40 + (i % 3) * 12}%`} height={13} />
+                <SkeletonLine width={`${25 + (i % 2) * 15}%`} height={10} />
+              </div>
+              <SkeletonLine width={44} height={24} style={{ borderRadius: 4 }} />
+            </div>
+          ))}
+        </SkeletonRoot>
       </section>
     );
   }
@@ -80,99 +108,190 @@ export function LearnedPreferencesSection(): JSX.Element {
   return (
     <section
       data-testid="settings-learned-preferences"
-      style={{ padding: 32, maxWidth: '64rem', margin: '0 auto', background: 'var(--paper)', color: 'var(--ink)' }}
+      style={{
+        padding: '32px 40px 80px',
+        maxWidth: '64rem',
+        margin: '0 auto',
+        background: 'var(--paper)',
+        color: 'var(--ink)',
+        minHeight: '100%',
+      }}
     >
       <div
         style={{
           fontFamily: 'var(--f-mono)',
           fontSize: 10,
+          fontWeight: 500,
           letterSpacing: '0.2em',
           textTransform: 'uppercase',
           color: 'var(--gold)',
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
-        Settings · Behaviour
+        SETTINGS · LEARNING
       </div>
-      <header
+      <h2
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontSize: 30,
+          fontWeight: 500,
+          letterSpacing: '-0.02em',
+          color: 'var(--ink)',
+          margin: 0,
+          marginBottom: 14,
+          lineHeight: 1.05,
+        }}
+      >
+        What Aria has learned
+      </h2>
+      <p
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontStyle: 'italic',
+          fontSize: 15,
+          color: 'var(--ink-soft)',
+          margin: '0 0 30px 0',
+          maxWidth: '54em',
+          lineHeight: 1.6,
+        }}
+      >
+        Last updated {row.lastUpdatedAt ?? 'never'} · {row.signalsCount} signals seen · nothing
+        leaves this device.
+      </p>
+
+      {/* Tabs + reset-all */}
+      <div
         style={{
           display: 'flex',
-          alignItems: 'baseline',
-          gap: 16,
-          marginBottom: 16,
-          borderBottom: '1px solid var(--rule)',
-          paddingBottom: 12,
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 18,
+          flexWrap: 'wrap',
         }}
       >
-        <h2
-          style={{
-            fontFamily: 'var(--f-display)',
-            fontSize: 28,
-            fontWeight: 500,
-            letterSpacing: '-0.01em',
-            color: 'var(--ink)',
-            margin: 0,
-          }}
-        >
-          Learned Preferences
-        </h2>
-        <span style={{ fontSize: 13, color: '#6b7280' }}>
-          Last updated: {row.lastUpdatedAt ?? 'never'} · signals seen: {row.signalsCount}
-        </span>
         <button
           type="button"
           data-testid="learn-view-toggle"
-          onClick={() => setView((v) => (v === 'prefs' ? 'signal-log' : 'prefs'))}
-          style={{ marginLeft: 'auto' }}
+          onClick={() => setView('prefs')}
+          aria-pressed={view === 'prefs'}
+          style={tabPill(view === 'prefs')}
         >
-          {view === 'prefs' ? 'View signal log' : 'Back to preferences'}
+          PREFERENCES
         </button>
-      </header>
+        <button
+          type="button"
+          onClick={() => setView('signal-log')}
+          aria-pressed={view === 'signal-log'}
+          style={tabPill(view === 'signal-log')}
+        >
+          SIGNAL LOG
+        </button>
+        <span style={{ flex: 1 }} />
+        {view === 'prefs' && (
+          <button
+            type="button"
+            data-testid="learn-reset-all"
+            onClick={() => setResetAllConfirm(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 12px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'var(--f-mono)',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+              transition: 'color 180ms ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--rose)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--gray)')}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+            Reset all
+          </button>
+        )}
+      </div>
 
       {view === 'prefs' ? (
-        <div>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {FIELDS.map((f) => {
-              const v = pickValue(row.preferences, f.path);
-              return (
-                <li
-                  key={f.path}
-                  data-testid={`learn-field-${f.path}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '8px 0',
-                    borderBottom: '1px solid #e5e7eb',
-                  }}
-                >
-                  <span style={{ flex: 1 }}>
-                    <strong>{f.label}</strong>:{' '}
-                    <code style={{ fontSize: 12, color: '#4b5563' }}>
-                      {JSON.stringify(v)}
-                    </code>
-                  </span>
-                  <button
-                    type="button"
-                    data-testid={`learn-reset-${f.path}`}
-                    onClick={() => setPendingField(f.path)}
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {FIELDS.map((f, i) => {
+            const v = pickValue(row.preferences, f.path);
+            const formatted = JSON.stringify(v);
+            const isLong = formatted.length > 60;
+            return (
+              <li
+                key={f.path}
+                data-testid={`learn-field-${f.path}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 14,
+                  alignItems: 'center',
+                  padding: '16px 8px',
+                  borderTop: '1px solid var(--rule)',
+                  borderBottom: i === FIELDS.length - 1 ? '1px solid var(--rule)' : 'none',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--f-body)',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--ink)',
+                      lineHeight: 1.3,
+                      marginBottom: 4,
+                    }}
                   >
-                    Reset
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <div style={{ marginTop: 16 }}>
-            <button
-              type="button"
-              data-testid="learn-reset-all"
-              onClick={() => setResetAllConfirm(true)}
-              style={{ background: '#dc2626', color: '#fff', padding: '6px 12px', borderRadius: 4 }}
-            >
-              Reset all preferences
-            </button>
-          </div>
-        </div>
+                    {f.label}
+                  </div>
+                  <code
+                    style={{
+                      display: isLong ? 'block' : 'inline-block',
+                      fontFamily: 'var(--f-mono)',
+                      fontSize: 12,
+                      color: 'var(--gray)',
+                      letterSpacing: '0.02em',
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {formatted}
+                  </code>
+                </div>
+                <button
+                  type="button"
+                  data-testid={`learn-reset-${f.path}`}
+                  onClick={() => setPendingField(f.path)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--f-mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'var(--gray)',
+                    transition: 'color 180ms ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--rose)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--gray)')}
+                >
+                  Reset
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
         <SignalLogPanel />
       )}
@@ -199,6 +318,28 @@ export function LearnedPreferencesSection(): JSX.Element {
   );
 }
 
+const TH_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--f-mono)',
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-soft)',
+  padding: '0 16px 10px 0',
+  borderBottom: '1px solid var(--rule)',
+  textAlign: 'left',
+  whiteSpace: 'nowrap',
+};
+
+const TD_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--f-mono)',
+  fontSize: 12,
+  color: 'var(--ink)',
+  padding: '12px 16px 12px 0',
+  borderBottom: '1px solid var(--rule)',
+  verticalAlign: 'middle',
+};
+
 function SignalLogPanel(): JSX.Element {
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<LearningSignalDto[]>([]);
@@ -215,37 +356,91 @@ function SignalLogPanel(): JSX.Element {
 
   return (
     <div data-testid="learn-signal-log">
-      <p style={{ fontSize: 12, color: '#6b7280' }}>
-        Read-only. Signals never leave your device.
-      </p>
-      <table style={{ width: '100%', fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            <th align="left">When</th>
-            <th align="left">Source</th>
-            <th align="left">Kind</th>
-            <th align="left">Payload (redacted)</th>
+            <th style={TH_STYLE}>WHEN</th>
+            <th style={TH_STYLE}>SOURCE</th>
+            <th style={TH_STYLE}>KIND</th>
+            <th style={TH_STYLE}>PAYLOAD</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} data-testid={`signal-row-${r.id}`}>
-              <td>{r.occurredAt}</td>
-              <td>{r.source}</td>
-              <td>{r.kind}</td>
-              <td><code style={{ fontSize: 11 }}>{JSON.stringify(r.payload)}</code></td>
+              <td style={{ ...TD_STYLE, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{r.occurredAt}</td>
+              <td style={TD_STYLE}>{r.source}</td>
+              <td style={TD_STYLE}>
+                <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{r.kind}</span>
+              </td>
+              <td style={{ ...TD_STYLE, color: 'var(--ink-soft)' }}>
+                <code style={{ fontSize: 11, letterSpacing: '0.01em' }}>{JSON.stringify(r.payload)}</code>
+              </td>
             </tr>
           ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={4} style={{ ...TD_STYLE, color: 'var(--ink-soft)', fontStyle: 'italic', paddingTop: 24 }}>
+                No signals recorded yet.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-          Prev
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button
+          type="button"
+          disabled={page === 0}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          style={paginationPill(page === 0)}
+        >
+          ← Prev
         </button>
-        <button type="button" disabled={rows.length < limit} onClick={() => setPage((p) => p + 1)}>
-          Next
+        <button
+          type="button"
+          disabled={rows.length < limit}
+          onClick={() => setPage((p) => p + 1)}
+          style={paginationPill(rows.length < limit)}
+        >
+          Next →
         </button>
       </div>
     </div>
   );
+}
+
+function paginationPill(disabled: boolean): React.CSSProperties {
+  return {
+    padding: '5px 12px',
+    fontFamily: 'var(--f-mono)',
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: disabled ? 'var(--ink-soft)' : 'var(--ink)',
+    background: 'transparent',
+    border: `1px solid ${disabled ? 'var(--rule)' : 'var(--rule-strong)'}`,
+    borderRadius: 'var(--radius-sm)',
+    cursor: disabled ? 'default' : 'pointer',
+    opacity: disabled ? 0.4 : 1,
+    transition: 'opacity 180ms ease',
+  };
+}
+
+function tabPill(active: boolean): React.CSSProperties {
+  return {
+    padding: '6px 14px',
+    fontFamily: 'var(--f-mono)',
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: active ? 'var(--paper)' : 'var(--ink-soft)',
+    background: active ? 'var(--ink)' : 'var(--paper)',
+    border: `1px solid ${active ? 'var(--ink)' : 'var(--rule-strong)'}`,
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    transition:
+      'background 180ms ease, color 180ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1)',
+  };
 }

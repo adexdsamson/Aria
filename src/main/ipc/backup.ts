@@ -11,6 +11,7 @@
 import { dialog, type IpcMain } from 'electron';
 import type { Logger } from 'pino';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { CHANNELS } from '../../shared/ipc-contract';
 import { createBackup, BackupOverwriteError } from '../db/backup';
 import { restoreBackup, RestoreInvalidError } from '../db/restore';
@@ -31,6 +32,35 @@ function isoStamp(): string {
 
 export function registerBackupHandlers(ipcMain: IpcMain, deps: BackupDeps): void {
   const { logger, dataDir, dbHolder } = deps;
+
+  ipcMain.handle(CHANNELS.BACKUP_STATS, async () => {
+    const dbPath = path.join(dataDir, 'aria.db');
+    let dbSizeBytes = 0;
+    try { dbSizeBytes = fs.statSync(dbPath).size; } catch { /* no db yet */ }
+
+    const backupsDir = path.join(dataDir, 'backups');
+    let lastBackupName: string | null = null;
+    let lastBackupAt: string | null = null;
+    try {
+      const candidates = [dataDir, backupsDir]
+        .flatMap(dir => {
+          try { return fs.readdirSync(dir).map(f => ({ dir, f })); } catch { return []; }
+        })
+        .filter(({ f }) => f.endsWith('.ariabackup') || f.endsWith('.db'))
+        .map(({ dir, f }) => ({ f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      if (candidates[0]) {
+        lastBackupName = candidates[0].f;
+        lastBackupAt = new Date(candidates[0].mtime).toISOString();
+      }
+    } catch { /* ignore */ }
+
+    const schemaVersion = dbHolder.db
+      ? (() => { try { return (dbHolder.db!.prepare('PRAGMA user_version').get() as { user_version: number }).user_version; } catch { return null; } })()
+      : null;
+
+    return { dbSizeBytes, lastBackupName, lastBackupAt, schemaVersion };
+  });
 
   ipcMain.handle(CHANNELS.BACKUP_CREATE, async (_e, req?: unknown) => {
     const r = (req as { destination?: string } | undefined) ?? {};

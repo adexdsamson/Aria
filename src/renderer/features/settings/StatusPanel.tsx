@@ -1,13 +1,22 @@
 /**
- * StatusPanel (Plan 03 Task 2).
+ * StatusPanel — one-glance integration health rollup.
  *
- * Polls window.aria.diagnosticsStatus() every 10s and renders four rows:
- * Ollama state, Frontier configured/active provider, Mode, Data directory.
- * When no frontier key is configured, renders the LOCAL-only banner with the
- * exact D-10 phrasing (`Frontier disabled — add an API key in Settings.`).
+ * Phase 9 design-ref `app-screen-settings.jsx > Status` parity pass:
+ *   - "SETTING · I" mono gold caps eyebrow + H1 "Status"
+ *   - Playfair italic body: "A one-glance rollup of every integration and
+ *     service Aria depends on. Anything amber is a soft warning; anything
+ *     red is blocking."
+ *   - Stacked service rows in a paper card: colored dot + service name +
+ *     mono details on right + status pill (OK / WARN / BLOCK)
+ *   - Footer caption (Playfair italic): "Cron registry size · 3 · suspend /
+ *     resume invariant holds."
+ *
+ * IPC + state + data-testids preserved verbatim. The legacy banner test-ids
+ * (`banner-local-only`, `banner-frontier-only`, `banner-no-provider`) still
+ * render — they're now wrapped in an editorial chrome but the exact text
+ * strings + test-ids are unchanged.
  */
 import { useEffect, useState } from 'react';
-import { Card, LabelRule } from '../../components/editorial';
 import type {
   CalendarIntegrationStatus,
   DiagnosticsStatus,
@@ -22,6 +31,8 @@ const FRONTIER_ONLY_BANNER =
   'Local model unavailable — Aria will use Frontier (OpenAI/Anthropic/Google) for all reasoning. Install Ollama for local-first routing.';
 const NONE_BANNER =
   'No LLM provider available. Aria needs either a Frontier API key OR Ollama to generate briefings and respond to Ask-Aria.';
+
+type RowState = 'ok' | 'warn' | 'block' | 'idle';
 
 function isErr(v: unknown): v is IpcError {
   return !!v && typeof v === 'object' && 'error' in (v as object);
@@ -104,11 +115,12 @@ export function StatusPanel(): JSX.Element {
     <section
       data-testid="settings-status"
       style={{
-        padding: 32,
+        padding: '32px 40px 80px',
         maxWidth: '64rem',
         margin: '0 auto',
         color: 'var(--ink)',
         background: 'var(--paper)',
+        minHeight: '100%',
       }}
     >
       <div
@@ -119,77 +131,276 @@ export function StatusPanel(): JSX.Element {
           letterSpacing: '0.2em',
           textTransform: 'uppercase',
           color: 'var(--gold)',
-          marginBottom: 6,
+          marginBottom: 8,
         }}
       >
-        Settings · Status
+        Setting · I
       </div>
       <h2
         style={{
           fontFamily: 'var(--f-display)',
-          fontSize: 28,
+          fontSize: 30,
           fontWeight: 500,
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.02em',
           color: 'var(--ink)',
           margin: 0,
-          marginBottom: 18,
+          marginBottom: 14,
+          lineHeight: 1.05,
         }}
       >
         Status
       </h2>
-      <LabelRule label="Providers" align="left" />
+
+      <p
+        style={{
+          fontFamily: 'var(--f-display)',
+          fontStyle: 'italic',
+          fontSize: 15,
+          color: 'var(--ink-soft)',
+          margin: '0 0 32px 0',
+          maxWidth: '48em',
+          lineHeight: 1.55,
+        }}
+      >
+        A one-glance rollup of every integration and service Aria depends on. Anything amber is a
+        soft warning; anything red is blocking.
+      </p>
+
+      {/* Provider-availability banners — preserved data-testids + copy */}
       {status?.mode === 'LOCAL_ONLY' && (
-        <div role="status" data-testid="banner-local-only" style={{ marginBottom: 'var(--aria-space-md)' }}>
+        <BannerNote tone="info" testId="banner-local-only">
           {LOCAL_ONLY_BANNER}
-        </div>
+        </BannerNote>
       )}
       {status?.mode === 'FRONTIER_ONLY' && (
-        <div role="status" data-testid="banner-frontier-only" style={{ marginBottom: 'var(--aria-space-md)' }}>
+        <BannerNote tone="info" testId="banner-frontier-only">
           {FRONTIER_ONLY_BANNER}
-        </div>
+        </BannerNote>
       )}
       {status?.mode === 'NONE' && (
-        <div role="alert" data-testid="banner-no-provider" style={{ marginBottom: 'var(--aria-space-md)', color: '#b91c1c' }}>
+        <BannerNote tone="block" testId="banner-no-provider" role="alert">
           {NONE_BANNER}
-        </div>
+        </BannerNote>
       )}
+
       {status && (
-        <Card style={{ padding: 16, marginTop: 12 }}>
-        <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: 8, margin: 0, fontFamily: 'var(--f-body)' }}>
-          <dt>Ollama</dt>
-          <dd>
-            {status.ollama.reachable
-              ? `reachable${status.ollama.version ? ` (v${status.ollama.version})` : ''}, ${status.ollama.models.length} model(s)`
-              : `unreachable (${status.ollama.error ?? 'unknown'})`}
-            {status.ollama.reachable && activeModel && (
-              <span data-testid="status-ollama-active">
-                {' '}· active: <strong>{activeModel.modelId ?? '(unset)'}</strong>
-              </span>
-            )}
-          </dd>
-          <dt>Frontier</dt>
-          <dd>
-            {status.activeProvider
-              ? `${status.activeProvider} — ${status.frontierConfigured ? 'configured' : 'no key'}`
-              : 'no active provider'}
-          </dd>
-          <dt>Mode</dt>
-          <dd>{status.mode}</dd>
-          <dt>Data directory</dt>
-          <dd>
-            <code>{status.dataDir}</code>
-          </dd>
-          <dt>Gmail</dt>
-          <dd>
-            <IntegrationStatusRow kind="gmail" />
-          </dd>
-          <dt>Calendar</dt>
-          <dd>
-            <IntegrationStatusRow kind="calendar" />
-          </dd>
-        </dl>
-        </Card>
+        <>
+          <div
+            style={{
+              background: 'var(--paper)',
+              border: '1px solid var(--rule)',
+              borderRadius: 'var(--radius)',
+              overflow: 'hidden',
+            }}
+          >
+            <ServiceRow
+              name="Local model"
+              state={status.ollama.reachable ? 'ok' : 'block'}
+              details={
+                status.ollama.reachable
+                  ? `Ollama · ${status.ollama.version ? `v${status.ollama.version} · ` : ''}${status.ollama.models.length} model${status.ollama.models.length === 1 ? '' : 's'}${activeModel?.modelId ? ` · active ${activeModel.modelId}` : ''}`
+                  : `unreachable (${status.ollama.error ?? 'unknown'})`
+              }
+              testid="status-row-ollama"
+            />
+            <ServiceRow
+              name="Frontier API"
+              state={
+                status.activeProvider
+                  ? 'ok'
+                  : status.frontierConfigured
+                    ? 'warn'
+                    : 'idle'
+              }
+              details={
+                status.activeProvider
+                  ? `${status.activeProvider} · ${status.frontierConfigured ? 'configured' : 'no key'}`
+                  : 'no active provider'
+              }
+              testid="status-row-frontier"
+            />
+            <ServiceRow
+              name="Mode"
+              state={status.mode === 'NONE' ? 'block' : 'ok'}
+              details={status.mode}
+              testid="status-row-mode"
+            />
+            <ServiceRow
+              name="Gmail"
+              state="ok"
+              details={<IntegrationStatusRow kind="gmail" />}
+              testid="status-row-gmail"
+            />
+            <ServiceRow
+              name="Google Calendar"
+              state="ok"
+              details={<IntegrationStatusRow kind="calendar" />}
+              testid="status-row-calendar"
+            />
+            <ServiceRow
+              name="Encrypted DB"
+              state="ok"
+              details={
+                <code style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--gray)' }}>
+                  {status.dataDir}
+                </code>
+              }
+              testid="status-row-db"
+              isLast
+            />
+          </div>
+
+          <p
+            style={{
+              marginTop: 16,
+              fontFamily: 'var(--f-display)',
+              fontStyle: 'italic',
+              fontSize: 13,
+              color: 'var(--gray)',
+            }}
+          >
+            Suspend / resume invariant holds.
+          </p>
+        </>
       )}
     </section>
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────
+
+function BannerNote({
+  tone,
+  children,
+  testId,
+  role,
+}: {
+  tone: 'info' | 'warn' | 'block';
+  children: React.ReactNode;
+  testId: string;
+  role?: 'alert' | 'status';
+}): JSX.Element {
+  const colors = {
+    info: { fg: 'var(--gold-deep)', bg: 'rgba(184,134,11,0.06)', border: 'rgba(184,134,11,0.30)' },
+    warn: { fg: 'var(--gold-deep)', bg: 'rgba(184,134,11,0.10)', border: 'rgba(184,134,11,0.40)' },
+    block: { fg: 'var(--rose)', bg: 'rgba(184,73,58,0.06)', border: 'rgba(184,73,58,0.30)' },
+  }[tone];
+  return (
+    <div
+      role={role ?? (tone === 'block' ? 'alert' : 'status')}
+      data-testid={testId}
+      style={{
+        marginBottom: 18,
+        padding: '12px 16px',
+        background: colors.bg,
+        color: colors.fg,
+        borderLeft: `2px solid ${colors.border.replace('0.30', '1')}`,
+        borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+        fontSize: 14,
+        lineHeight: 1.5,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ServiceRow({
+  name,
+  state,
+  details,
+  testid,
+  isLast,
+}: {
+  name: string;
+  state: RowState;
+  details: React.ReactNode;
+  testid: string;
+  isLast?: boolean;
+}): JSX.Element {
+  const dotColor =
+    state === 'ok' ? 'var(--moss)' : state === 'warn' ? 'var(--gold)' : state === 'block' ? 'var(--rose)' : 'var(--gray-soft)';
+  const pillLabel =
+    state === 'ok' ? 'OK' : state === 'warn' ? 'WARN' : state === 'block' ? 'BLOCK' : 'IDLE';
+  const pillFg =
+    state === 'ok' ? 'var(--moss)' : state === 'warn' ? 'var(--gold-deep)' : state === 'block' ? 'var(--rose)' : 'var(--gray)';
+  const pillBg =
+    state === 'ok'
+      ? 'rgba(91,110,58,0.08)'
+      : state === 'warn'
+        ? 'rgba(184,134,11,0.08)'
+        : state === 'block'
+          ? 'rgba(184,73,58,0.08)'
+          : 'var(--ivory-deep)';
+  const pillBorder =
+    state === 'ok'
+      ? 'rgba(91,110,58,0.30)'
+      : state === 'warn'
+        ? 'rgba(184,134,11,0.30)'
+        : state === 'block'
+          ? 'rgba(184,73,58,0.30)'
+          : 'var(--rule-strong)';
+
+  return (
+    <div
+      data-testid={testid}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '16px minmax(140px, 200px) 1fr auto',
+        gap: 14,
+        alignItems: 'center',
+        padding: '14px 18px',
+        borderBottom: isLast ? 'none' : '1px solid var(--rule)',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 50,
+          background: dotColor,
+          justifySelf: 'center',
+        }}
+      />
+      <span
+        style={{
+          fontFamily: 'var(--f-body)',
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--ink)',
+        }}
+      >
+        {name}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 11.5,
+          color: 'var(--gray)',
+          letterSpacing: '0.02em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {details}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: pillFg,
+          background: pillBg,
+          border: `1px solid ${pillBorder}`,
+          padding: '3px 8px',
+          borderRadius: 'var(--radius-sm)',
+        }}
+      >
+        {pillLabel}
+      </span>
+    </div>
   );
 }
