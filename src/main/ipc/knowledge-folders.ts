@@ -1,9 +1,9 @@
 /**
- * Plan 10-01 Task 4 — Knowledge Folders IPC.
+ * Plan 10-01 Task 4 / Plan 10-02 Task 1 — Knowledge Folders IPC.
  *
- * Registers 7 channels. The set-sensitivity channel is intentionally deferred
- * to plan 10-02 to avoid an intermediate-state hole where the channel exists
- * but doesn't flip chunk-row sensitivity.
+ * Registers 8 channels (7 from plan 10-01 + aria:knowledge:set-sensitivity
+ * added in plan 10-02 alongside the chunk-bulk-flip — no intermediate-state
+ * hole).
  */
 import type { IpcMain, Dialog } from 'electron';
 import type { Logger } from 'pino';
@@ -11,6 +11,8 @@ import { CHANNELS } from '../../shared/ipc-contract';
 import type { FolderRegistry } from '../folder-ingestion/folder-registry';
 import type { FolderIngestionService } from '../folder-ingestion/ingestion-service';
 import { prescanFolder } from '../folder-ingestion/prescan';
+import { flipFolderSensitivity } from '../folder-ingestion/folder-flip';
+import type Database from 'better-sqlite3-multiple-ciphers';
 
 const FILE_COUNT_THRESHOLD = 5000;
 const BYTES_THRESHOLD = 2 * 1024 * 1024 * 1024; // 2 GB
@@ -21,10 +23,11 @@ export interface KnowledgeFolderIpcDeps {
   ingestionService: FolderIngestionService;
   dialog: Pick<Dialog, 'showOpenDialog'>;
   logger: Logger;
+  db: Database.Database;
 }
 
 export function registerKnowledgeFolderIpc(deps: KnowledgeFolderIpcDeps): void {
-  const { ipcMain, registry, ingestionService, dialog, logger } = deps;
+  const { ipcMain, registry, ingestionService, dialog, logger, db } = deps;
 
   // aria:knowledge:pick-folder
   ipcMain.handle(CHANNELS.KNOWLEDGE_PICK_FOLDER, async () => {
@@ -125,4 +128,21 @@ export function registerKnowledgeFolderIpc(deps: KnowledgeFolderIpcDeps): void {
     });
     return { ok: true };
   });
+
+  // aria:knowledge:set-sensitivity (Plan 10-02 — shipped together with chunk-bulk-flip)
+  ipcMain.handle(
+    CHANNELS.KNOWLEDGE_SET_SENSITIVITY,
+    async (_event, req: { folderId: string; sensitivity: 'general' | 'sensitive' }) => {
+      const { folderUpdated, chunksUpdated } = flipFolderSensitivity(db, req.folderId, req.sensitivity);
+      logger.info({
+        scope: 'knowledge-ipc',
+        event: 'set_sensitivity',
+        folderId: req.folderId,
+        sensitivity: req.sensitivity,
+        folderUpdated,
+        chunksUpdated,
+      });
+      return { ok: true, folderUpdated, chunksUpdated };
+    },
+  );
 }
