@@ -5,9 +5,15 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
+# Allow the workflow to create releases and upload assets
+permissions:
+  contents: write
+
 jobs:
   build-win:
     runs-on: windows-latest
+    outputs:
+      exe_name: ${{ steps.find_exe.outputs.exe_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,15 +29,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
-          # Skip dual-build in CI — electron-builder handles native rebuild
           SKIP_DUAL_BUILD: '1'
 
       - name: Build (vite)
         run: pnpm run build
 
       - name: Package Windows installer
-        # electron-builder internally runs @electron/rebuild for native deps
         run: npx electron-builder --win nsis --publish never
+
+      - name: Find installer filename
+        id: find_exe
+        shell: bash
+        run: echo "exe_name=$(ls dist/*.exe | head -1 | xargs basename)" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
@@ -41,6 +50,8 @@ jobs:
 
   build-mac:
     runs-on: macos-latest
+    outputs:
+      dmg_name: ${{ steps.find_dmg.outputs.dmg_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,14 +72,54 @@ jobs:
       - name: Build (vite)
         run: pnpm run build
 
-      - name: Package macOS DMG (unsigned, no notarize)
+      - name: Package macOS DMG (unsigned)
         run: npx electron-builder --mac dmg --publish never
         env:
-          # Disable notarization — no Apple certs needed for test builds
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Find DMG filename
+        id: find_dmg
+        run: echo "dmg_name=$(ls dist/*.dmg | head -1 | xargs basename)" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
           name: mac-dmg
           path: dist/*.dmg
           retention-days: 14
+
+  release:
+    needs: [build-win, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-dmg
+          path: dist/
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Create or update pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-${{ steps.sha.outputs.short }}
+          name: "Dev build ${{ steps.sha.outputs.short }}"
+          body: |
+            **Test build** — not signed or notarized.
+
+            | Platform | Notes |
+            |---|---|
+            | Windows | May show SmartScreen warning — click "More info → Run anyway" |
+            | macOS | Right-click the app → Open to bypass Gatekeeper on first launch |
+
+            Commit: ${{ github.sha }}
+          prerelease: true
+          files: dist/*
