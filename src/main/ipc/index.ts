@@ -58,6 +58,7 @@ import {
   makeRendererEmitter,
 } from './entitlement';
 import { registerKnowledgeFolderIpc } from './knowledge-folders';
+import { registerResearchHandlers } from './research';
 import { createFolderRegistry } from '../folder-ingestion/folder-registry';
 import { createFolderIngestionService } from '../folder-ingestion/ingestion-service';
 import { PARSERS } from '../folder-ingestion/parsers/index';
@@ -500,8 +501,39 @@ export function registerHandlers(
     CHANNELS.TRANSCRIPT_GET_REVIEW,
   ];
   if (!transcriptChannels.every((c) => skip.has(c))) {
-    registerTranscriptHandlers(ipcMain, { logger, dbHolder });
+    registerTranscriptHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      emitToRenderer: makeRendererEmitter(deps.mainWindow ?? null),
+    });
     transcriptChannels.forEach((c) => skip.add(c));
+  }
+
+  // Phase 11 Research channels (12 job/report/feedback + 2 secrets).
+  const researchChannels = [
+    CHANNELS.RESEARCH_JOB_CREATE,
+    CHANNELS.RESEARCH_JOB_LIST,
+    CHANNELS.RESEARCH_JOB_GET,
+    CHANNELS.RESEARCH_JOB_UPDATE,
+    CHANNELS.RESEARCH_JOB_DELETE,
+    CHANNELS.RESEARCH_JOB_RUN,
+    CHANNELS.RESEARCH_REPORT_GET,
+    CHANNELS.RESEARCH_REPORT_LIST,
+    CHANNELS.RESEARCH_FEEDBACK_SAVE,
+    CHANNELS.RESEARCH_SUGGESTIONS_GET,
+    CHANNELS.RESEARCH_SUGGESTION_APPROVE,
+    CHANNELS.RESEARCH_SUGGESTION_DISMISS,
+    CHANNELS.RESEARCH_SECRETS_SET,
+    CHANNELS.RESEARCH_SECRETS_HAS,
+  ];
+  if (!researchChannels.every((c) => skip.has(c))) {
+    registerResearchHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      scheduler: getScheduler(),
+      emitToRenderer: makeRendererEmitter(deps.mainWindow ?? null),
+    });
+    researchChannels.forEach((c) => skip.add(c));
   }
 }
 
