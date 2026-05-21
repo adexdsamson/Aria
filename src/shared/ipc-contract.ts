@@ -147,6 +147,21 @@ export const CHANNELS = {
   ENTITLEMENT_OPEN_PORTAL: 'aria:entitlement:open-portal',
   ENTITLEMENT_REFRESH_NOW: 'aria:entitlement:refresh-now',
   ENTITLEMENT_STATE_CHANGED: 'aria:entitlement:state-changed', // event
+  // Phase 11 Research
+  RESEARCH_JOB_CREATE: 'aria:research:job-create',
+  RESEARCH_JOB_LIST: 'aria:research:job-list',
+  RESEARCH_JOB_GET: 'aria:research:job-get',
+  RESEARCH_JOB_UPDATE: 'aria:research:job-update',
+  RESEARCH_JOB_DELETE: 'aria:research:job-delete',
+  RESEARCH_JOB_RUN: 'aria:research:job-run',
+  RESEARCH_REPORT_GET: 'aria:research:report-get',
+  RESEARCH_REPORT_LIST: 'aria:research:report-list',
+  RESEARCH_FEEDBACK_SAVE: 'aria:research:feedback-save',
+  RESEARCH_SUGGESTIONS_GET: 'aria:research:suggestions-get',
+  RESEARCH_SUGGESTION_APPROVE: 'aria:research:suggestion-approve',
+  RESEARCH_SUGGESTION_DISMISS: 'aria:research:suggestion-dismiss',
+  // Push event (ipcRenderer.on):
+  RESEARCH_REPORT_DONE: 'aria:research:report-done',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -978,6 +993,22 @@ export interface AriaApi {
    * still wires this name; preload patches it to register a listener.
    */
   entitlementOnStateChanged(): Promise<{ ok: true } | IpcError>;
+
+  // Phase 11 Research
+  researchJobCreate(req: unknown): Promise<{ job: ResearchJobDto } | IpcError>;
+  researchJobList(req: unknown): Promise<{ jobs: ResearchJobDto[] } | IpcError>;
+  researchJobGet(req: { id: string }): Promise<{ job: ResearchJobDto | null } | IpcError>;
+  researchJobUpdate(req: unknown): Promise<{ ok: true } | IpcError>;
+  researchJobDelete(req: { id: string }): Promise<{ ok: true } | IpcError>;
+  researchJobRun(req: { jobId: string; feedbackContext?: string }): Promise<{ ok: true; reportId: string } | IpcError>;
+  researchReportGet(req: { reportId: string }): Promise<{ report: ResearchReportDto | null } | IpcError>;
+  researchReportList(req: { jobId: string }): Promise<{ reports: ResearchReportDto[] } | IpcError>;
+  researchFeedbackSave(req: { reportId: string; sectionId: string | null; thumb: 1 | -1 | null; note: string | null }): Promise<{ ok: true } | IpcError>;
+  researchSuggestionsGet(req: unknown): Promise<{ jobs: ResearchJobDto[] } | IpcError>;
+  researchSuggestionApprove(req: { jobId: string }): Promise<{ ok: true } | IpcError>;
+  researchSuggestionDismiss(req: { jobId: string }): Promise<{ ok: true } | IpcError>;
+  /** Push event — registered via ipcRenderer.on, not invoke. */
+  researchReportDone(): Promise<{ ok: true } | IpcError>;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1341,6 +1372,20 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   ENTITLEMENT_OPEN_PORTAL: 'entitlementOpenPortal',
   ENTITLEMENT_REFRESH_NOW: 'entitlementRefreshNow',
   ENTITLEMENT_STATE_CHANGED: 'entitlementOnStateChanged',
+  // Phase 11 Research
+  RESEARCH_JOB_CREATE: 'researchJobCreate',
+  RESEARCH_JOB_LIST: 'researchJobList',
+  RESEARCH_JOB_GET: 'researchJobGet',
+  RESEARCH_JOB_UPDATE: 'researchJobUpdate',
+  RESEARCH_JOB_DELETE: 'researchJobDelete',
+  RESEARCH_JOB_RUN: 'researchJobRun',
+  RESEARCH_REPORT_GET: 'researchReportGet',
+  RESEARCH_REPORT_LIST: 'researchReportList',
+  RESEARCH_FEEDBACK_SAVE: 'researchFeedbackSave',
+  RESEARCH_SUGGESTIONS_GET: 'researchSuggestionsGet',
+  RESEARCH_SUGGESTION_APPROVE: 'researchSuggestionApprove',
+  RESEARCH_SUGGESTION_DISMISS: 'researchSuggestionDismiss',
+  RESEARCH_REPORT_DONE: 'researchReportDone',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1396,3 +1441,50 @@ export const EntitlementActivateResponse = _z_ent.union([
 export type EntitlementActivateResponse = _z_ent.infer<
   typeof EntitlementActivateResponse
 >;
+
+// ---------------------------------------------------------------------------
+// Phase 11 Research DTOs
+// ---------------------------------------------------------------------------
+
+export interface ResearchJobDto {
+  id: string;
+  title: string;
+  goals: string;
+  domains: string[];         // parsed from domains_json column
+  status: 'draft' | 'running' | 'done' | 'failed';
+  scheduleInterval: 'none' | 'daily' | 'weekly';
+  nextRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchReportDto {
+  id: string;
+  jobId: string;
+  version: number;
+  status: 'generating' | 'done' | 'failed';
+  trigger: 'manual' | 'schedule' | 'feedback_rerun';
+  summary: string | null;
+  confidenceScore: number | null;
+  errorMessage: string | null;
+  generatedAt: string | null;
+  sections: ResearchReportSectionDto[];
+}
+
+export interface ResearchReportSectionDto {
+  id: string;
+  reportId: string;
+  sectionType: string;         // 'findings' | 'sources' | 'metrics'
+  ordinal: number;
+  contentJson: string;         // raw JSON, parsed in renderer
+  feedback?: ResearchFeedbackDto | null;
+}
+
+export interface ResearchFeedbackDto {
+  id: string;
+  reportId: string;
+  sectionId: string | null;    // null = whole-report
+  thumb: 1 | -1 | null;
+  note: string | null;
+  createdAt: string;
+}

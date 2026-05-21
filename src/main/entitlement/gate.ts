@@ -31,7 +31,9 @@ export type EntitlementAction =
   | 'calendar_change'
   | 'task_push'
   | 'briefing_generate'
-  | 'rag_ask';
+  | 'rag_ask'
+  | 'research_create'
+  | 'research_run';
 
 export type EntitlementErrorCode =
   | 'no-entitlement'
