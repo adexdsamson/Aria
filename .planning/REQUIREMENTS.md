@@ -115,6 +115,17 @@
 - [ ] **XCUT-06**: Aria provides a status panel showing sync state, queue depth, last error per integration
 - [ ] **XCUT-07**: Aria respects user time zone correctly across all integrations
 
+### Research (RES)
+
+- [ ] **RES-01**: User can create a research job with title, goals, and domain tags
+- [ ] **RES-02**: Research job runs via Brave Search API + Exa (either alone is sufficient); Jina Reader fetches full page content from result URLs
+- [ ] **RES-03**: Research job can be scheduled for daily or weekly automatic refresh
+- [ ] **RES-04**: Aria auto-detects research topics from ingested meeting transcripts and surfaces them as draft suggestions (briefing notification + one-click approve)
+- [ ] **RES-05**: Research report renders in two switchable views: Document (sections + citations) and Dashboard (stat cards + coverage chart + findings grid)
+- [ ] **RES-06**: User can leave per-section feedback (thumbs up/down + free-text note)
+- [ ] **RES-07**: User can trigger a re-run incorporating consolidated feedback as prompt guidance; all report versions are preserved and navigable
+- [ ] **RES-08**: If no API key is configured, research job creation is blocked with a clear prompt to add keys in Settings
+
 ## v2 Requirements (Deferred)
 
 Per PROJECT.md - defer until v1 validates:
