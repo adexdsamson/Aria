@@ -17,9 +17,9 @@ Every downstream agent (researcher, planner) MUST read these before acting.
 - `.planning/phases/07-rag-qa/07-CONTEXT.md` — RAG pipeline + model-swap reconciler invariant
 - `.planning/phases/03-approval-queue/03-CONTEXT.md` — sensitivity router shape; per-call taint pattern
 - `.planning/phases/08-insights-recap-learning-release/08-CONTEXT.md` — 14-day hard gate (folder corpus does **not** count toward gate; see §decisions)
-- `src/main/services/rag/` — Phase 7 chunker, embedder, vector store (reuse)
+- `src/main/rag/` — Phase 7 chunker, embedder, vector store (reuse) — see `<schema_reconciliation>` for the canonical paths and hook-points
 - `src/main/db/migrations/` — confirm next migration number during planning
-- `src/main/services/sensitivity-router/` — Phase 3 gate (extend, do not duplicate)
+- `src/main/rag/answer-router.ts` — Phase 7 cached-sensitivity router; the hook-point for folder sensitivity is the `FORCE_LOCAL_PREFIXES` array literal (NOT `src/main/llm/router.ts`, which is the Phase 3 prompt router and is unrelated to retrieval-time routing)
 - `src/renderer/features/settings/RagIndexSection.tsx`, `IntegrationsSection.tsx`, `BackupRestoreSection.tsx` — editorial card pattern to mirror
 </canonical_refs>
 
@@ -102,17 +102,17 @@ Captured here so they don't get lost; **not** Phase 10 work:
 </deferred>
 
 <code_context>
-Reusable assets (from scout + memory):
+Reusable assets (from scout + memory). NOTE: the `<schema_reconciliation>` block below is canonical for paths; the entries here are quick orientation and use real paths.
 
-- **Phase 7 RAG pipeline** — `src/main/services/rag/` — chunker, Ollama embedder, vector store, RRF retrieval, model-swap reconciler. Folder ingestion plugs in at the chunk-write step; no new retrieval code.
-- **Phase 3 sensitivity router** — `src/main/services/sensitivity-router/` (or equivalent) — extend the gate function to consult `knowledge_folders.sensitivity` for any chunk with `corpus='folder'`.
+- **Phase 7 RAG pipeline** — `src/main/rag/` — chunker (`chunk-text.ts`, `chunk-strategies.ts`), Ollama embedder (`ollama-embeddings.ts`), vector store (`vector-store.ts`), index writer (`index-writer.ts`), RRF retrieval, model-swap reconciler (`model-swap-reconciler.ts`). Folder ingestion plugs in at the chunk-write step via `index-writer.ts`; no new retrieval code.
+- **Sensitivity routing hook-point** — `src/main/rag/answer-router.ts` is where retrieval-time sensitivity routing happens (reads cached `rag_chunk.sensitivity`); the extension point is the `FORCE_LOCAL_PREFIXES` literal. Note: `src/main/llm/router.ts` is the Phase 3 *prompt* router and is **NOT** the hook point for folder sensitivity — do not edit it for this phase.
 - **Phase 8 destructive-action confirm dialog** — already wired in Settings; reuse on Remove.
 - **`AddAccountModal`-style modal** — for the large-folder confirm + the sensitivity-on-add inline form.
 - **`RagIndexSection.tsx`** — closest visual analog for `KnowledgeFoldersSection.tsx`.
-- **Migration pattern** — `src/main/db/migrations/NNN-*.ts`; planner must grep the latest number, must not invent column names already present in `chunks`.
+- **Migration pattern** — `src/main/db/migrations/NNN_*.sql`; planner must grep the latest number, must not invent column names already present in `rag_chunk`.
 - **node-cron + p-queue + powerMonitor** — Phase 1 wiring; reuse for the 03:00 sweep + concurrency control + sleep/wake.
 
-Watch out for ([[feedback-plan-schema-invention]]): grep `chunks` schema before drafting the ALTER. Do not `CREATE TABLE IF NOT EXISTS` on existing shared tables.
+Watch out for ([[feedback-plan-schema-invention]]): grep `rag_chunk` schema before drafting the migration. Do not `CREATE TABLE IF NOT EXISTS` on existing shared tables.
 </code_context>
 
 <next_steps>
