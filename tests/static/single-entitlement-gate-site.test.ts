@@ -4,7 +4,7 @@
  * Mirrors the SHAPE of `tests/static/single-calendar-write-site.test.ts`.
  * Three guarantees:
  *
- *  1. Each of the 5 gated source files calls assertEntitled with the
+ *  1. Each of the 7 gated source files calls assertEntitled with the
  *     documented action literal (one per surface).
  *  2. No other file under src/main calls assertEntitled — this prevents future
  *     contributors from sprinkling the call as cosmetic decoration in places
@@ -32,6 +32,8 @@ const GATED_SITES = [
   },
   { file: 'src/main/briefing/generate.ts', action: 'briefing_generate' },
   { file: 'src/main/ipc/ask.ts', action: 'rag_ask' },
+  { file: 'src/main/ipc/research.ts', action: 'research_create' },
+  { file: 'src/main/ipc/research.ts', action: 'research_run' },
 ] as const;
 
 const ALLOWED_CALLERS = new Set(GATED_SITES.map((s) => abs(s.file)));
@@ -72,7 +74,7 @@ describe('XCUT-08 single entitlement-gate-site enforcer', () => {
     });
   }
 
-  it('no file under src/main outside the 5 gated sites calls assertEntitled', () => {
+  it('no file under src/main outside the 7 gated sites calls assertEntitled', () => {
     const files = walk(ROOT);
     const offenders: string[] = [];
     for (const f of files) {
@@ -87,7 +89,7 @@ describe('XCUT-08 single entitlement-gate-site enforcer', () => {
     }
     expect(
       offenders,
-      `assertEntitled called outside the 5 allowed sites: ${offenders.join(', ')}`,
+      `assertEntitled called outside the 7 allowed sites: ${offenders.join(', ')}`,
     ).toEqual([]);
   });
 

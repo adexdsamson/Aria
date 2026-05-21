@@ -197,6 +197,8 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
       <CalendarRow />
       <TodoistRow onProviderChanged={refreshAccounts} />
       <RagDisconnectedSection />
+      <ResearchApiKeyRow provider="brave" label="Research — Brave Search" />
+      <ResearchApiKeyRow provider="exa" label="Research — Exa" />
       {pendingDisconnect && (
         <DisconnectConfirmDialog
           provider={
@@ -689,6 +691,97 @@ function rowStyle(): React.CSSProperties {
     borderRadius: 6,
     marginBottom: 'var(--aria-space-md)',
   };
+}
+
+// ============================================================================
+// Research API key rows — Phase 11
+// ============================================================================
+
+function ResearchApiKeyRow({
+  provider,
+  label,
+}: {
+  provider: 'brave' | 'exa';
+  label: string;
+}): JSX.Element {
+  const [keyValue, setKeyValue] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function save(): Promise<void> {
+    if (!keyValue.trim()) return;
+    setBusy(true);
+    try {
+      await window.aria.researchSecretsSet({ provider, key: keyValue.trim() });
+      setSaved(true);
+      setKeyValue('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--rule)' }}>
+      <div
+        style={{
+          fontFamily: 'var(--f-mono)',
+          fontSize: 11,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--gray-soft)',
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          type="password"
+          value={keyValue}
+          onChange={(e) => { setKeyValue(e.target.value); setSaved(false); }}
+          placeholder="Paste API key…"
+          style={{
+            flex: 1,
+            fontFamily: 'var(--f-mono)',
+            fontSize: 13,
+            border: '1px solid var(--rule)',
+            borderRadius: 4,
+            padding: '7px 12px',
+            background: 'var(--bg)',
+            color: 'inherit',
+          }}
+        />
+        <button
+          onClick={() => void save()}
+          disabled={!keyValue.trim() || busy}
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 12,
+            background: keyValue.trim() ? 'var(--gold)' : 'var(--rule)',
+            color: keyValue.trim() ? 'var(--bg)' : 'var(--gray-soft)',
+            border: 'none',
+            borderRadius: 4,
+            padding: '7px 16px',
+            cursor: keyValue.trim() && !busy ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {busy ? 'Saving…' : 'Save key'}
+        </button>
+      </div>
+      {saved && (
+        <div
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 12,
+            color: '#27ae60',
+            marginTop: 6,
+          }}
+        >
+          Key saved
+        </div>
+      )}
+    </div>
+  );
 }
 
 function headerStyle(): React.CSSProperties {

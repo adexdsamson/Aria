@@ -162,6 +162,9 @@ export const CHANNELS = {
   RESEARCH_SUGGESTION_DISMISS: 'aria:research:suggestion-dismiss',
   // Push event (ipcRenderer.on):
   RESEARCH_REPORT_DONE: 'aria:research:report-done',
+  // Research secrets
+  RESEARCH_SECRETS_SET: 'aria:research:secrets-set',
+  RESEARCH_SECRETS_HAS: 'aria:research:secrets-has',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -1009,6 +1012,11 @@ export interface AriaApi {
   researchSuggestionDismiss(req: { jobId: string }): Promise<{ ok: true } | IpcError>;
   /** Push event — registered via ipcRenderer.on, not invoke. */
   researchReportDone(): Promise<{ ok: true } | IpcError>;
+  researchSecretsSet(req: { provider: 'brave' | 'exa'; key: string }): Promise<{ ok: true } | IpcError>;
+  researchSecretsHas(req: unknown): Promise<{ hasBrave: boolean; hasExa: boolean } | IpcError>;
+
+  /** Subscription helper — wraps ipcRenderer.on for RESEARCH_REPORT_DONE. */
+  onResearchReportDone?: (cb: (payload: { jobId: string; reportId: string }) => void) => () => void;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1386,6 +1394,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RESEARCH_SUGGESTION_APPROVE: 'researchSuggestionApprove',
   RESEARCH_SUGGESTION_DISMISS: 'researchSuggestionDismiss',
   RESEARCH_REPORT_DONE: 'researchReportDone',
+  RESEARCH_SECRETS_SET: 'researchSecretsSet',
+  RESEARCH_SECRETS_HAS: 'researchSecretsHas',
 } as const;
 
 // ---------------------------------------------------------------------------

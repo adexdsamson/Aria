@@ -10,6 +10,7 @@ import { TranscriptCaptureScreen } from '../features/meetings/TranscriptCaptureS
 import { TasksScreen } from '../features/tasks/TasksScreen';
 import { AskScreen } from '../features/ask/AskScreen';
 import { RecapScreen } from '../features/recap/RecapScreen';
+import { ResearchScreen } from '../features/research/ResearchScreen';
 import { PaywallScreen } from '../features/entitlement/PaywallScreen';
 import { useEntitlement } from '../features/entitlement/useEntitlement';
 import { isLocked } from '../features/entitlement/types';
@@ -37,6 +38,7 @@ const READ_ONLY_ALLOW_LIST: readonly string[] = [
   '/routing-log',
   '/tasks',
   '/ask', // read-only-from-cache; live ask gated by assertEntitled at IPC layer
+  '/research', // read-only listing; job create + re-run gated by assertEntitled at IPC layer
 ];
 
 export function isReadOnlyAllowed(pathname: string): boolean {
@@ -75,6 +77,7 @@ export function AppRoutes(): JSX.Element {
       <Route path="/ask" element={<LockedGuard><AskScreen /></LockedGuard>} />
       <Route path="/recap" element={<LockedGuard><RecapScreen /></LockedGuard>} />
       <Route path="/routing-log" element={<LockedGuard><RoutingLogScreen /></LockedGuard>} />
+      <Route path="/research" element={<LockedGuard><ResearchScreen /></LockedGuard>} />
       <Route path="/settings/*" element={<LockedGuard><SettingsScreen /></LockedGuard>} />
       <Route path="*" element={<Navigate to="/briefing" replace />} />
     </Routes>
