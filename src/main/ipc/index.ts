@@ -452,6 +452,7 @@ export function registerHandlers(
     CHANNELS.KNOWLEDGE_REMOVE_FOLDER,
     CHANNELS.KNOWLEDGE_FOLDER_STATS,
     CHANNELS.KNOWLEDGE_REINDEX,
+    CHANNELS.KNOWLEDGE_SET_SENSITIVITY,
   ];
   if (!knowledgeChannels.every((c) => skip.has(c))) {
     const db = dbHolder.db;
@@ -473,6 +474,7 @@ export function registerHandlers(
         ingestionService: knowledgeIngestion,
         dialog,
         logger,
+        db,
       });
     }
     knowledgeChannels.forEach((c) => skip.add(c));

@@ -20,6 +20,7 @@
  * tool-call descriptor field appears in this file or answer-service.ts.
  */
 import { z } from 'zod';
+import type { SourceKind } from './chunk-types';
 
 export const ANSWER_SCHEMA = z.object({
   answer: z.string().max(8192),
@@ -31,7 +32,7 @@ export type AnswerSchemaT = z.infer<typeof ANSWER_SCHEMA>;
 export interface RouterChunk {
   id: string;
   text: string;
-  sourceKind: 'email' | 'event' | 'note' | 'action';
+  sourceKind: SourceKind;
   sourceId: string;
   title: string;
   sensitivity: string | null; // C5: from rag_chunk.sensitivity cache
@@ -55,7 +56,7 @@ export interface RouteDecision {
  * `SensitivityClass`: `<category>:<low|med|high>`. Forced-local thresholds
  * mirror CONTEXT.md — HR/legal/financial at med-or-above.
  */
-const FORCE_LOCAL_PREFIXES = ['hr:med', 'hr:high', 'legal:med', 'legal:high', 'financial:med', 'financial:high'];
+const FORCE_LOCAL_PREFIXES = ['hr:med', 'hr:high', 'legal:med', 'legal:high', 'financial:med', 'financial:high', 'folder:high'];
 
 /**
  * REVIEWS C5: pure function over `chunk.sensitivity` only. Zero classifier

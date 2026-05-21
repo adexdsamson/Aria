@@ -131,7 +131,7 @@ export const CHANNELS = {
   UPDATER_DOWNLOAD: 'aria:updater:download',
   UPDATER_RESTART: 'aria:updater:restart',
   UPDATER_CHANNEL: 'aria:updater:channel',
-  // Plan 10-01 Knowledge Folders (7 channels; set-sensitivity deferred to 10-02)
+  // Plan 10-01/10-02 Knowledge Folders (8 channels; set-sensitivity added in 10-02)
   KNOWLEDGE_PICK_FOLDER: 'aria:knowledge:pick-folder',
   KNOWLEDGE_PRESCAN_FOLDER: 'aria:knowledge:prescan-folder',
   KNOWLEDGE_ADD_FOLDER: 'aria:knowledge:add-folder',
@@ -139,6 +139,7 @@ export const CHANNELS = {
   KNOWLEDGE_REMOVE_FOLDER: 'aria:knowledge:remove-folder',
   KNOWLEDGE_FOLDER_STATS: 'aria:knowledge:folder-stats',
   KNOWLEDGE_REINDEX: 'aria:knowledge:reindex',
+  KNOWLEDGE_SET_SENSITIVITY: 'aria:knowledge:set-sensitivity',
   // Plan 08.1-02 entitlement
   ENTITLEMENT_GET_STATE: 'aria:entitlement:get-state',
   ENTITLEMENT_ACTIVATE: 'aria:entitlement:activate',
@@ -953,6 +954,7 @@ export interface AriaApi {
   knowledgeRemoveFolder(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
   knowledgeFolderStats(req: { folderId: string }): Promise<KnowledgeFolderStatsDto | IpcError>;
   knowledgeReindex(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
+  knowledgeSetSensitivity(req: { folderId: string; sensitivity: 'general' | 'sensitive' }): Promise<{ ok: true; folderUpdated: number; chunksUpdated: number } | IpcError>;
 
   // Plan 08-04 Task 5 — auto-updater
   updaterCheck(): Promise<{ ok: true; info: unknown | null; channel: string | null } | { error: string } | IpcError>;
@@ -1332,6 +1334,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   KNOWLEDGE_REMOVE_FOLDER: 'knowledgeRemoveFolder',
   KNOWLEDGE_FOLDER_STATS: 'knowledgeFolderStats',
   KNOWLEDGE_REINDEX: 'knowledgeReindex',
+  KNOWLEDGE_SET_SENSITIVITY: 'knowledgeSetSensitivity',
   ENTITLEMENT_GET_STATE: 'entitlementGetState',
   ENTITLEMENT_ACTIVATE: 'entitlementActivate',
   ENTITLEMENT_OPEN_CHECKOUT: 'entitlementOpenCheckout',
