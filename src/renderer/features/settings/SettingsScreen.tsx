@@ -18,6 +18,7 @@ import { LearnedPreferencesSection } from './LearnedPreferencesSection';
 import { IntegrationsSection } from './IntegrationsSection';
 import { NewsSourcesSection } from './NewsSourcesSection';
 import { OllamaSection } from './OllamaSection';
+import { KnowledgeFoldersSection } from './KnowledgeFoldersSection';
 import { RagIndexSection } from './RagIndexSection';
 import { SchedulingRulesSection } from './SchedulingRulesSection';
 import { StatusPanel } from './StatusPanel';
@@ -54,6 +55,7 @@ const SECTIONS: ReadonlyArray<NavSection> = [
       { to: 'integrations', label: 'Integrations' },
       { to: 'news-sources', label: 'News sources' },
       { to: 'rag-index', label: 'RAG index' },
+      { to: 'knowledge-folders', label: 'Knowledge folders' },
     ],
   },
   {
@@ -132,6 +134,7 @@ export function SettingsScreen(): JSX.Element {
           <Route path="frontier-key" element={<FrontierKeySection />} />
           <Route path="ollama" element={<OllamaSection />} />
           <Route path="rag-index" element={<RagIndexSection />} />
+          <Route path="knowledge-folders" element={<KnowledgeFoldersSection />} />
           <Route path="integrations" element={<IntegrationsSection />} />
           <Route path="scheduling-rules" element={<SchedulingRulesSection />} />
           <Route
