@@ -131,6 +131,14 @@ export const CHANNELS = {
   UPDATER_DOWNLOAD: 'aria:updater:download',
   UPDATER_RESTART: 'aria:updater:restart',
   UPDATER_CHANNEL: 'aria:updater:channel',
+  // Plan 10-01 Knowledge Folders (7 channels; set-sensitivity deferred to 10-02)
+  KNOWLEDGE_PICK_FOLDER: 'aria:knowledge:pick-folder',
+  KNOWLEDGE_PRESCAN_FOLDER: 'aria:knowledge:prescan-folder',
+  KNOWLEDGE_ADD_FOLDER: 'aria:knowledge:add-folder',
+  KNOWLEDGE_LIST_FOLDERS: 'aria:knowledge:list-folders',
+  KNOWLEDGE_REMOVE_FOLDER: 'aria:knowledge:remove-folder',
+  KNOWLEDGE_FOLDER_STATS: 'aria:knowledge:folder-stats',
+  KNOWLEDGE_REINDEX: 'aria:knowledge:reindex',
   // Plan 08.1-02 entitlement
   ENTITLEMENT_GET_STATE: 'aria:entitlement:get-state',
   ENTITLEMENT_ACTIVATE: 'aria:entitlement:activate',
@@ -937,6 +945,15 @@ export interface AriaApi {
   briefingInsightDismiss(req: { briefingDate: string; kind: string }): Promise<{ ok: true } | IpcError>;
   ragTurnFeedback(req: { turnId: string; thumb: -1 | 0 | 1 }): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
 
+  // Plan 10-01 Knowledge Folders
+  knowledgePickFolder(): Promise<{ path: string } | { canceled: true } | IpcError>;
+  knowledgePrescanFolder(req: { path: string }): Promise<{ fileCount: number; totalBytes: number; exceedsThreshold: boolean } | IpcError>;
+  knowledgeAddFolder(req: { path: string; label: string; sensitivity: 'general' | 'sensitive' }): Promise<{ folderId: string } | IpcError>;
+  knowledgeListFolders(): Promise<{ folders: KnowledgeFolderDto[] } | IpcError>;
+  knowledgeRemoveFolder(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
+  knowledgeFolderStats(req: { folderId: string }): Promise<KnowledgeFolderStatsDto | IpcError>;
+  knowledgeReindex(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
+
   // Plan 08-04 Task 5 — auto-updater
   updaterCheck(): Promise<{ ok: true; info: unknown | null; channel: string | null } | { error: string } | IpcError>;
   updaterDownload(): Promise<{ ok: true } | { error: string } | IpcError>;
@@ -1308,6 +1325,13 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   UPDATER_DOWNLOAD: 'updaterDownload',
   UPDATER_RESTART: 'updaterRestart',
   UPDATER_CHANNEL: 'updaterChannel',
+  KNOWLEDGE_PICK_FOLDER: 'knowledgePickFolder',
+  KNOWLEDGE_PRESCAN_FOLDER: 'knowledgePrescanFolder',
+  KNOWLEDGE_ADD_FOLDER: 'knowledgeAddFolder',
+  KNOWLEDGE_LIST_FOLDERS: 'knowledgeListFolders',
+  KNOWLEDGE_REMOVE_FOLDER: 'knowledgeRemoveFolder',
+  KNOWLEDGE_FOLDER_STATS: 'knowledgeFolderStats',
+  KNOWLEDGE_REINDEX: 'knowledgeReindex',
   ENTITLEMENT_GET_STATE: 'entitlementGetState',
   ENTITLEMENT_ACTIVATE: 'entitlementActivate',
   ENTITLEMENT_OPEN_CHECKOUT: 'entitlementOpenCheckout',
@@ -1317,6 +1341,30 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Plan 10-01 Knowledge Folders DTOs -------------------------------------------
+
+export interface KnowledgeFolderDto {
+  id: string;
+  path: string;
+  label: string;
+  sensitivity: 'general' | 'sensitive';
+  status: 'active' | 'paused' | 'error';
+  fileCount: number;
+  bytesIndexed: number;
+  lastScanAt: string | null;
+  lastError: string | null;
+}
+
+export interface KnowledgeFolderStatsDto {
+  fileCount: number;
+  bytesIndexed: number;
+  indexedCount: number;
+  errorCount: number;
+  pendingCount: number;
+  tombstonedCount: number;
+  lastScanAt: string | null;
+}
+
 // Plan 08.1-02 entitlement IPC DTOs
 // ---------------------------------------------------------------------------
 

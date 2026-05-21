@@ -57,6 +57,11 @@ import {
   registerEntitlementHandlers,
   makeRendererEmitter,
 } from './entitlement';
+import { registerKnowledgeFolderIpc } from './knowledge-folders';
+import { createFolderRegistry } from '../folder-ingestion/folder-registry';
+import { createFolderIngestionService } from '../folder-ingestion/ingestion-service';
+import { PARSERS } from '../folder-ingestion/parsers/index';
+import { strategyC } from '../rag/chunk-strategies';
 import type { EntitlementService } from '../entitlement/service';
 import type { BrowserWindow } from 'electron';
 import { registerScheduler, type SchedulerHandle } from '../lifecycle/scheduler';
@@ -436,6 +441,41 @@ export function registerHandlers(
       emitToRenderer: makeRendererEmitter(deps.mainWindow ?? null),
     });
     entitlementChannels.forEach((c) => skip.add(c));
+  }
+
+  // Plan 10-01 — Knowledge Folders IPC (7 channels).
+  const knowledgeChannels = [
+    CHANNELS.KNOWLEDGE_PICK_FOLDER,
+    CHANNELS.KNOWLEDGE_PRESCAN_FOLDER,
+    CHANNELS.KNOWLEDGE_ADD_FOLDER,
+    CHANNELS.KNOWLEDGE_LIST_FOLDERS,
+    CHANNELS.KNOWLEDGE_REMOVE_FOLDER,
+    CHANNELS.KNOWLEDGE_FOLDER_STATS,
+    CHANNELS.KNOWLEDGE_REINDEX,
+  ];
+  if (!knowledgeChannels.every((c) => skip.has(c))) {
+    const db = dbHolder.db;
+    if (db) {
+      const knowledgeRegistry = createFolderRegistry(db);
+      const knowledgeIngestion = createFolderIngestionService({
+        db,
+        logger,
+        registry: knowledgeRegistry,
+        parsers: PARSERS,
+        strategy: strategyC,
+      });
+      // dialog is only available in the main process; import lazily to avoid
+      // renderer-side resolution issues.
+      const { dialog } = require('electron') as { dialog: import('electron').Dialog };
+      registerKnowledgeFolderIpc({
+        ipcMain,
+        registry: knowledgeRegistry,
+        ingestionService: knowledgeIngestion,
+        dialog,
+        logger,
+      });
+    }
+    knowledgeChannels.forEach((c) => skip.add(c));
   }
 
   // Plan 08-04 Task 5 — auto-updater IPC.
