@@ -66,6 +66,11 @@ if (process.env['ARIA_E2E'] === '1') {
     ipcRenderer.invoke('aria:scheduling:__e2e_read_audit__', req);
 }
 
+// Plan 10-01: knowledge folder channels (KNOWLEDGE_PICK_FOLDER, KNOWLEDGE_PRESCAN_FOLDER,
+// KNOWLEDGE_ADD_FOLDER, KNOWLEDGE_LIST_FOLDERS, KNOWLEDGE_REMOVE_FOLDER,
+// KNOWLEDGE_FOLDER_STATS, KNOWLEDGE_REINDEX) are auto-mapped by the buildApi() loop
+// above via the CHANNELS / CHANNEL_METHODS registry in ipc-contract.ts.
+
 contextBridge.exposeInMainWorld('aria', api);
 
 // Type augmentation for renderer consumers.
