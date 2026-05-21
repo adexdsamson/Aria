@@ -97,7 +97,7 @@ function AppShell(): JSX.Element {
           }}
         >
           <TrialBanner />
-          <Topbar />
+          <Topbar onLocked={() => void refresh()} />
           <div style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
             <AppRoutes />
           </div>
