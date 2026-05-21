@@ -118,3 +118,79 @@ Watch out for ([[feedback-plan-schema-invention]]): grep `chunks` schema before 
 <next_steps>
 `/gsd-plan-phase 10` — research will be minimal (most decisions locked); planner should produce ~3 plans following the spec's §12 rollout order, collapsed where dependencies allow.
 </next_steps>
+
+<schema_reconciliation>
+**Added 2026-05-21 after first plan-checker BLOCK.** The design spec at `docs/superpowers/specs/2026-05-21-knowledge-folders-design.md` was written against a fictional schema. This addendum **supersedes** spec §4, §7, and any path references where they conflict with what follows. The spec doc remains for narrative; this section is canonical for planning.
+
+### Real schema (verified against `src/main/db/migrations/126_rag_index.sql`)
+- The chunks table is **`rag_chunk`** (NOT `chunks`). It has a column **`source_kind`** with CHECK `source_kind IN ('email','event','note','action')`. There is **no** `corpus` column.
+- `rag_chunk` already has per-chunk columns: `sensitivity` (cached classifier tag), `sensitivity_model`, `sensitivity_at`, `deleted_at` (soft-delete), `dirty`, `source_updated_at`.
+- The CHECK constraint cannot be altered in place under SQLite; the codebase pattern (see `127_rag_source_dirty_dedupe.sql`) is the **create-new / copy / drop / rename** dance. The planner must follow this pattern.
+
+### Migration approach (replaces spec §4)
+Single new migration `132_knowledge_folders.sql` (next-in-sequence after `131_entitlement.sql`). It must:
+1. Create `knowledge_folders` (per spec §4 column list).
+2. Create `knowledge_files` (per spec §4 column list); `id` = `sha256(folder_id || relative_path)`; FK `folder_id REFERENCES knowledge_folders(id) ON DELETE CASCADE`; UNIQUE `(folder_id, relative_path)`.
+3. **Extend `rag_chunk` to accept `source_kind='folder'`** via the create-new-copy-drop-rename pattern:
+   - Create `rag_chunk_new` with the same columns + extended CHECK `source_kind IN ('email','event','note','action','folder')` + two new nullable columns `folder_id TEXT` and `file_id TEXT`.
+   - `INSERT INTO rag_chunk_new SELECT *, NULL, NULL FROM rag_chunk`.
+   - `DROP TABLE rag_chunk`; `ALTER TABLE rag_chunk_new RENAME TO rag_chunk`.
+   - Recreate the four indexes (`idx_rag_chunk_source`, `idx_rag_chunk_dirty`, `idx_rag_chunk_account`, `idx_rag_chunk_alive`).
+   - Add `CREATE INDEX idx_rag_chunk_file_id ON rag_chunk(file_id) WHERE file_id IS NOT NULL;`.
+   - **Important:** `rag_embedding` has `chunk_id REFERENCES rag_chunk(id) ON DELETE CASCADE` — dropping `rag_chunk` will trigger cascade unless wrapped in `PRAGMA foreign_keys=OFF` for the migration. Use the same `PRAGMA foreign_keys=OFF/ON` envelope as `127_rag_source_dirty_dedupe.sql` so existing rows survive.
+4. Tombstone sweep cron query: `DELETE FROM knowledge_files WHERE status='tombstoned' AND tombstoned_at < ?` — cascade deletes the chunks via the new `file_id`-keyed cascade we set up below.
+   - To get the cascade, add `FOREIGN KEY (file_id) REFERENCES knowledge_files(id) ON DELETE CASCADE` on the `rag_chunk_new` definition.
+
+### Sensitivity gate — REUSE existing `rag_chunk.sensitivity` cache (replaces spec §7)
+The retrieval path already routes off `rag_chunk.sensitivity` via `src/main/rag/answer-router.ts:routeFromChunks(chunks)`, a pure function over chunk sensitivities with fail-closed semantics on NULL and `FORCE_LOCAL_PREFIXES = ['hr:med','hr:high','legal:med','legal:high','financial:med','financial:high']`.
+
+**Decision (supersedes Q4 of original CONTEXT.md):** at index time, when a chunk's folder has `sensitivity='sensitive'`, write `rag_chunk.sensitivity='folder:high'` and `sensitivity_model='folder-rule:v1'` into the row. Add `'folder:high'` and `'folder:low'` to `FORCE_LOCAL_PREFIXES` (only `:high` forces LOCAL; `:low` is permitted FRONTIER). For non-sensitive folders, set `sensitivity='folder:low'`.
+
+Folder-flip semantics:
+- General → Sensitive: `UPDATE rag_chunk SET sensitivity='folder:high', sensitivity_model='folder-rule:v1', sensitivity_at=? WHERE folder_id = ?`. No re-embed.
+- Sensitive → General: symmetric, writes `'folder:low'`.
+- The flip is a single SQL UPDATE in a transaction. Next retrieval picks up the new value automatically via the existing `routeFromChunks` reader.
+- Per-turn taint and no-cross-turn-stickiness are *preserved for free* — they're already the semantics of `routeFromChunks`.
+- In-flight call is not interrupted because the answer-router has already read its `chunks[]` snapshot before LLM dispatch.
+
+**Consequences (planner must respect):**
+- No JOIN against `knowledge_folders` at retrieval time.
+- No new gate file; the only edit to `answer-router.ts` is widening `FORCE_LOCAL_PREFIXES` (one array literal).
+- The 5-case sensitivity test contract is met by:
+  1. pure-sensitive folder: chunks tagged `folder:high` → LOCAL.
+  2. pure-general folder: chunks tagged `folder:low` → FRONTIER permitted (unless another chunk in the set forces local).
+  3. hybrid set (folder:high + email:none): existing `routeFromChunks` already forces LOCAL on the first match — case is *automatically* satisfied; assert via integration test.
+  4. multi-turn no-stickiness: each turn re-reads `chunks[]` and re-evaluates → automatic via existing code.
+  5. in-flight flip: integration test issues flip during a pending answer-service call and asserts (a) the in-flight call completes with the pre-flip routing, (b) the next call routes with the post-flip value.
+
+### Path corrections (replaces all `services/rag`, `services/sensitivity-router`, `services/phase8` references)
+| Old (fictional) | Real |
+|---|---|
+| `src/main/services/rag/` | `src/main/rag/` |
+| `src/main/services/sensitivity-router/` | `src/main/llm/router.ts` (Phase 3 prompt router — **NOT the hook point** for folder sensitivity). The real hook is the existing **`src/main/rag/answer-router.ts`** which already routes off `rag_chunk.sensitivity`. |
+| `src/main/services/phase8/` (14d gate) | `src/main/insights/gate.ts` |
+| Phase 7 reconciler "zero-diff" target | `src/main/rag/model-swap-reconciler.ts` (this file's diff must remain empty — folder chunks are just `rag_chunk` rows and flow through automatically) |
+| Phase 7 chunker / embedder / vector store | `src/main/rag/chunk-text.ts`, `src/main/rag/chunk-strategies.ts`, `src/main/rag/ollama-embeddings.ts`, `src/main/rag/vector-store.ts`, `src/main/rag/index-writer.ts` |
+
+### Read-first additions for all plans
+Every plan touching the chunks table must `<read_first>` include:
+- `src/main/db/migrations/126_rag_index.sql` (canonical `rag_chunk` schema)
+- `src/main/db/migrations/127_rag_source_dirty_dedupe.sql` (canonical `PRAGMA foreign_keys=OFF` migration pattern for this codebase)
+- `src/main/rag/answer-router.ts` (canonical routing — `FORCE_LOCAL_PREFIXES` is the extension point)
+- `src/main/rag/sensitivity-cache.ts` (how per-chunk sensitivity is read/written)
+- `src/main/rag/index-writer.ts` (where chunks are inserted; folder ingestion will call into the same writer)
+
+Every plan touching the 14d gate must `<read_first>`:
+- `src/main/insights/gate.ts` (real gate; acceptance grep should target this file, not a fictional `services/phase8/` dir)
+
+### Phase 7 reconciler integration (supersedes CONTEXT decision 1)
+Folder chunks are just `rag_chunk` rows. The existing `src/main/rag/model-swap-reconciler.ts` re-embeds rows by reading `rag_chunk.text`. It does not branch on `source_kind`. Folder chunks **participate automatically** with zero new code in `model-swap-reconciler.ts`. The verification assertion is `git diff src/main/rag/model-swap-reconciler.ts` after Phase 10 commits = empty.
+
+### Phase 8 gate exclusion (supersedes CONTEXT 14d-gate note)
+`src/main/insights/gate.ts` currently filters `source_kind IN ('email','note')`. Phase 10 must NOT widen this set. The verification grep is exactly: `grep -E "source_kind\s+IN" src/main/insights/gate.ts` — the result must not contain `'folder'`.
+
+### Dependency notes for plan rewrite
+- The hook-point for folder ingestion writing into `rag_chunk` is `src/main/rag/index-writer.ts`. Use it directly; do not create a parallel `ChunkStore`.
+- The hook-point for folder embedding is `src/main/rag/ollama-embeddings.ts` (or whatever the existing index-worker calls). Same — reuse, do not duplicate.
+- The `bytesIndexed = SUM(knowledge_files.size)` IPC: omit any status filter (the previous draft `AND status='indexed'` is **wrong** — it silently excludes errored files; a 50MB file that failed to parse still takes 50MB on disk and users want that reflected).
+</schema_reconciliation>
