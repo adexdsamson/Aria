@@ -26,8 +26,6 @@ const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
 export function GenerateNowAffordance({ onDone }: { onDone: () => void }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pressed, setPressed] = useState(false);
-
   async function onClick(): Promise<void> {
     setBusy(true);
     setError(null);
