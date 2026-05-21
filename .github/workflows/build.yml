@@ -22,11 +22,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          # Skip dual-build in CI — electron-builder handles native rebuild
+          SKIP_DUAL_BUILD: '1'
 
       - name: Build (vite)
         run: pnpm run build
 
       - name: Package Windows installer
+        # electron-builder internally runs @electron/rebuild for native deps
         run: npx electron-builder --win nsis --publish never
 
       - uses: actions/upload-artifact@v4
@@ -51,6 +55,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          SKIP_DUAL_BUILD: '1'
 
       - name: Build (vite)
         run: pnpm run build
