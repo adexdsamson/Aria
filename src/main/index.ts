@@ -94,6 +94,10 @@ import { reconcileModelSwap as reconcileModelSwap_C3 } from './rag/model-swap-re
 // imports the same function from its real path. Do NOT remove — this is the C3
 // boot-sequence anchor that the verifier greps for.
 void reconcileModelSwap_C3;
+import {
+  startKnowledgeFolderLifecycle,
+  stopKnowledgeFolderLifecycle,
+} from './folder-ingestion/lifecycle';
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -303,10 +307,44 @@ async function bootstrap(): Promise<void> {
   };
   // Poll for DB readiness (driven by the unlock IPC). Cheap and avoids
   // restructuring the existing onboarding wiring.
+  let lifecycleBooted = false;
   const bootPoll = setInterval(() => {
     if (dbHolder.db) {
       clearInterval(bootPoll);
       void tryBootstrapEntitlement();
+      // Plan 10-02: start knowledge folder lifecycle once DB is unlocked.
+      if (!lifecycleBooted) {
+        lifecycleBooted = true;
+        const kfDb = dbHolder.db;
+        // Lazy import to avoid circular deps; registry + ingestion created inline.
+        void import('./folder-ingestion/folder-registry').then(({ createFolderRegistry }) =>
+          import('./folder-ingestion/ingestion-service').then(({ createFolderIngestionService }) =>
+            import('./folder-ingestion/parsers/index').then(({ PARSERS }) =>
+              import('./rag/chunk-strategies').then(({ strategyC }) => {
+                const kfRegistry = createFolderRegistry(kfDb);
+                const kfIngestion = createFolderIngestionService({
+                  db: kfDb,
+                  logger,
+                  registry: kfRegistry,
+                  parsers: PARSERS,
+                  strategy: strategyC,
+                });
+                return startKnowledgeFolderLifecycle({
+                  db: kfDb,
+                  registry: kfRegistry,
+                  ingestionService: kfIngestion,
+                  logger,
+                });
+              }),
+            ),
+          ),
+        ).catch((err) => {
+          logger.warn(
+            { scope: 'knowledge-lifecycle', err: (err as Error).message },
+            'knowledge folder lifecycle failed to start',
+          );
+        });
+      }
     }
   }, 250);
 
@@ -393,4 +431,8 @@ app.whenReady().then(bootstrap).catch((err) => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  void stopKnowledgeFolderLifecycle(getLogger());
 });
