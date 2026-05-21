@@ -9,10 +9,12 @@ import {
   listTranscriptNotes,
 } from '../transcripts/ingest';
 import { createTaskBatchApprovalForNote } from '../transcripts/post-ingest';
+import { detectResearchTopics } from '../services/ResearchService';
 
 export interface TranscriptHandlerDeps {
   logger: Logger;
   dbHolder: DbHolder;
+  emitToRenderer?: (channel: string, payload?: unknown) => void;
 }
 
 export function registerTranscriptHandlers(ipcMain: IpcMain, deps: TranscriptHandlerDeps): void {
@@ -28,6 +30,12 @@ export function registerTranscriptHandlers(ipcMain: IpcMain, deps: TranscriptHan
     try {
       const result = ingestTranscriptNote(db, req);
       const approval = createTaskBatchApprovalForNote(db, result.noteId);
+
+      // Fire-and-forget research topic auto-detect (Phase 11).
+      void detectResearchTopics(db, result.noteId, result.title ?? '', deps.emitToRenderer).catch(
+        (err) => logger.warn({ scope: 'research', err: String(err) }, 'auto-detect failed silently'),
+      );
+
       return { ...result, taskBatchApprovalId: approval.approvalId, actionCount: approval.actionCount };
     } catch (err) {
       logger.warn({ scope: 'transcripts', err: err instanceof Error ? err.message : String(err) }, 'transcript ingest failed');
