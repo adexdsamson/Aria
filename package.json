@@ -47,6 +47,7 @@
     "docx": "^9.6.1",
     "electron-updater": "^6.8.3",
     "email-reply-parser": "^2.3.5",
+    "chokidar": "^4.0.0",
     "exceljs": "^4.4.0",
     "google-auth-library": "^9.15.1",
     "googleapis": "^144.0.0",
