@@ -72,6 +72,7 @@ import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
 import { registerEntitlementHandlers, makeRendererEmitter } from './ipc/entitlement';
+import { registerKnowledgeFolderIpc } from './ipc/knowledge-folders';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
@@ -290,14 +291,21 @@ async function bootstrap(): Promise<void> {
       // the entitlement block there is skipped (no service yet). Without
       // this call the renderer hits "No handler registered for
       // 'aria:entitlement:get-state'" the moment EntitlementProvider mounts.
+      // Remove the pre-unlock stub before re-registering with the real service.
+      ipcMain.removeHandler(CHANNELS.ENTITLEMENT_GET_STATE);
+      const emitToRenderer = makeRendererEmitter(
+        BrowserWindow.getAllWindows()[0] ?? null,
+      );
       registerEntitlementHandlers(ipcMain, {
         logger,
         dbHolder,
         service: entitlementService,
-        emitToRenderer: makeRendererEmitter(
-          BrowserWindow.getAllWindows()[0] ?? null,
-        ),
+        emitToRenderer,
       });
+      // Push the real state so the renderer updates from the stub immediately.
+      void entitlementService.getCurrentState().then((realState) => {
+        emitToRenderer(CHANNELS.ENTITLEMENT_STATE_CHANGED, { state: realState });
+      }).catch(() => { /* non-fatal */ });
     } catch (err) {
       logger.warn(
         { scope: 'entitlement.boot', err: (err as Error).message },
@@ -328,6 +336,20 @@ async function bootstrap(): Promise<void> {
                   registry: kfRegistry,
                   parsers: PARSERS,
                   strategy: strategyC,
+                });
+                // Plan 10 post-UAT fix: registerHandlers() ran pre-unlock so
+                // the knowledge IPC block in ipc/index.ts was skipped (db was
+                // null) and added the channels to its skip-set permanently.
+                // Wire them now with the same registry+ingestion the lifecycle
+                // owns. Mirrors the entitlement re-registration pattern above.
+                const { dialog } = require('electron') as { dialog: import('electron').Dialog };
+                registerKnowledgeFolderIpc({
+                  ipcMain,
+                  registry: kfRegistry,
+                  ingestionService: kfIngestion,
+                  dialog,
+                  logger,
+                  db: kfDb,
                 });
                 return startKnowledgeFolderLifecycle({
                   db: kfDb,

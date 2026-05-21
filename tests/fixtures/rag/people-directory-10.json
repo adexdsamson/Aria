@@ -10,7 +10,7 @@
       "id": "p:alex@example.com",
       "canonicalEmail": "alex@example.com",
       "displayName": "Alex Kim",
-      "aliases": ["Kim", "Alex"]
+      "aliases": ["Alex", "Kim"]
     },
     {
       "id": "p:rita@example.com",
@@ -43,22 +43,22 @@
       "aliases": ["Lin", "Park"]
     },
     {
+      "id": "p:priya@example.com",
+      "canonicalEmail": "priya@example.com",
+      "displayName": "Priya Morrison",
+      "aliases": ["Priya", "Morrison"]
+    },
+    {
+      "id": "p:noah@example.com",
+      "canonicalEmail": "noah@example.com",
+      "displayName": "Noah Lee",
+      "aliases": ["Noah", "Lee"]
+    },
+    {
       "id": "p:alex2@example.com",
-      "canonicalEmail": "alex.morrison@example.com",
-      "displayName": "Alex Morrison",
-      "aliases": ["Morrison", "Alex"]
-    },
-    {
-      "id": "p:alex3@example.com",
-      "canonicalEmail": "alex.lee@example.com",
-      "displayName": "Alex Lee",
-      "aliases": ["Lee"]
-    },
-    {
-      "id": "p:alex4@example.com",
       "canonicalEmail": "alex.wright@example.com",
       "displayName": "Alex Wright",
-      "aliases": ["Wright"]
+      "aliases": ["Alex", "Wright"]
     }
   ],
   "cases": [
@@ -68,9 +68,9 @@
     { "question": "Tara asked about budget", "expectedPersonId": "p:tara@example.com" },
     { "question": "Lin signed off on it", "expectedPersonId": "p:lin@example.com" },
     { "question": "Jay agreed yesterday", "expectedPersonId": "p:jay@example.com" },
-    { "question": "Did Morrison reply?", "expectedPersonId": "p:alex2@example.com" },
-    { "question": "Kim sent the spec", "expectedPersonId": "p:alex@example.com" },
-    { "question": "Lee on the design call", "expectedPersonId": "p:alex3@example.com" },
-    { "question": "Did Alex agree?", "expectedPersonId": "p:alex@example.com", "ambiguous": true }
+    { "question": "Did Priya reply?", "expectedPersonId": "p:priya@example.com" },
+    { "question": "Noah sent the spec", "expectedPersonId": "p:noah@example.com" },
+    { "question": "Did Alex agree about scope?", "expectedPersonId": "p:alex@example.com", "ambiguous": true },
+    { "question": "What did Rita write last week?", "expectedPersonId": "p:rita@example.com" }
   ]
 }

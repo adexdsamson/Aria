@@ -1,14 +1,16 @@
 /**
  * AskAriaBox — Settings → Diagnostics interactive prompt box (Plan 04 Task 3).
  *
- * UX:
- *   1. textarea for the prompt
- *   2. source selector (default 'generic')
- *   3. Submit → window.aria.askAria({ prompt, source })
- *   4. Renders answer + route badge ([LOCAL] / [FRONTIER]) + reason + latency
+ * Phase 9 design-ref pass:
+ *   - Editorial in-card form: single Playfair-italic textarea + Source select
+ *     + gold "Ask" button. Heading is owned by the parent card eyebrow
+ *     ("ASK ARIA · DIAGNOSTICS"), so this component no longer renders its
+ *     own h3.
+ *   - Result block: route pill + verbatim reason + latency + answer in
+ *     ivory-deep mono block.
  *
- * The reason string is rendered verbatim — it is part of the routing contract
- * (D-06) and the user-facing audit trail.
+ * IPC + data-testids preserved verbatim. The reason string is rendered
+ * verbatim — it is part of the routing contract (D-06).
  */
 import { useState } from 'react';
 import type {
@@ -17,6 +19,8 @@ import type {
   Route,
   SourceTag,
 } from '../../../shared/ipc-contract';
+
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
 
 const SOURCES: ReadonlyArray<SourceTag> = [
   'generic',
@@ -69,77 +73,208 @@ export function AskAriaBox({ onAnswered }: AskAriaBoxProps): JSX.Element {
       } else {
         setError(res.error);
       }
-    } catch (e) {
-      setError((e as Error).message);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <section data-testid="ask-aria-box" style={{ marginBottom: 'var(--aria-space-xl)' }}>
-      <h3 style={{ fontFamily: 'var(--f-display)', fontSize: 22, fontWeight: 500, color: 'var(--ink)', marginTop: 0, borderBottom: '1px solid var(--rule)', paddingBottom: 8 }}>Ask Aria</h3>
-      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label htmlFor="ask-prompt" style={{ fontSize: 'var(--aria-type-sm)' }}>
-          Prompt
-        </label>
+    <section data-testid="ask-aria-box">
+      <form onSubmit={onSubmit}>
         <textarea
           id="ask-prompt"
           data-testid="ask-prompt"
-          placeholder="Ask Aria anything…"
+          placeholder='e.g. "what&apos;s on my calendar at 3pm"'
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          rows={3}
+          rows={2}
           disabled={pending}
-          style={{ resize: 'vertical', fontFamily: 'inherit', padding: 8 }}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            background: 'var(--paper)',
+            color: 'var(--ink)',
+            border: '1px solid var(--rule-strong)',
+            borderRadius: 'var(--radius)',
+            fontFamily: 'var(--f-display)',
+            fontStyle: 'italic',
+            fontSize: 16,
+            lineHeight: 1.5,
+            outline: 'none',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            transition: 'border-color 180ms ease',
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--gold)')}
+          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--rule-strong)')}
         />
-        <label htmlFor="ask-source" style={{ fontSize: 'var(--aria-type-sm)' }}>
-          Source
-        </label>
-        <select
-          id="ask-source"
-          data-testid="ask-source"
-          value={source}
-          onChange={(e) => setSource(e.target.value as SourceTag)}
-          disabled={pending}
+
+        <div
+          style={{
+            marginTop: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
         >
-          {SOURCES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <button type="submit" data-testid="ask-submit" disabled={pending || !prompt.trim()}>
-          {pending ? 'Asking…' : 'Submit'}
-        </button>
+          <label
+            htmlFor="ask-source"
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+            }}
+          >
+            Source
+          </label>
+          <select
+            id="ask-source"
+            data-testid="ask-source"
+            value={source}
+            onChange={(e) => setSource(e.target.value as SourceTag)}
+            disabled={pending}
+            style={{
+              padding: '6px 10px',
+              fontFamily: 'var(--f-mono)',
+              fontSize: 12,
+              color: 'var(--ink-soft)',
+              background: 'var(--paper)',
+              border: '1px solid var(--rule-strong)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: pending ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <span style={{ flex: 1 }} />
+
+          <button
+            type="submit"
+            data-testid="ask-submit"
+            disabled={pending || !prompt.trim()}
+            style={{
+              padding: '8px 22px',
+              fontFamily: 'var(--f-body)',
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+              color: 'var(--paper)',
+              background: pending || !prompt.trim() ? 'var(--rule-strong)' : 'var(--gold)',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              cursor: pending || !prompt.trim() ? 'not-allowed' : 'pointer',
+              transition: `background 200ms ease, transform 140ms ${EASE_OUT}`,
+            }}
+            onMouseEnter={(e) => {
+              if (!pending && prompt.trim()) e.currentTarget.style.background = 'var(--gold-deep)';
+            }}
+            onMouseLeave={(e) => {
+              if (!pending && prompt.trim()) e.currentTarget.style.background = 'var(--gold)';
+            }}
+            onMouseDown={(e) => {
+              if (!pending && prompt.trim()) e.currentTarget.style.transform = 'scale(0.97)';
+            }}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            {pending ? 'Asking…' : 'Ask'}
+          </button>
+        </div>
       </form>
 
       {pending && (
-        <p data-testid="ask-pending" style={{ marginTop: 12, color: 'var(--aria-fg-muted)' }}>
-          <span aria-busy="true">Routing decision pending…</span>
+        <p
+          data-testid="ask-pending"
+          aria-busy="true"
+          style={{
+            marginTop: 14,
+            fontFamily: 'var(--f-mono)',
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--gray)',
+          }}
+        >
+          Routing decision pending…
         </p>
       )}
+
       {error && (
-        <p data-testid="ask-error" role="alert" style={{ marginTop: 12, color: 'var(--aria-danger)' }}>
-          Error: {error}
+        <p
+          data-testid="ask-error"
+          role="alert"
+          style={{
+            marginTop: 14,
+            padding: '8px 12px',
+            fontFamily: 'var(--f-mono)',
+            fontSize: 12,
+            color: 'var(--rose)',
+            background: 'rgba(184,73,58,0.06)',
+            borderLeft: '2px solid var(--rose)',
+            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+          }}
+        >
+          {error}
         </p>
       )}
+
       {result && (
-        <div data-testid="ask-result" style={{ marginTop: 12 }}>
-          <p>
-            <RouteBadge route={result.route} />{' '}
-            <code data-testid="ask-reason">{result.reason}</code>{' '}
-            <span style={{ color: 'var(--aria-fg-muted)' }}>
-              ({result.latency_ms} ms)
+        <div data-testid="ask-result" style={{ marginTop: 18 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <ResultRouteBadge route={result.route} />
+            <code
+              data-testid="ask-reason"
+              style={{
+                fontFamily: 'var(--f-mono)',
+                fontSize: 12,
+                color: 'var(--ink-soft)',
+                fontStyle: 'italic',
+              }}
+            >
+              {result.reason}
+            </code>
+            <span
+              style={{
+                fontFamily: 'var(--f-mono)',
+                fontSize: 10,
+                color: 'var(--gray-soft)',
+                letterSpacing: '0.1em',
+              }}
+            >
+              {result.latency_ms} ms
             </span>
-          </p>
+          </div>
           <pre
             data-testid="ask-answer"
             style={{
               whiteSpace: 'pre-wrap',
-              backgroundColor: 'var(--aria-surface-alt)',
-              padding: 12,
-              borderRadius: 6,
+              fontFamily: 'var(--f-body)',
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: 'var(--ink)',
+              background: 'var(--ivory-deep)',
+              padding: '14px 16px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--rule)',
+              margin: 0,
             }}
           >
             {result.answer}
@@ -150,19 +285,25 @@ export function AskAriaBox({ onAnswered }: AskAriaBoxProps): JSX.Element {
   );
 }
 
-function RouteBadge({ route }: { route: Route }): JSX.Element {
+function ResultRouteBadge({ route }: { route: Route }): JSX.Element {
   const isLocal = route === 'LOCAL';
   return (
     <span
       data-testid={`route-badge-${route}`}
       style={{
-        display: 'inline-block',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
         padding: '2px 8px',
-        borderRadius: 4,
-        fontSize: 'var(--aria-type-sm)',
+        borderRadius: 'var(--radius-sm)',
+        fontFamily: 'var(--f-mono)',
+        fontSize: 10,
         fontWeight: 600,
-        backgroundColor: isLocal ? 'var(--aria-accent)' : 'var(--aria-surface-alt)',
-        color: isLocal ? 'var(--aria-accent-fg)' : 'var(--aria-fg)',
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        color: isLocal ? 'var(--moss)' : 'var(--gold-deep)',
+        background: isLocal ? 'rgba(91,110,58,0.08)' : 'rgba(184,134,11,0.08)',
+        border: `1px solid ${isLocal ? 'rgba(91,110,58,0.30)' : 'rgba(184,134,11,0.30)'}`,
       }}
     >
       [{route}]

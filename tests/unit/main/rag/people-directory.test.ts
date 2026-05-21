@@ -16,8 +16,13 @@ const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../src/main/db/migratio
 const FIXTURE = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../fixtures/rag/people-directory-10.json'), 'utf8'),
 ) as {
-  people: Array<{ id: string; email: string; display: string }>;
-  questions: Array<{ mention: string; expected: string | null; ambiguous: boolean }>;
+  people: Array<{
+    id: string;
+    canonicalEmail: string | null;
+    displayName: string;
+    aliases: string[];
+  }>;
+  cases: Array<{ question: string; expectedPersonId: string; ambiguous?: boolean }>;
 };
 
 function setupDb() {
@@ -36,7 +41,13 @@ function seedGmailFromFixture(db: ReturnType<typeof setupDb>) {
          id, thread_id, from_addr, subject, snippet, received_at, label_ids,
          is_unread, is_important, history_id, fetched_at
        ) VALUES (?, ?, ?, 'subj', 'body', ?, '[]', 0, 0, NULL, ?)`,
-    ).run(`msg-${p.email}`, `t-${p.email}`, `"${p.display}" <${p.email}>`, now, now);
+    ).run(
+      `msg-${p.canonicalEmail ?? p.id}`,
+      `t-${p.canonicalEmail ?? p.id}`,
+      `"${p.displayName}" <${p.canonicalEmail ?? `${p.id}@example.com`}>`,
+      now,
+      now,
+    );
   }
 }
 
@@ -64,14 +75,20 @@ describe('people-directory — Plan 07-02 Task 8 / REVIEWS C10', () => {
     rebuildPeopleDirectory(db);
     let correct = 0;
     let ambiguousMatches = 0;
-    for (const q of FIXTURE.questions) {
-      const res = resolvePersonMention(db, q.mention);
+    for (const q of FIXTURE.cases) {
+      // Extract the first capitalized token from the question as the mention
+      // probe (the fixture in dual-purpose mode no longer ships a bare
+      // \`mention\` field — the person-resolver test reads structured questions).
+      const STOP = new Set(['What', 'Who', 'When', 'Where', 'Why', 'How', 'Did', 'Do', 'Does', 'Is', 'Are', 'Was', 'Were']);
+      const tokens = [...q.question.matchAll(/\b([A-Z][a-zA-Z]+)\b/g)].map((m) => m[1]!);
+      const mention = tokens.find((t) => !STOP.has(t)) ?? q.question;
+      const res = resolvePersonMention(db, mention);
       if (q.ambiguous) {
         if (res.kind === 'ambiguous') {
           ambiguousMatches++;
           correct++;
         }
-      } else if (res.kind === 'confident' && res.person.id === q.expected) {
+      } else if (res.kind === 'confident' && res.person.id === q.expectedPersonId) {
         correct++;
       }
     }

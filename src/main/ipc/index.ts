@@ -442,6 +442,20 @@ export function registerHandlers(
       emitToRenderer: makeRendererEmitter(deps.mainWindow ?? null),
     });
     entitlementChannels.forEach((c) => skip.add(c));
+  } else if (!skip.has(CHANNELS.ENTITLEMENT_GET_STATE)) {
+    // DB not yet unlocked — register a stub so the renderer's EntitlementProvider
+    // doesn't throw "No handler registered" on first mount. Returns a safe
+    // trial-active state in the correct { ok, state } shape; the lazy bootstrap
+    // in main/index.ts calls removeHandler + re-registers with the real service,
+    // then pushes ENTITLEMENT_STATE_CHANGED so the renderer updates.
+    const trialExpiresAt = new Date(
+      Date.now() + 60 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    ipcMain.handle(CHANNELS.ENTITLEMENT_GET_STATE, () => ({
+      ok: true,
+      state: { kind: 'trial-active-quiet', daysRemaining: 60, trialExpiresAt },
+    }));
+    skip.add(CHANNELS.ENTITLEMENT_GET_STATE);
   }
 
   // Plan 10-01 — Knowledge Folders IPC (7 channels).

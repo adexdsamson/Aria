@@ -11,6 +11,7 @@ import { UnlockScreen } from '../features/onboarding/UnlockScreen';
 import { RestoreScreen } from '../features/onboarding/RestoreScreen';
 import { EntitlementProvider } from '../features/entitlement/EntitlementProvider';
 import { TrialBanner } from '../features/entitlement/TrialBanner';
+import { AppLogo } from '../components/editorial/Logo';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -55,8 +56,8 @@ function AppShell(): JSX.Element {
 
   if (gate === 'loading') {
     return (
-      <div data-testid="gate-loading" style={shellStyle()}>
-        <p style={{ padding: 24 }}>Loading…</p>
+      <div data-testid="gate-loading" style={{ ...shellStyle(), background: 'var(--paper)' }}>
+        <GateLoadingScreen />
       </div>
     );
   }
@@ -106,6 +107,67 @@ function AppShell(): JSX.Element {
         <ToastHost />
       </div>
     </EntitlementProvider>
+  );
+}
+
+function GateLoadingScreen(): JSX.Element {
+  return (
+    <>
+      <style>{`
+        @keyframes gate-fade-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+        @keyframes gate-progress {
+          0%   { width: 0%;   }
+          60%  { width: 55%;  }
+          85%  { width: 62%;  }
+          100% { width: 66%;  }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gate-logo { animation: none !important; opacity: 1 !important; }
+          .gate-bar  { animation: none !important; width: 40% !important; opacity: 0.4 !important; }
+        }
+      `}</style>
+      <div
+        className="gate-logo"
+        style={{
+          margin: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 28,
+          animation: 'gate-fade-in 400ms cubic-bezier(0.23,1,0.32,1) both',
+          animationDelay: '60ms',
+        }}
+      >
+        <AppLogo variant="splash" />
+        {/* Gold progress bar — suggests activity without implying exact progress */}
+        <div
+          style={{
+            width: 160,
+            height: 2,
+            background: 'var(--rule)',
+            borderRadius: 2,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <div
+            className="gate-bar"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              height: '100%',
+              background: 'var(--gold)',
+              borderRadius: 2,
+              animation: 'gate-progress 2.4s cubic-bezier(0.23,1,0.32,1) forwards',
+            }}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 

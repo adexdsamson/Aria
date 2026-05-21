@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApprovalRowDto, ApprovalUiState } from '../../../shared/ipc-contract';
 import { Button } from '../../components/editorial';
 import { ApprovalQueue } from './ApprovalQueue';
+import { SkeletonRoot, SkeletonBlock, SkeletonLine } from '../../components/Skeleton';
 
 const FILTERABLE_STATES: ApprovalUiState[] = [
   'pending',
@@ -322,12 +323,33 @@ export function ApprovalsScreen(): JSX.Element {
       )}
 
       {!loaded && (
-        <p
-          data-testid="approvals-loading"
-          style={{ fontFamily: 'var(--f-display)', fontStyle: 'italic', color: 'var(--gray)' }}
-        >
-          Loading…
-        </p>
+        <div data-testid="approvals-loading">
+          <SkeletonRoot style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[88, 72, 88, 64].map((h, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '16px 18px',
+                  border: '1px solid var(--rule)',
+                  borderRadius: 'var(--radius-lg)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <SkeletonLine width={56} height={10} />
+                  <SkeletonLine width={120} height={13} />
+                </div>
+                <SkeletonBlock width="100%" height={h - 40} radius={4} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <SkeletonLine width={72} height={28} style={{ borderRadius: 6 }} />
+                  <SkeletonLine width={72} height={28} style={{ borderRadius: 6 }} />
+                </div>
+              </div>
+            ))}
+          </SkeletonRoot>
+        </div>
       )}
       {loaded && visible.length === 0 && (
         <p

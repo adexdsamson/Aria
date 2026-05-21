@@ -26,6 +26,7 @@ export const CHANNELS = {
   DIAGNOSTICS_STATUS: 'aria:diagnostics:status',
   BACKUP_CREATE: 'aria:backup:create',
   BACKUP_RESTORE: 'aria:backup:restore',
+  BACKUP_STATS: 'aria:backup:stats',
   // Plan 02-01 Gmail integration
   GMAIL_CONNECT: 'aria:gmail:connect',
   GMAIL_STATUS: 'aria:gmail:status',
@@ -774,6 +775,7 @@ export interface AriaApi {
 
   backupCreate(req?: { destination?: string }): Promise<{ path: string } | IpcError>;
   backupRestore(req: { source: string; passphrase: string }): Promise<{ ok: boolean } | IpcError>;
+  backupStats(): Promise<{ dbSizeBytes: number; lastBackupName: string | null; lastBackupAt: string | null; schemaVersion: number | null }>;
 
   gmailConnect(): Promise<{ ok: true; email: string } | { ok: false; error: string } | IpcError>;
   gmailStatus(): Promise<GmailIntegrationStatus | IpcError>;
@@ -1278,6 +1280,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   DIAGNOSTICS_STATUS: 'diagnosticsStatus',
   BACKUP_CREATE: 'backupCreate',
   BACKUP_RESTORE: 'backupRestore',
+  BACKUP_STATS: 'backupStats',
   GMAIL_CONNECT: 'gmailConnect',
   GMAIL_STATUS: 'gmailStatus',
   GMAIL_DISCONNECT: 'gmailDisconnect',

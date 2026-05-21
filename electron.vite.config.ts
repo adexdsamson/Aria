@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { defineConfig, type UserConfig } from 'electron-vite';
+import { defineConfig, externalizeDepsPlugin, type UserConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -30,6 +30,12 @@ const config: UserConfig = {
     },
   },
   preload: {
+    // Preload runs in Electron's sandboxed context — CommonJS `require()` cannot
+    // resolve node_modules from the renderer's preload host. Anything pulled in
+    // via @shared (e.g. zod schemas in ipc-contract.ts) MUST be bundled INTO
+    // preload/index.js rather than left as an external require. Exclude zod
+    // from electron-vite's default `externalize-deps` plugin so it's inlined.
+    plugins: [externalizeDepsPlugin({ exclude: ['zod'] })],
     build: {
       outDir: 'out/preload',
       rollupOptions: {

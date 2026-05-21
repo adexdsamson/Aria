@@ -254,6 +254,22 @@ export function AskScreen(): JSX.Element {
             );
           })}
         </ul>
+
+        {/* Ephemeral / Cmd-K hint — design-ref left-rail footer note */}
+        <p
+          style={{
+            marginTop: 'auto',
+            paddingTop: 20,
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--gray-soft)',
+            lineHeight: 1.55,
+          }}
+        >
+          ⌘K answers are ephemeral. Use "Expand to chat" to keep one.
+        </p>
       </aside>
 
       {/* Main panel */}
@@ -278,10 +294,17 @@ export function AskScreen(): JSX.Element {
           }}
         >
           <span
-            className="smallcaps"
-            style={{ color: 'var(--gray-soft)', marginRight: 8 }}
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+              marginRight: 8,
+            }}
           >
-            Filter accounts
+            Search across
           </span>
           {accounts.length === 0 && (
             <span
@@ -416,6 +439,30 @@ export function AskScreen(): JSX.Element {
             {busy ? 'Asking…' : 'Ask'}
           </Button>
         </footer>
+
+        {/* Routing/privacy caption row — design-ref footer microcopy. Tells the
+            user what runs locally vs. what routes to the local LLM. */}
+        <div
+          aria-hidden="true"
+          style={{
+            padding: '8px 24px 14px',
+            background: 'var(--ivory)',
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--gray-soft)',
+            display: 'flex',
+            gap: 14,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>BM25 + nomic-embed-text</span>
+          <span>·</span>
+          <span>Queries stay local</span>
+          <span>·</span>
+          <span>PII routes to llama3.1:8b</span>
+        </div>
       </main>
     </div>
   );
