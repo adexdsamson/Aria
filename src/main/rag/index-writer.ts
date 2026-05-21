@@ -54,6 +54,14 @@ function nowIso(): string {
 }
 
 function chunkId(doc: SourceDoc, index: number): string {
+  if (doc.sourceKind === 'folder') {
+    if (!doc.fileId) {
+      throw new Error(
+        `[index-writer] folder source requires fileId on SourceDoc (sourceId=${doc.sourceId})`,
+      );
+    }
+    return `folder:${doc.fileId}:chunk:${index}`;
+  }
   return `${doc.sourceKind}:${doc.sourceId}:chunk:${index}`;
 }
 
@@ -87,8 +95,9 @@ export function createIndexWriter(deps: IndexWriterDeps): IndexWriter {
         `INSERT INTO rag_chunk (
            id, source_kind, source_id, provider_key, account_id, parent_ref,
            speaker_hint, title, text, char_start, char_end, token_count,
-           lang, source_updated_at, dirty, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           lang, source_updated_at, dirty, created_at, updated_at,
+           folder_id, file_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
       );
       chunks.forEach((c, i) => {
         insertStmt.run(
@@ -108,6 +117,8 @@ export function createIndexWriter(deps: IndexWriterDeps): IndexWriter {
           c.sourceUpdatedAt ?? null,
           now,
           now,
+          doc.folderId ?? null,
+          doc.fileId ?? null,
         );
       });
       inserted = chunks.length;
