@@ -20,21 +20,34 @@
  *   - Existing tests for TranscriptCaptureScreen + NoteReviewScreen
  *     continue to pass because both components are unchanged here
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TranscriptCaptureScreen } from './TranscriptCaptureScreen';
 import { NoteReviewScreen } from './NoteReviewScreen';
 import { SkeletonRoot, SkeletonLine } from '../../components/Skeleton';
 
 type RecentNote = {
-  noteId: string;
+  id: string;
   title: string | null;
-  source: string | null;
-  createdAt: string | null;
-  itemCount?: number | null;
+  sourceKind: string | null;
+  ingestedAt: string | null;
 };
 
 function isErr(v: unknown): v is { error: string } {
   return !!v && typeof v === 'object' && 'error' in (v as object);
+}
+
+function formatSourceKind(k: string | null): string {
+  if (!k) return '';
+  const map: Record<string, string> = {
+    paste: 'Paste',
+    upload: 'Upload',
+    gong: 'Gong',
+    zoom: 'Zoom',
+    teams: 'Teams',
+    meet: 'Meet',
+    webex: 'Webex',
+  };
+  return map[k.toLowerCase()] ?? k;
 }
 
 function formatRecentDate(iso: string | null): string {
@@ -56,6 +69,7 @@ export function MeetingsScreen(): JSX.Element {
   const [loaded, setLoaded] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [showPasteForm, setShowPasteForm] = useState(false);
+  const hasAutoSelected = useRef(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -67,17 +81,19 @@ export function MeetingsScreen(): JSX.Element {
       }
       const res = await fn();
       if (!isErr(res) && res && 'rows' in res) {
-        const rows = (res.rows as RecentNote[]) ?? [];
+        const rows = (res.rows as unknown as RecentNote[]) ?? [];
         setRecent(rows);
-        if (rows.length > 0 && !selectedNoteId) {
-          setSelectedNoteId(rows[0].noteId);
+        if (rows.length > 0 && !hasAutoSelected.current) {
+          hasAutoSelected.current = true;
+          setSelectedNoteId(rows[0].id);
         }
       }
     } catch {
       /* keep empty */
     }
     setLoaded(true);
-  }, [selectedNoteId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -222,13 +238,13 @@ export function MeetingsScreen(): JSX.Element {
 
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {recent.map((row) => {
-            const isSelected = row.noteId === selectedNoteId;
+            const isSelected = row.id === selectedNoteId;
             return (
-              <li key={row.noteId}>
+              <li key={row.id}>
                 <button
                   type="button"
-                  data-testid={`meetings-recent-${row.noteId}`}
-                  onClick={() => setSelectedNoteId(row.noteId)}
+                  data-testid={`meetings-recent-${row.id}`}
+                  onClick={() => setSelectedNoteId(row.id)}
                   style={{
                     width: '100%',
                     textAlign: 'left',
@@ -267,9 +283,8 @@ export function MeetingsScreen(): JSX.Element {
                       letterSpacing: '0.06em',
                     }}
                   >
-                    {formatRecentDate(row.createdAt)}
-                    {row.source ? ` · ${row.source}` : ''}
-                    {row.itemCount != null ? ` · ${row.itemCount} items` : ''}
+                    {formatRecentDate(row.ingestedAt)}
+                    {row.sourceKind ? ` · ${formatSourceKind(row.sourceKind)}` : ''}
                   </div>
                 </button>
               </li>
