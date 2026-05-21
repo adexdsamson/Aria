@@ -6,7 +6,7 @@
  * that `title` is non-empty so RagCitation hydration is a single-row read.
  */
 
-export type SourceKind = 'email' | 'event' | 'note' | 'action';
+export type SourceKind = 'email' | 'event' | 'note' | 'action' | 'folder';
 
 export type ProviderKey = 'google' | 'microsoft' | 'todoist';
 
@@ -55,6 +55,9 @@ export interface SourceDoc {
   occurredAt?: string;
   sourceUpdatedAt?: string | null;
   lang?: string | null;
+  /** Phase 10: folder chunk context (only populated for sourceKind='folder'). */
+  folderId?: string | null;
+  fileId?: string | null;
 }
 
 export interface ChunkingStrategy {
