@@ -21,6 +21,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NewsSourceRow, IpcError } from '../../../shared/ipc-contract';
+import { Modal } from '../../components/editorial/Modal';
 import CATALOG_RAW from '../../assets/news-catalog.json';
 
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
@@ -359,8 +360,14 @@ export function NewsSourcesSection(): JSX.Element {
         )}
       </div>
 
-      {/* ── Catalog picker ───────────────────────────────────────── */}
-      {catalogOpen && (
+      {/* ── Catalog dialog ───────────────────────────────────────── */}
+      <Modal
+        open={catalogOpen}
+        onClose={() => setCatalogOpen(false)}
+        eyebrow="Feed catalog"
+        title="Browse &amp; add curated sources"
+        size="lg"
+      >
         <CatalogPicker
           activeCat={activeCat}
           setActiveCat={setActiveCat}
@@ -368,9 +375,8 @@ export function NewsSourcesSection(): JSX.Element {
           addedUrls={addedUrls}
           addingUrl={addingUrl}
           onAdd={addCatalogFeed}
-          onClose={() => setCatalogOpen(false)}
         />
-      )}
+      </Modal>
 
       {/* ── Custom RSS form ──────────────────────────────────────── */}
       {formOpen && (
@@ -483,7 +489,6 @@ interface CatalogPickerProps {
   addedUrls: Set<string>;
   addingUrl: string | null;
   onAdd: (feed: CatalogFeed) => Promise<void>;
-  onClose: () => void;
 }
 
 function CatalogPicker({
@@ -493,76 +498,14 @@ function CatalogPicker({
   addedUrls,
   addingUrl,
   onAdd,
-  onClose,
 }: CatalogPickerProps): JSX.Element {
   return (
     <div
       data-testid="news-catalog-picker"
-      style={{
-        marginTop: 20,
-        border: '1px solid var(--rule)',
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--ivory-deep)',
-        overflow: 'hidden',
-      }}
+      /* flush against Modal's 18px 22px padding */
+      style={{ margin: '-18px -22px', overflow: 'hidden' }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 20px 14px',
-          borderBottom: '1px solid var(--rule)',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--f-mono)',
-              fontSize: 10,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--gold)',
-              marginBottom: 4,
-            }}
-          >
-            Feed catalog
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--f-display)',
-              fontSize: 17,
-              fontWeight: 500,
-              color: 'var(--ink)',
-            }}
-          >
-            Browse &amp; add curated sources
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close catalog"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--ink-soft)',
-            fontSize: 18,
-            lineHeight: 1,
-            padding: '4px 6px',
-            borderRadius: 'var(--radius-sm)',
-            transition: 'color 150ms ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--ink)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-soft)')}
-        >
-          ✕
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', minHeight: 360 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', height: 420 }}>
         {/* Category sidebar */}
         <div
           style={{

@@ -233,13 +233,25 @@ Plans:
 
 ### Phase 10: Knowledge Folders
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Register local folders as knowledge sources for /ask. Aria walks, parses (.txt/.md/.csv/.docx/.xlsx/.pdf), chunks + embeds into the Phase 7 chunks table with corpus=folder, watches live (chokidar + tombstones + 24h resurrection), and forces local-only LLM routing per turn when any chunk from a sensitivity=sensitive folder enters the retrieval set. Google Drive deferred.
+**Requirements**: SPEC-§3, SPEC-§4, SPEC-§5, SPEC-§6, SPEC-§7, SPEC-§8, SPEC-§9, SPEC-§10, SPEC-§11 (Phase 10 inserted after v1 REQ-ID lock — see canonical spec docs/superpowers/specs/2026-05-21-knowledge-folders-design.md)
 **Depends on:** Phase 9
+**Plans:** 3 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Migration 132, FolderRegistry, parser registry, FileScanner + ChunkStore one-shot ingest, full IPC surface (incl. prescan)
+- [ ] 10-02-PLAN.md — Per-turn sensitivity gate extension, chokidar watcher + tombstones + 24h resurrection, daily 03:00 cron sweep, boot reconciler, powerMonitor, Phase 7 model-swap reconciler integration verified
+- [ ] 10-03-PLAN.md — KnowledgeFoldersSection editorial UI + prescan-confirm + destructive remove dialog (3-split contract) + integration round-trip + Playwright E2E + human-verify UAT
+
+### Phase 11: Research
+
+**Goal:** Aria lets users commission web-backed research jobs (manual + transcript auto-detected), renders versioned reports in Document and Dashboard views, and refines results through a structured per-section feedback loop
+**Requirements:** RES-01, RES-02, RES-03, RES-04, RES-05, RES-06, RES-07, RES-08
+**Depends on:** Phase 6, Phase 9
 **Plans:** 0 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 10 to break down)
+- [ ] TBD (run /gsd-plan-phase 11 to break down)
 
 ---
 
