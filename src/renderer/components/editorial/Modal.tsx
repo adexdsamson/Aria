@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-export type ModalSize = 'sm' | 'md' | 'lg';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export interface ModalProps {
   open: boolean;
@@ -17,6 +17,7 @@ const SIZE_TO_WIDTH: Record<ModalSize, string> = {
   sm: 'min(420px, 92vw)',
   md: 'min(560px, 92vw)',
   lg: 'min(720px, 92vw)',
+  xl: 'min(920px, 96vw)',
 };
 
 /**
@@ -61,7 +62,9 @@ export function Modal({
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: '12vh',
+        paddingTop: size === 'xl' ? '5vh' : '12vh',
+        paddingBottom: '5vh',
+        overflowY: 'auto',
       }}
     >
       <div
