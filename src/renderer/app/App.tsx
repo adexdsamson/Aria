@@ -2,7 +2,9 @@ import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { SideNav } from '../components/SideNav';
+import { Topbar } from '../components/Topbar';
 import { CommandPalette } from '../components/CommandPalette';
+import { ToastHost } from '../components/ToastHost';
 import { AppRoutes } from './routes';
 import { OnboardingWizard } from '../features/onboarding/OnboardingWizard';
 import { UnlockScreen } from '../features/onboarding/UnlockScreen';
@@ -90,14 +92,18 @@ function AppShell(): JSX.Element {
             display: 'flex',
             flexDirection: 'column',
             position: 'relative',
+            background: 'var(--ivory)',
+            color: 'var(--ink)',
           }}
         >
           <TrialBanner />
+          <Topbar />
           <div style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
             <AppRoutes />
           </div>
         </main>
         <CommandPalette />
+        <ToastHost />
       </div>
     </EntitlementProvider>
   );
