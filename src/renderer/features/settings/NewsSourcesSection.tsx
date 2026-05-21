@@ -366,7 +366,7 @@ export function NewsSourcesSection(): JSX.Element {
         onClose={() => setCatalogOpen(false)}
         eyebrow="Feed catalog"
         title="Browse &amp; add curated sources"
-        size="lg"
+        size="xl"
       >
         <CatalogPicker
           activeCat={activeCat}
@@ -505,7 +505,7 @@ function CatalogPicker({
       /* flush against Modal's 18px 22px padding */
       style={{ margin: '-18px -22px', overflow: 'hidden' }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', height: 420 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', height: 'calc(80vh - 140px)', minHeight: 480 }}>
         {/* Category sidebar */}
         <div
           style={{
