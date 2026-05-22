@@ -153,7 +153,7 @@ export function registerInsightsHandlers(
           const weekYmd = weekStartYmdFor(new Date(), tz);
           await aggregate(db, weekYmd, { router, logger });
         },
-        { scheduler: deps.scheduler, logger },
+        { scheduler: deps.scheduler, logger, dbHolder },
       );
     } catch (err) {
       logger.warn(

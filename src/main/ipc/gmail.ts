@@ -33,6 +33,8 @@ import { clearGoogleTokens, getGoogleTokens } from '../secrets/safeStorage';
 import { createGmailClient, type GmailClient } from '../integrations/google/gmail';
 import { isVerificationPending } from '../integrations/google/sendLog';
 import { GmailSync, createGmailSync } from '../integrations/google/sync-gmail';
+import { pendingCatchup } from '../lifecycle/pendingCatchup';
+import { trayBus } from '../tray/index';
 
 export interface GmailHandlerDeps {
   logger: Logger;
@@ -83,6 +85,14 @@ export function registerGmailHandlers(ipcMain: IpcMain, deps: GmailHandlerDeps):
     const task = cron.schedule(
       CRON_SCHEDULE,
       () => {
+        // Phase 12 / Plan 12-02 — sealed-DB guard (BG-04). Silent-skip when
+        // the vault is sealed; queue a catchup ticket and badge the tray.
+        const db = dbHolder.db;
+        if (!db) {
+          pendingCatchup.add('gmail-sync');
+          trayBus.setBadge();
+          return;
+        }
         // Fire-and-log; never throw out of cron.
         void runTick().catch((err) => {
           logger.warn({ scope: 'gmail-sync', err: (err as Error).message }, 'cron tick error');

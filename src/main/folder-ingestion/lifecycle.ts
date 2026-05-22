@@ -20,6 +20,8 @@ import type { SweepHandle } from './sweep-cron';
 import { runBootReconciliation } from './boot-reconciler';
 import { registerLifecycleCallbacks } from '../lifecycle/powerMonitor';
 import type Database from 'better-sqlite3-multiple-ciphers';
+import type { SchedulerHandle } from '../lifecycle/scheduler';
+import type { DbHolder } from '../ipc/onboarding';
 
 type Db = Database.Database;
 
@@ -28,6 +30,11 @@ export interface LifecycleDeps {
   registry: FolderRegistry;
   ingestionService: FolderIngestionService;
   logger: Logger;
+  /** Phase 12 / Plan 12-02 — wire scheduler so sweep-cron registers with
+   *  cronRegistry (no-bare-cron-schedule ratchet) and dbHolder so the
+   *  seal-guard knows when the vault is sealed. */
+  scheduler?: SchedulerHandle;
+  dbHolder?: Pick<DbHolder, 'db'>;
 }
 
 let currentWatcher: FolderWatcher | null = null;
@@ -49,8 +56,14 @@ async function startWatchersAndSweep(deps: LifecycleDeps): Promise<void> {
   }
   currentWatcher = watcher;
 
-  // Start tombstone sweep cron
-  currentSweep = startTombstoneSweep({ db, logger });
+  // Start tombstone sweep cron — pass scheduler + dbHolder so the cron
+  // task registers with cronRegistry AND carries the sealed-DB guard.
+  currentSweep = startTombstoneSweep({
+    db,
+    logger,
+    scheduler: deps.scheduler,
+    dbHolder: deps.dbHolder,
+  });
 
   logger.info({
     scope: 'knowledge-lifecycle',

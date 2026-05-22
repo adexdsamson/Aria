@@ -116,7 +116,7 @@ export function registerRecapHandlers(ipcMain: IpcMain, deps: RecapHandlerDeps):
             logger,
           });
         },
-        { scheduler: deps.scheduler, logger },
+        { scheduler: deps.scheduler, logger, dbHolder },
       );
     } catch (err) {
       logger.warn({ scope: 'recap-bootstrap', err: (err as Error).message }, 'failed to register recap cron');
