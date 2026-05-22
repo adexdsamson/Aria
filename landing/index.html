@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Aria — A chief of staff who lives on your desk</title>
+<meta name="description" content="Aria reads your mail and calendar, drafts replies in your voice, and writes you one quiet briefing each morning. Local-first. Every send asks you first." />
+<meta property="og:title" content="Aria — A chief of staff who lives on your desk" />
+<meta property="og:description" content="Local-first AI assistant for executives. One briefing every morning. Every send asks you first." />
+<meta property="og:type" content="website" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+
+<style>
+/* ── Design tokens ──────────────────────────────────────────────────── */
+:root {
+  --ivory:        #FAFAF8;
+  --ivory-deep:   #F5F3F0;
+  --paper:        #FFFFFF;
+  --ink:          #1A1A1A;
+  --ink-soft:     #2A2826;
+  --gray:         #6B6B6B;
+  --gray-soft:    #8A8784;
+  --gray-faint:   #C7C2BB;
+  --rule:         #E8E4DF;
+  --rule-strong:  #D6D1C8;
+  --gold:         #B8860B;
+  --gold-light:   #D4A84B;
+  --gold-deep:    #8E6708;
+  --rose:         #B8493A;
+  --moss:         #5B6E3A;
+
+  --f-display: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --f-body:    "Source Sans 3", system-ui, sans-serif;
+  --f-mono:    "IBM Plex Mono", ui-monospace, monospace;
+
+  --container:      64rem;
+  --container-wide: 80rem;
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 8px;
+  --t:         200ms cubic-bezier(.2,.6,.2,1);
+  --t-slow:    320ms cubic-bezier(.2,.6,.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html {
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+body { background: var(--ivory); color: var(--ink); min-height: 100vh; }
+
+/* Paper overlay */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0; opacity: 0.4;
+  background-image:
+    radial-gradient(circle at 22% 18%, rgba(184,134,11,0.025) 0%, transparent 40%),
+    radial-gradient(circle at 88% 84%, rgba(26,26,26,0.02) 0%, transparent 40%);
+  mix-blend-mode: multiply;
+}
+
+h1,h2,h3,h4 { font-family: var(--f-display); font-weight: 400; letter-spacing: -0.01em; margin: 0; color: var(--ink); }
+p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+::selection { background: rgba(184,134,11,0.2); color: var(--ink); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 8px; border: 2px solid var(--ivory); }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-soft); }
+
+/* ── Utilities ──────────────────────────────────────────────────────── */
+.smallcaps {
+  font-family: var(--f-mono); font-weight: 500; font-size: 0.7rem;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--gray);
+}
+.smallcaps-gold { color: var(--gold); }
+.container { max-width: var(--container); margin: 0 auto; padding: 0 1.5rem; }
+.container-wide { max-width: var(--container-wide); margin: 0 auto; padding: 0 1.5rem; }
+.muted { color: var(--gray); }
+.gold { color: var(--gold); }
+.italic { font-style: italic; }
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 44px; padding: 0 1.25rem;
+  font-family: var(--f-body); font-size: 0.875rem; font-weight: 500;
+  letter-spacing: 0.04em; border-radius: var(--radius);
+  border: 1px solid transparent; cursor: pointer;
+  transition: all var(--t); white-space: nowrap; text-decoration: none;
+}
+.btn-primary {
+  background: var(--gold); color: #fff;
+  box-shadow: 0 1px 2px rgba(26,26,26,0.04);
+}
+.btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(184,134,11,0.22); }
+.btn-primary:active { transform: translateY(0); }
+.btn-outline {
+  background: transparent; color: var(--ink); border-color: var(--rule-strong);
+}
+.btn-outline:hover { border-color: var(--gold); color: var(--gold); background: rgba(184,134,11,0.04); }
+.btn-ghost { background: transparent; color: var(--gray); border: none; }
+.btn-ghost:hover { color: var(--ink); }
+
+/* Download button variants */
+.btn-dl {
+  background: var(--ink); color: var(--ivory);
+  border: 1px solid var(--ink);
+  gap: 0.625rem;
+}
+.btn-dl:hover { background: var(--ink-soft); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,26,26,0.18); }
+.btn-dl .dl-os { font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.6; }
+.btn-dl .dl-label { font-size: 0.9rem; font-weight: 500; }
+
+/* ── Top nav ────────────────────────────────────────────────────────── */
+.topnav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(250,250,248,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--rule);
+}
+.topnav-inner {
+  max-width: 80rem; margin: 0 auto; padding: 14px 2rem;
+  display: flex; align-items: center; gap: 1.5rem;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--ivory); border: 1px solid var(--rule);
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 2px rgba(26,26,26,0.04);
+  flex-shrink: 0;
+}
+.brand-letter {
+  font-family: var(--f-display); font-weight: 500; font-size: 18px;
+  line-height: 1; color: var(--ink); position: relative; padding-bottom: 2px;
+}
+.brand-letter::after {
+  content: ""; position: absolute;
+  left: 20%; right: 20%; bottom: 14%; height: 1.5px; background: var(--gold);
+}
+.brand-word { font-family: var(--f-display); font-size: 1.375rem; font-weight: 500; letter-spacing: 0.01em; }
+.topnav nav { display: flex; gap: 2rem; margin-left: auto; }
+.topnav nav a {
+  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--gray); transition: color var(--t);
+}
+.topnav nav a:hover { color: var(--gold); }
+.topnav .actions { display: flex; gap: 0.75rem; align-items: center; }
+@media (max-width: 768px) {
+  .topnav nav { display: none; }
+  .topnav .actions .btn-ghost-nav { display: none; }
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────── */
+.hero { padding: 6rem 2rem 4rem; border-bottom: 1px solid var(--rule); }
+.hero-inner { max-width: 80rem; margin: 0 auto; }
+
+.hero-masthead {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 1.5rem; align-items: center;
+  padding-bottom: 1.5rem; border-bottom: 1px solid var(--rule);
+  margin-bottom: 3rem;
+}
+.hero-masthead .mast-left,
+.hero-masthead .mast-right {
+  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--gray);
+}
+.hero-masthead .mast-right { text-align: right; }
+.hero-masthead .mast-center {
+  font-family: var(--f-display); font-style: italic; font-size: 1rem; color: var(--gold);
+}
+@media (max-width: 700px) {
+  .hero-masthead { grid-template-columns: 1fr; text-align: center; }
+  .hero-masthead .mast-right { text-align: center; }
+}
+
+.hero-grid {
+  display: grid; grid-template-columns: 1.4fr 1fr;
+  gap: 4rem; align-items: end;
+}
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 2rem; } }
+
+.hero h1 {
+  font-size: clamp(3rem, 8.5vw, 7.5rem);
+  line-height: 0.95; font-weight: 500; letter-spacing: -0.03em;
+  margin-bottom: 1.25rem;
+}
+.hero h1 .it { font-style: italic; color: var(--ink-soft); font-weight: 400; }
+.hero h1 .gold-underline { position: relative; display: inline-block; }
+.hero h1 .gold-underline::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -0.05em;
+  height: 4px; background: var(--gold);
+}
+
+.hero .lede {
+  font-family: var(--f-display); font-style: italic;
+  font-size: 1.5rem; line-height: 1.45; color: var(--gray);
+  max-width: 30em; margin-top: 1.5rem;
+}
+
+.hero .cta-row {
+  display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+  margin-top: 2.5rem;
+}
+.hero .dl-pair { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.hero .meta-line {
+  font-family: var(--f-mono); font-size: 0.7rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--gray-soft); display: flex; align-items: center; gap: 0.75rem;
+  margin-top: 0.5rem; width: 100%;
+}
+.hero .meta-line .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+
+/* Hero aside */
+.hero-preview {
+  position: relative;
+  border: 1px solid var(--rule); border-top: 2px solid var(--gold);
+  border-radius: 8px; background: var(--paper);
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 12px 40px rgba(26,26,26,0.08);
+  transform: rotate(-1deg);
+}
+.hero-preview::before {
+  content: ""; position: absolute; top: -1rem; left: 2rem;
+  width: 60px; height: 1px; background: var(--gold);
+}
+.hero-preview .eyebrow {
+  font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 0.5rem;
+}
+.hero-preview h3 { font-size: 1.625rem; line-height: 1.15; margin-bottom: 0.75rem; }
+.hero-preview p { font-size: 0.95rem; line-height: 1.6; color: var(--gray); }
+.hero-preview .signature {
+  margin-top: 1.25rem; padding-top: 1rem;
+  border-top: 1px dotted var(--rule);
+  font-family: var(--f-mono); font-size: 0.65rem;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--gray-soft);
+  display: flex; justify-content: space-between;
+}
+
+/* ── Strip ──────────────────────────────────────────────────────────── */
+.strip {
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  padding: 1.5rem 0; background: var(--ivory-deep); overflow: hidden;
+}
+.strip-inner {
+  max-width: 80rem; margin: 0 auto;
+  display: flex; align-items: center; gap: 3rem;
+  padding: 0 2rem; flex-wrap: wrap; justify-content: center;
+}
+.strip-item {
+  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gray);
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.strip-item .glyph {
+  font-family: var(--f-display); font-style: italic; color: var(--gold); font-size: 1.125rem;
+}
+
+/* ── Sections ───────────────────────────────────────────────────────── */
+section.section { padding: 8rem 2rem; border-bottom: 1px solid var(--rule); }
+section.dark { background: var(--ink); color: var(--ivory); }
+
+.sec-eyebrow {
+  display: flex; align-items: center; gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.sec-eyebrow .sec-rule { width: 60px; height: 1px; background: var(--rule); }
+.sec-eyebrow .sec-rule-flex { flex: 1; height: 1px; background: var(--rule); }
+section.dark .sec-eyebrow .sec-rule,
+section.dark .sec-eyebrow .sec-rule-flex { background: rgba(212,168,75,0.4); }
+.sec-eyebrow .num {
+  font-family: var(--f-display); font-style: italic; font-size: 1.5rem;
+  color: var(--gold); line-height: 1;
+}
+.sec-eyebrow .lbl {
+  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--gold);
+}
+
+.sec-h {
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem); line-height: 1.05;
+  font-weight: 500; letter-spacing: -0.025em;
+  max-width: 18em; margin-bottom: 1rem;
+}
+.sec-h em { font-style: italic; color: var(--gray); font-weight: 400; }
+section.dark .sec-h em { color: var(--gold-light); }
+.sec-sub {
+  font-family: var(--f-display); font-style: italic;
+  font-size: 1.25rem; line-height: 1.5; color: var(--gray);
+  max-width: 30em; margin-bottom: 3rem;
+}
+section.dark .sec-sub { color: rgba(255,255,255,0.7); }
+
+/* ── How it works ───────────────────────────────────────────────────── */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin-top: 2rem; }
+@media (max-width: 900px) { .steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+.step { padding-top: 1.25rem; border-top: 1px solid var(--rule); }
+.step .n {
+  font-family: var(--f-display); font-size: 3rem; font-weight: 500;
+  color: var(--gold); line-height: 1; font-style: italic;
+  margin-bottom: 0.75rem;
+}
+.step h4 { font-size: 1.25rem; line-height: 1.25; margin-bottom: 0.5rem; font-weight: 500; }
+.step p { font-size: 0.95rem; line-height: 1.65; color: var(--gray); }
+
+/* ── Feature blocks ─────────────────────────────────────────────────── */
+.feature { display: grid; gap: 4rem; align-items: center; margin-bottom: 8rem; }
+.feature:last-child { margin-bottom: 0; }
+.feature.flip { grid-template-columns: 1fr 1.1fr; }
+.feature.flip .feat-visual { order: 1; }
+.feature.flip .feat-copy { order: 2; }
+.feature:not(.flip) { grid-template-columns: 1.1fr 1fr; }
+@media (max-width: 900px) {
+  .feature, .feature.flip { grid-template-columns: 1fr; gap: 2rem; }
+  .feature.flip .feat-visual,
+  .feature.flip .feat-copy { order: 0; }
+}
+
+.feat-copy h3 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.1;
+  font-weight: 500; letter-spacing: -0.02em; margin-bottom: 1rem;
+}
+.feat-copy h3 em { font-style: italic; color: var(--gray); }
+.feat-copy p {
+  font-size: 1.0625rem; line-height: 1.75; color: var(--ink-soft);
+  max-width: 32em; margin-bottom: 1.5rem;
+}
+.feat-copy ul { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.feat-copy li {
+  display: grid; grid-template-columns: 20px 1fr; gap: 0.75rem;
+  padding: 0.6rem 0; border-top: 1px dotted var(--rule);
+  font-size: 0.95rem; color: var(--ink-soft);
+}
+.feat-copy li:last-child { border-bottom: 1px dotted var(--rule); }
+.feat-copy li .swatch {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+  margin-top: 0.65rem; justify-self: start;
+}
+
+/* Mocks */
+.mock {
+  background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 1.5rem 1.75rem;
+  box-shadow: 0 12px 40px rgba(26,26,26,0.08); position: relative;
+}
+.mock.tilt { transform: rotate(-0.6deg); }
+.mock.tilt-right { transform: rotate(0.6deg); }
+.mock-eyebrow {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding-bottom: 0.75rem; border-bottom: 1px solid var(--rule); margin-bottom: 1rem;
+}
+.agenda-row {
+  display: grid; grid-template-columns: 52px 1fr auto;
+  align-items: baseline; gap: 12px; padding: 8px 0;
+  border-bottom: 1px dotted var(--rule);
+}
+.agenda-row:last-child { border-bottom: 0; }
+.agenda-row .t { font-family: var(--f-mono); font-size: 11px; color: var(--gray); letter-spacing: 0.05em; }
+.agenda-row .meta { font-family: var(--f-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.1em; text-transform: uppercase; }
+.agenda-row .it { font-style: italic; color: var(--gray); font-size: 0.95rem; }
+.draft-block {
+  background: var(--ivory); border: 1px dashed var(--rule);
+  padding: 14px 18px; border-radius: 4px;
+  font-family: Georgia, serif; font-size: 14px; line-height: 1.7;
+  color: var(--ink); white-space: pre-wrap;
+}
+.q-bubble {
+  background: var(--ink); color: var(--ivory);
+  padding: 10px 16px; border-radius: 14px; border-top-right-radius: 4px;
+  display: inline-block;
+  font-family: var(--f-display); font-style: italic; font-size: 0.95rem;
+}
+.citation {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 8px 0; border-bottom: 1px dotted var(--rule);
+  font-size: 0.85rem; color: var(--ink-soft);
+}
+.citation:last-child { border-bottom: 0; }
+.src-kind { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold); flex-shrink: 0; }
+
+/* ── Trust ──────────────────────────────────────────────────────────── */
+.trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 2rem; }
+@media (max-width: 900px) { .trust-grid { grid-template-columns: 1fr; } }
+.trust-card {
+  padding: 2rem 1.75rem; border-top: 2px solid var(--gold-light);
+  background: rgba(255,255,255,0.04);
+}
+.trust-card .glyph {
+  font-family: var(--f-display); font-style: italic; font-size: 2.5rem;
+  color: var(--gold-light); line-height: 1; margin-bottom: 0.75rem;
+}
+.trust-card h4 { font-size: 1.375rem; margin-bottom: 0.75rem; font-weight: 500; color: var(--ivory); }
+.trust-card p { color: rgba(255,255,255,0.7); font-size: 0.95rem; line-height: 1.65; }
+
+/* ── Download section ───────────────────────────────────────────────── */
+.dl-section {
+  padding: 8rem 2rem; border-bottom: 1px solid var(--rule);
+  text-align: center;
+}
+.dl-section h2 {
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem); line-height: 1.05;
+  font-weight: 500; letter-spacing: -0.025em;
+  max-width: 18em; margin: 0 auto 1rem;
+}
+.dl-section h2 em { font-style: italic; color: var(--gray); font-weight: 400; }
+.dl-section p {
+  font-family: var(--f-display); font-style: italic;
+  font-size: 1.25rem; line-height: 1.5; color: var(--gray);
+  max-width: 30em; margin: 0 auto 3rem;
+}
+.dl-cards {
+  display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+.dl-card {
+  background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 2rem 2.25rem;
+  min-width: 240px; text-align: left;
+  box-shadow: 0 4px 20px rgba(26,26,26,0.04);
+  transition: all var(--t);
+}
+.dl-card:hover { box-shadow: 0 8px 32px rgba(26,26,26,0.08); border-color: var(--rule-strong); }
+.dl-card .platform-label {
+  font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 0.75rem;
+}
+.dl-card .platform-name { font-family: var(--f-display); font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
+.dl-card .platform-detail { font-size: 0.875rem; color: var(--gray); margin-bottom: 1.5rem; }
+.dl-card a.dl-btn {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--ink); color: var(--ivory);
+  padding: 0.75rem 1.25rem; border-radius: var(--radius);
+  font-size: 0.875rem; font-weight: 500;
+  transition: all var(--t); text-decoration: none;
+}
+.dl-card a.dl-btn:hover { background: var(--ink-soft); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,26,26,0.15); }
+.dl-card a.dl-btn svg { flex-shrink: 0; }
+.dl-note {
+  font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--gray-soft);
+  margin-top: 2rem; display: flex; align-items: center; gap: 0.75rem; justify-content: center;
+}
+.dl-note .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+
+/* ── FAQ ────────────────────────────────────────────────────────────── */
+.faq-item { border-top: 1px solid var(--rule); padding: 1.25rem 0; }
+.faq-item:last-child { border-bottom: 1px solid var(--rule); }
+.faq-q {
+  all: unset; cursor: pointer;
+  display: flex; align-items: center; gap: 1rem; width: 100%;
+  font-family: var(--f-display); font-size: 1.25rem; line-height: 1.3; font-weight: 500;
+}
+.faq-q .marker {
+  font-family: var(--f-display); font-style: italic;
+  color: var(--gold); font-size: 1.5rem; line-height: 1;
+  transition: transform var(--t); user-select: none;
+}
+.faq-item.open .faq-q .marker { transform: rotate(45deg); }
+.faq-a {
+  padding-top: 0.75rem; padding-left: 2rem;
+  max-width: 38em; color: var(--gray); line-height: 1.7; font-size: 1rem;
+  display: none;
+}
+.faq-item.open .faq-a { display: block; }
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+footer.bottom { padding: 5rem 2rem 3rem; background: var(--ink); color: var(--ivory); }
+footer.bottom .f-inner {
+  max-width: 80rem; margin: 0 auto;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem;
+}
+@media (max-width: 720px) { footer.bottom .f-inner { grid-template-columns: 1fr 1fr; } }
+footer h5 {
+  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold-light); margin-bottom: 1rem;
+}
+footer ul { list-style: none; padding: 0; margin: 0; }
+footer li { padding: 0.35rem 0; }
+footer a { color: rgba(255,255,255,0.8); font-size: 0.9rem; transition: color var(--t); }
+footer a:hover { color: var(--gold-light); }
+.f-brand-word { font-family: var(--f-display); font-size: 2.25rem; font-weight: 500; }
+.f-brand-mark {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.f-brand-letter {
+  font-family: var(--f-display); font-weight: 500; font-size: 22px;
+  line-height: 1; color: var(--ivory); position: relative; padding-bottom: 2px;
+}
+.f-brand-letter::after {
+  content: ""; position: absolute; left: 20%; right: 20%; bottom: 14%;
+  height: 1.5px; background: var(--gold-light);
+}
+.f-brand-p { color: rgba(255,255,255,0.6); max-width: 22em; line-height: 1.6; margin-top: 0.75rem; font-size: 0.95rem; }
+.f-signup {
+  display: flex; margin-top: 1rem;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; overflow: hidden;
+}
+.f-signup input {
+  all: unset; flex: 1; padding: 0.75rem 1rem;
+  font-family: var(--f-body); font-size: 0.875rem; color: var(--ivory);
+}
+.f-signup input::placeholder { color: rgba(255,255,255,0.4); font-style: italic; }
+.f-signup button {
+  all: unset; cursor: pointer; background: var(--gold); color: #fff;
+  padding: 0.75rem 1rem; font-family: var(--f-mono); font-size: 0.7rem;
+  letter-spacing: 0.18em; text-transform: uppercase; transition: background var(--t);
+}
+.f-signup button:hover { background: var(--gold-light); }
+.f-legal {
+  max-width: 80rem; margin: 4rem auto 0; padding-top: 2rem;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: rgba(255,255,255,0.5);
+  flex-wrap: wrap; gap: 1rem;
+}
+
+/* ── Scroll-reveal ──────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal { opacity: 0; }
+.reveal.visible { animation: fadeUp 0.55s cubic-bezier(.2,.6,.2,1) forwards; }
+.reveal-d1 { animation-delay: 0.05s; }
+.reveal-d2 { animation-delay: 0.12s; }
+.reveal-d3 { animation-delay: 0.20s; }
+.reveal-d4 { animation-delay: 0.28s; }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<header class="topnav">
+  <div class="topnav-inner">
+    <a class="brand" href="#">
+      <div class="brand-mark">
+        <span class="brand-letter">A</span>
+      </div>
+      <span class="brand-word">Aria</span>
+    </a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#trust">Trust</a>
+      <a href="#download">Download</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="actions">
+      <a href="#download" class="btn btn-primary" style="min-height:36px;padding:0 16px;font-size:13px">Download</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-masthead reveal">
+      <div class="mast-left">Early Access · Build 0.1.0 · 2026</div>
+      <div class="mast-center">A Local-First Desktop Assistant</div>
+      <div class="mast-right">macOS &amp; Windows</div>
+    </div>
+
+    <div class="hero-grid">
+      <div>
+        <h1 class="reveal reveal-d1">
+          A chief of staff who lives <span class="it">on your desk</span>, not in someone else's <span class="gold-underline">cloud</span>.
+        </h1>
+        <p class="lede reveal reveal-d2">
+          Aria reads your mail and calendar, drafts replies in your voice, extracts every commitment from a meeting, and writes you one quiet briefing each morning. Every send asks you first.
+        </p>
+        <div class="cta-row reveal reveal-d3">
+          <div class="dl-pair">
+            <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria.Setup.0.1.0.exe" class="btn btn-dl">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/>
+                <path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span>
+                <span class="dl-os">Windows</span>
+                <span class="dl-label" style="display:block;line-height:1.2">Download .exe</span>
+              </span>
+            </a>
+            <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria-0.1.0-arm64.dmg" class="btn btn-dl">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2C4.686 2 2 4.686 2 8s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6z" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/>
+                <path d="M8 5v4.5M6 8l2 1.5L10 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>
+                <span class="dl-os">macOS · Apple Silicon</span>
+                <span class="dl-label" style="display:block;line-height:1.2">Download .dmg</span>
+              </span>
+            </a>
+          </div>
+          <div class="meta-line">
+            <span class="dot"></span>
+            <span>Early access build · unsigned · free to try</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="hero-preview reveal reveal-d2">
+        <div class="eyebrow">Aria · 07:00, this morning</div>
+        <h3>Marcus is waiting on you on the term sheet.</h3>
+        <p>The drag-along threshold and the Maple side letter are the only two open items on the deal. He has held tomorrow at 9 for a final call. A draft reply is sitting in your approval queue.</p>
+        <div class="signature">
+          <span>Inbox · 07:14</span>
+          <span style="color:var(--gold)">● flagged</span>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<div class="strip">
+  <div class="strip-inner">
+    <div class="strip-item"><span class="glyph">❦</span> Local-first by design</div>
+    <div class="strip-item"><span class="glyph">§</span> No SaaS · no telemetry</div>
+    <div class="strip-item"><span class="glyph">¶</span> Encrypted SQLite, your machine only</div>
+    <div class="strip-item"><span class="glyph">†</span> Every send asks you first</div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div style="max-width:64rem;margin:0 auto">
+    <div class="sec-eyebrow reveal">
+      <span class="sec-rule"></span>
+      <span class="num">I</span>
+      <span class="lbl">How it works · four movements</span>
+      <span class="sec-rule-flex"></span>
+    </div>
+    <h2 class="sec-h reveal reveal-d1">A briefing on Monday <em>becomes a chief of staff by Friday.</em></h2>
+    <p class="sec-sub reveal reveal-d2">The wedge is the morning brief. From there, Aria takes on triage, drafting, and meeting capture — under your oversight, at the pace you allow.</p>
+
+    <div class="steps">
+      <div class="step reveal reveal-d1">
+        <div class="n">i.</div>
+        <h4>Install &amp; connect</h4>
+        <p>A signed app for Mac and Windows. Connect Gmail, Outlook, your calendar, and Todoist. Read scope only at first.</p>
+      </div>
+      <div class="step reveal reveal-d2">
+        <div class="n">ii.</div>
+        <h4>Read &amp; index</h4>
+        <p>Aria reads the last 90 days locally. Everything is stored in one encrypted SQLite database on your machine. Nothing is uploaded.</p>
+      </div>
+      <div class="step reveal reveal-d3">
+        <div class="n">iii.</div>
+        <h4>Brief, every morning</h4>
+        <p>By 7am, Aria has written one briefing — agenda, urgent mail, action items, the one thing that could blow up — and is ready when you sit down.</p>
+      </div>
+      <div class="step reveal reveal-d4">
+        <div class="n">iv.</div>
+        <h4>Earn the leash</h4>
+        <p>Approve a few drafts. Reject the ones that miss your voice. Aria learns. After thirty days you choose how much rope she gets.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div style="max-width:80rem;margin:0 auto">
+    <div class="sec-eyebrow reveal">
+      <span class="sec-rule"></span>
+      <span class="num">II</span>
+      <span class="lbl">Four deep capabilities</span>
+      <span class="sec-rule-flex"></span>
+    </div>
+    <h2 class="sec-h reveal reveal-d1">Quiet on the surface. <em>Doing a great deal underneath.</em></h2>
+    <p class="sec-sub reveal reveal-d2">Four products in one application — sharing context, learning together, none of them louder than they need to be.</p>
+
+    <!-- Feature 1: The Briefing -->
+    <div class="feature reveal">
+      <div class="feat-copy">
+        <span class="smallcaps smallcaps-gold">The Briefing</span>
+        <h3 style="margin-top:.5rem">One page, every morning, <em>before you've finished coffee.</em></h3>
+        <p>Pulled from calendar, inbox, action items, and the news you follow. Written in the voice of a thoughtful editor. Reads in under two minutes. Surfaces the one thing that could blow up the day at the top.</p>
+        <ul>
+          <li><span class="swatch"></span><span>Generated locally; routed to a frontier model with PII redacted</span></li>
+          <li><span class="swatch"></span><span>Delivered at the time you choose; suspends on sleep, resumes on wake</span></li>
+          <li><span class="swatch"></span><span>Improves with feedback — "less of this", "more of that"</span></li>
+        </ul>
+      </div>
+      <div class="feat-visual">
+        <div class="mock tilt">
+          <div class="mock-eyebrow">
+            <span class="smallcaps">The Morning · Vol. I, No. 87</span>
+            <span style="flex:1"></span>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gray-soft);letter-spacing:0.1em">17 MAY 2026</span>
+          </div>
+          <div style="font-family:var(--f-display);font-size:1.625rem;line-height:1.1;font-weight:500;margin-bottom:.5rem">
+            Good morning,<br><em style="color:var(--gray)">Eleanor.</em>
+          </div>
+          <p style="color:var(--ink-soft);line-height:1.65;font-size:.9rem;margin-bottom:1rem">
+            <span style="font-family:var(--f-display);font-weight:500;float:left;font-size:2.5rem;line-height:.85;padding:.3rem .5rem 0 0">T</span>oday's edition turns on the close. The Series B language has moved from open to nearly signed; Marcus wants you for one final call this afternoon.
+          </p>
+          <div style="background:var(--ivory-deep);padding:12px 14px;border-left:2px solid var(--gold);border-radius:2px;margin-top:1rem">
+            <div class="smallcaps" style="color:var(--gold);margin-bottom:4px">One thing that could blow up today</div>
+            <div style="font-family:var(--f-display);font-size:1rem;line-height:1.3">Marcus needs you on the drag-along <em>and</em> the side letter before tomorrow's call.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 2: Triage -->
+    <div class="feature flip reveal">
+      <div class="feat-copy">
+        <span class="smallcaps smallcaps-gold">The Triage</span>
+        <h3 style="margin-top:.5rem">Urgent. Action. <em>For your information. Noise.</em></h3>
+        <p>Aria scores every incoming message — urgency, sender importance, the action required — and tells you why she put each one where she did. Drafts replies in your voice for the ones that need them. You approve every send.</p>
+        <ul>
+          <li><span class="swatch"></span><span>Voice learned from your last 50 sent messages per relationship tier</span></li>
+          <li><span class="swatch"></span><span>Sensitivity classifier holds risky drafts for explicit confirmation</span></li>
+          <li><span class="swatch"></span><span>Correct a classification once; Aria remembers for that sender</span></li>
+        </ul>
+      </div>
+      <div class="feat-visual">
+        <div class="mock tilt-right">
+          <div class="mock-eyebrow">
+            <span class="smallcaps">Reply · in your voice</span>
+            <span style="flex:1"></span>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gold);letter-spacing:.1em">VOICE MATCH 94%</span>
+          </div>
+          <div style="font-size:.85rem;color:var(--gray);margin-bottom:.5rem">
+            <strong style="color:var(--ink);font-weight:500">To:</strong> marcus@aldridgeco.com<br>
+            <strong style="color:var(--ink);font-weight:500">Subject:</strong> Re: Term sheet
+          </div>
+          <div class="draft-block">Marcus,
+
+Thanks — agreed on 1.2x and the 7-year sunset. I will concede board composition.
+
+For drag, hold at 60% — I want headroom in case we add a strategic later.
+
+— E</div>
+          <div style="display:flex;gap:8px;margin-top:1rem;align-items:center">
+            <span class="btn btn-primary" style="min-height:32px;padding:0 12px;font-size:12px;cursor:default">Send to queue</span>
+            <span class="btn btn-ghost" style="min-height:32px;padding:0 8px;font-size:12px;cursor:default">Edit</span>
+            <span style="flex:1"></span>
+            <span style="font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;color:var(--gray-soft)">● FINANCIAL · FLAGGED</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 3: Calendar -->
+    <div class="feature reveal">
+      <div class="feat-copy">
+        <span class="smallcaps smallcaps-gold">The Calendar</span>
+        <h3 style="margin-top:.5rem">She notices the stacks <em>before you do.</em></h3>
+        <p>A unified view across Google and Microsoft. Honors your rules — no meetings after four, fifteen-minute buffers, Tuesday afternoon for focus. Detects conflicts, drafts polite declines, suggests alternatives. Never writes to your calendar without you.</p>
+        <ul>
+          <li><span class="swatch"></span><span>Natural-language scheduling: "move my 3pm to Thursday"</span></li>
+          <li><span class="swatch"></span><span>Meeting prep briefs fifteen minutes before each event</span></li>
+          <li><span class="swatch"></span><span>Conflict alerts surfaced in the briefing — not as interruptions</span></li>
+        </ul>
+      </div>
+      <div class="feat-visual">
+        <div class="mock tilt">
+          <div class="mock-eyebrow">
+            <span class="smallcaps">This week · Aria notices</span>
+          </div>
+          <div style="padding:12px 14px;background:var(--ivory-deep);border-left:2px solid var(--gold);border-radius:2px;margin-bottom:12px">
+            <div class="smallcaps" style="color:var(--gold);margin-bottom:4px;font-size:.65rem">Thursday is a stack</div>
+            <div style="font-size:.95rem;color:var(--ink-soft);line-height:1.5">Five meetings in a row, 8:30 to 4:00. Draft a reschedule for the 3pm?</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <span class="btn btn-outline" style="min-height:26px;padding:0 10px;font-size:11px;cursor:default">Draft decline</span>
+              <span class="btn btn-ghost" style="min-height:26px;padding:0 10px;font-size:11px;cursor:default">Show alternatives</span>
+            </div>
+          </div>
+          <div class="agenda-row"><span class="t">10:30</span><span>Acme — Q3 partnership review</span><span class="meta">PREP READY</span></div>
+          <div class="agenda-row"><span class="t">12:00</span><span>Lunch · David Yoo</span><span class="meta">MOVED · 12:15</span></div>
+          <div class="agenda-row"><span class="t">14:00</span><span class="it">Focus block</span><span></span></div>
+          <div class="agenda-row"><span class="t">15:30</span><span>Board prep · Sarah Chen</span><span class="meta">PREP READY</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 4: Ask Aria -->
+    <div class="feature flip reveal">
+      <div class="feat-copy">
+        <span class="smallcaps smallcaps-gold">The Reader</span>
+        <h3 style="margin-top:.5rem">A natural-language reader <em>over your own history.</em></h3>
+        <p>"What did we agree with Acme last quarter?" "Who haven't I replied to in a week?" Indexed locally, queried locally — the question never leaves your machine, and every answer cites its sources.</p>
+        <ul>
+          <li><span class="swatch"></span><span>Indexed by a 274 MB embedding model running on your laptop</span></li>
+          <li><span class="swatch"></span><span>Hybrid BM25 + vector retrieval; cites every claim</span></li>
+          <li><span class="swatch"></span><span>One keystroke: ⌘K from anywhere in the application</span></li>
+        </ul>
+      </div>
+      <div class="feat-visual">
+        <div class="mock tilt-right">
+          <div class="mock-eyebrow">
+            <span class="smallcaps">Ask Aria</span>
+            <span style="flex:1"></span>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gray-soft);letter-spacing:.1em">LOCAL · 4.2s</span>
+          </div>
+          <div style="text-align:right;margin-bottom:14px">
+            <span class="q-bubble">What did Sarah commit to on Q3?</span>
+          </div>
+          <div style="font-family:Georgia,serif;font-size:.95rem;line-height:1.7;color:var(--ink-soft);margin-bottom:12px">
+            Sarah committed to two items: deliver <strong style="color:var(--ink)">v3 of the board deck</strong> by Monday (done) and lead with <strong style="color:var(--ink)">revenue, not pipeline, on slide 4</strong>.
+          </div>
+          <div style="background:var(--ivory-deep);padding:12px 14px;border-radius:4px">
+            <div class="smallcaps" style="color:var(--gold);margin-bottom:8px">Sources</div>
+            <div class="citation"><span class="src-kind">MEETING</span><span style="flex:1">Board prep · 6 May 2026</span></div>
+            <div class="citation"><span class="src-kind">EMAIL</span><span style="flex:1">Sarah Chen · "Board deck — v3 attached"</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section class="section dark" id="trust">
+  <div style="max-width:64rem;margin:0 auto">
+    <div class="sec-eyebrow reveal">
+      <span class="sec-rule"></span>
+      <span class="num" style="color:var(--gold-light)">III</span>
+      <span class="lbl">The deal we make with you</span>
+      <span class="sec-rule-flex"></span>
+    </div>
+    <h2 class="sec-h reveal reveal-d1" style="color:var(--ivory)">A premium product makes <em>promises it can keep.</em></h2>
+    <p class="sec-sub reveal reveal-d2">Aria does not earn its place by being clever. It earns its place by being trustworthy. Three commitments that hold for every customer, every feature, every release.</p>
+
+    <div class="trust-grid">
+      <div class="trust-card reveal reveal-d1">
+        <div class="glyph">i.</div>
+        <h4>Your data, on your machine.</h4>
+        <p>One encrypted SQLite database. SQLCipher whole-DB AES-256. The key is in your OS keychain. We do not run a server that holds your mail.</p>
+      </div>
+      <div class="trust-card reveal reveal-d2">
+        <div class="glyph">ii.</div>
+        <h4>Hybrid routing, by default.</h4>
+        <p>PII and sensitive content route to a small model running locally. Only redacted, scoped context ever reaches a frontier model. Every decision is logged for you to inspect.</p>
+      </div>
+      <div class="trust-card reveal reveal-d3">
+        <div class="glyph">iii.</div>
+        <h4>Every send asks you first.</h4>
+        <p>No autonomous outbound communication. No calendar writes without you. The sensitivity classifier holds risky drafts even when you've opted into auto-approve.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:4rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;gap:1rem;flex-wrap:wrap" class="reveal">
+      <span class="smallcaps" style="color:var(--gold-light)">What we don't do</span>
+      <span style="font-family:var(--f-display);font-style:italic;font-size:1.0625rem;color:rgba(255,255,255,0.7)">
+        No telemetry · no analytics · no third-party SDKs · no targeted advertising · no model training on your content · no shadow profile.
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section class="dl-section" id="download">
+  <div class="sec-eyebrow reveal" style="justify-content:center;margin-bottom:2rem">
+    <span class="sec-rule"></span>
+    <span class="num">IV</span>
+    <span class="lbl">Download the early access build</span>
+    <span class="sec-rule"></span>
+  </div>
+  <h2 class="reveal reveal-d1">Get Aria on <em>your machine today.</em></h2>
+  <p class="reveal reveal-d2">Early access — unsigned build, free to try. Windows may show a SmartScreen warning; macOS requires a right-click → Open on first launch.</p>
+
+  <div class="dl-cards reveal reveal-d3">
+    <div class="dl-card">
+      <div class="platform-label">Windows</div>
+      <div class="platform-name">Aria for Windows</div>
+      <div class="platform-detail">NSIS installer · v0.1.0 · Windows 10+</div>
+      <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria.Setup.0.1.0.exe" class="dl-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
+        Download .exe
+      </a>
+    </div>
+
+    <div class="dl-card" style="border-top: 2px solid var(--gold);">
+      <div class="platform-label">macOS · Apple Silicon</div>
+      <div class="platform-name">Aria for Mac</div>
+      <div class="platform-detail">DMG · v0.1.0 · arm64 · macOS 12+</div>
+      <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria-0.1.0-arm64.dmg" class="dl-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
+        Download .dmg
+      </a>
+    </div>
+  </div>
+
+  <div class="dl-note reveal reveal-d4">
+    <span class="dot"></span>
+    <span>Windows: click "More info → Run anyway" at SmartScreen</span>
+    <span class="dot"></span>
+    <span>macOS: right-click the app → Open on first launch</span>
+    <span class="dot"></span>
+    <span>All builds via GitHub Releases</span>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section" id="faq">
+  <div style="max-width:48rem;margin:0 auto">
+    <div class="sec-eyebrow reveal">
+      <span class="sec-rule"></span>
+      <span class="num">V</span>
+      <span class="lbl">Frequently asked</span>
+      <span class="sec-rule-flex"></span>
+    </div>
+    <h2 class="sec-h reveal reveal-d1">The questions we hear <em>most often.</em></h2>
+    <div id="faq-list" style="margin-top:2rem"></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bottom">
+  <div class="f-inner">
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+        <div class="f-brand-mark"><span class="f-brand-letter">A</span></div>
+        <span class="f-brand-word">Aria</span>
+      </div>
+      <p class="f-brand-p">A chief of staff who lives on your desk. Local-first by design. Available for macOS and Windows.</p>
+      <h5 style="margin-top:2rem">Get the launch note</h5>
+      <form class="f-signup" onsubmit="event.preventDefault();this.querySelector('button').textContent='Subscribed ✓'">
+        <input type="email" placeholder="your@email.com" required />
+        <button type="submit">Subscribe</button>
+      </form>
+    </div>
+    <div>
+      <h5>Product</h5>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="https://github.com/adexdsamson/Aria/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Trust</h5>
+      <ul>
+        <li><a href="#trust">How privacy works</a></li>
+        <li><a href="https://github.com/adexdsamson/Aria" target="_blank" rel="noopener">Source on GitHub</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Connect</h5>
+      <ul>
+        <li><a href="https://github.com/adexdsamson/Aria" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="mailto:adexdsamson@gmail.com">Contact</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="f-legal">
+    <span>© Aria · 2026 · A local-first tool</span>
+    <span style="display:flex;gap:1rem;align-items:center"><span style="color:var(--gold-light)">❦</span> Made with care</span>
+  </div>
+</footer>
+
+<script>
+/* ── FAQ ───────────────────────────────────────────────────────────── */
+const FAQ = [
+  { q: "Is my email and calendar data sent to your servers?",
+    a: "No. Everything ingested from your accounts is stored in one encrypted SQLite database on your machine. We do not run a server that holds your data. The only thing that leaves the device is scoped prompts to a frontier API (Anthropic, OpenAI, or Google), with PII redacted and sensitive content routed to a small model running locally instead." },
+  { q: "What happens when the internet is down?",
+    a: "Aria stays usable. The local model handles classification, redaction, and the Ask Aria reader without any connection. The morning briefing falls back to last-synced data. The frontier-API features pause until you're back online, then resume." },
+  { q: "Can I trust the drafts to sound like me?",
+    a: "Probably, after a few weeks. Aria's voice model learns from your last fifty sent messages per relationship tier. Every edit you make to a draft, every rejection, every approval — all of it refines the model. After thirty days most users report a 90%+ approval rate without edits." },
+  { q: "What stops Aria from sending something I would regret?",
+    a: "Three guardrails. First: no outbound communication ever happens without your explicit approval. Second: a sensitivity classifier holds anything containing financial, legal, HR, or urgent-tone language for explicit confirmation. Third: every action is logged in an audit you can inspect." },
+  { q: "How does the hybrid LLM routing actually work?",
+    a: "Every prompt is classified for sensitivity before routing. PII and sensitive content go to Llama 3.1 8B running locally via Ollama. General reasoning goes to a frontier model with sensitive bits replaced by tokens that are restored on response. The routing log is visible in Settings." },
+  { q: "The macOS build says it can't be opened. What do I do?",
+    a: "This is a Gatekeeper warning on unsigned builds. Right-click (or Control-click) the Aria app in your Applications folder and choose Open from the context menu. Confirm once — you won't see the prompt again." },
+  { q: "What if I want to stop using Aria?",
+    a: "Your local database stays exactly where it is. Aria stops generating new content but the indexed history, drafts, action items, and recaps all remain readable. You own the data entirely." },
+];
+
+const faqList = document.getElementById('faq-list');
+FAQ.forEach((item) => {
+  const el = document.createElement('div');
+  el.className = 'faq-item reveal';
+  el.innerHTML = `
+    <button class="faq-q"><span class="marker">+</span><span style="flex:1;text-align:left">${item.q}</span></button>
+    <div class="faq-a">${item.a}</div>
+  `;
+  el.querySelector('.faq-q').addEventListener('click', () => el.classList.toggle('open'));
+  faqList.appendChild(el);
+});
+
+/* ── Scroll-reveal ─────────────────────────────────────────────────── */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* ── Smooth scroll ─────────────────────────────────────────────────── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const id = a.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) { e.preventDefault(); window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); }
+  });
+});
+</script>
+</body>
+</html>
