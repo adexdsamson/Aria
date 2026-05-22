@@ -24,7 +24,8 @@
     "rebuild:native:node": "node scripts/build-native-dual.mjs --node-only",
     "release": "electron-builder --publish github",
     "release:mac": "electron-builder --mac --publish github",
-    "release:win": "electron-builder --win --publish github"
+    "release:win": "electron-builder --win --publish github",
+    "icons:tray": "node scripts/build-tray-icons.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
@@ -43,11 +44,11 @@
     "@tiptap/starter-kit": "^3.23.5",
     "ai": "^6.0.0",
     "better-sqlite3-multiple-ciphers": "^12.0.0",
+    "chokidar": "^4.0.0",
     "cmdk": "^1.1.1",
     "docx": "^9.6.1",
     "electron-updater": "^6.8.3",
     "email-reply-parser": "^2.3.5",
-    "chokidar": "^4.0.0",
     "exceljs": "^4.4.0",
     "google-auth-library": "^9.15.1",
     "googleapis": "^144.0.0",
@@ -86,12 +87,15 @@
     "autoprefixer": "^10.4.0",
     "electron": "41.6.1",
     "electron-builder": "^26.0.0",
+    "electron-icon-builder": "^2.0.1",
     "electron-vite": "^5.0.0",
     "jsdom": "^25.0.0",
     "patch-package": "^8.0.0",
     "playwright": "^1.60.0",
     "postcss": "^8.4.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.0",
+    "to-ico": "^1.1.5",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vitest": "^4.0.0"
@@ -151,6 +155,17 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/",
+        "to": ".",
+        "filter": [
+          "tray-icon*.ico",
+          "tray-iconTemplate*.png",
+          "tray-iconBadgedTemplate*.png"
+        ]
+      }
     ]
   }
 }

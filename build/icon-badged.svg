@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Aria (queued)">
+  <!-- Mirrors build/icon.svg + gold-dot badge for sealed-DB "queued" state.
+       Phase 12 Plan 12-02 — Pre-baked badge variant since nativeImage.composite
+       does not exist (see RESEARCH Pitfall 2). -->
+  <defs>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#1A1A1A" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" ry="54"
+        fill="#FAFAF8" stroke="#E8E4DF" stroke-width="2"
+        filter="url(#cardShadow)" />
+  <text x="128" y="178"
+        text-anchor="middle"
+        font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+        font-weight="500"
+        font-size="170"
+        fill="#1A1A1A">A</text>
+  <rect x="90" y="186" width="76" height="3" fill="#B8860B" />
+  <!-- Gold badge dot (queued indicator) — bottom-right quadrant, ~25% of canvas. -->
+  <circle cx="200" cy="200" r="36" fill="#C9A04B" stroke="#FAFAF8" stroke-width="6" />
+</svg>
