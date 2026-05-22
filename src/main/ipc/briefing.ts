@@ -165,7 +165,7 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
       async (date) => {
         await runOnce(date);
       },
-      { scheduler, logger },
+      { scheduler, logger, dbHolder },
     );
   }
 

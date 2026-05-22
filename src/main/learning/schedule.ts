@@ -26,6 +26,9 @@ import { registerLifecycleCallbacks } from '../lifecycle/powerMonitor';
 import { aggregatePreferences } from './aggregate';
 import { purgeOldSignals } from './signal-log';
 import { readSetting } from './prefs';
+import type { DbHolder } from '../ipc/onboarding';
+import { pendingCatchup } from '../lifecycle/pendingCatchup';
+import { trayBus } from '../tray/index';
 
 type Db = Database.Database;
 
@@ -39,6 +42,8 @@ export interface ScheduleLearningDeps {
   logger?: Pick<Logger, 'info' | 'warn'>;
   /** Test seam — replace node-cron.schedule. */
   cronImpl?: { schedule: typeof cron.schedule };
+  /** Phase 12 / Plan 12-02 — seal-guard hook (BG-04). */
+  dbHolder?: Pick<DbHolder, 'db'>;
 }
 
 export function scheduleLearning(
@@ -58,6 +63,13 @@ export function scheduleLearning(
   const task = cronImpl.schedule(
     expr,
     async () => {
+      // Phase 12 / Plan 12-02 — sealed-DB guard (BG-04).
+      const db = deps.dbHolder?.db;
+      if (deps.dbHolder && !db) {
+        pendingCatchup.add('learning');
+        trayBus.setBadge();
+        return;
+      }
       const today = computeLocalYmd(tz, new Date());
       if (_lastFiredYmd === today) {
         logger?.info({ scope: 'learning', event: 'cron-dedup', date: today }, 'learning already fired today; skipping');

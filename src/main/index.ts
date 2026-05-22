@@ -367,7 +367,7 @@ async function bootstrap(): Promise<void> {
     });
     try {
       await entitlementService.bootstrap();
-      scheduleEntitlementRefresh(entitlementService, { scheduler, logger });
+      scheduleEntitlementRefresh(entitlementService, { scheduler, logger, dbHolder });
       // Plan 08.1-02 — register the 5 entitlement IPC handlers now that the
       // service is live. registerHandlers() runs BEFORE the DB unlocks, so
       // the entitlement block there is skipped (no service yet). Without
@@ -440,6 +440,8 @@ async function bootstrap(): Promise<void> {
           registry: kfRegistry,
           ingestionService: kfIngestion,
           logger,
+          scheduler,
+          dbHolder,
         }).catch((err) => {
           logger.warn(
             { scope: 'knowledge-lifecycle', err: (err as Error).message },

@@ -31,6 +31,8 @@ import {
 import { clearGoogleTokens, getGoogleTokens } from '../secrets/safeStorage';
 import { createCalendarClient, type CalendarClient } from '../integrations/google/calendar';
 import { CalendarSync, createCalendarSync } from '../integrations/google/sync-calendar';
+import { pendingCatchup } from '../lifecycle/pendingCatchup';
+import { trayBus } from '../tray/index';
 
 export interface CalendarHandlerDeps {
   logger: Logger;
@@ -79,6 +81,13 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
   function ensureCron(): void {
     if (scheduler.cronRegistry.has(CRON_KEY)) return;
     const task = cron.schedule(CRON_SCHEDULE, () => {
+      // Phase 12 / Plan 12-02 — sealed-DB guard (BG-04).
+      const db = dbHolder.db;
+      if (!db) {
+        pendingCatchup.add('calendar-sync');
+        trayBus.setBadge();
+        return;
+      }
       void runTick().catch((err) => {
         logger.warn({ scope: 'calendar-sync', err: (err as Error).message }, 'cron tick error');
       });

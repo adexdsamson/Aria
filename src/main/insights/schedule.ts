@@ -17,6 +17,9 @@ import cron from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import { registerLifecycleCallbacks } from '../lifecycle/powerMonitor';
+import type { DbHolder } from '../ipc/onboarding';
+import { pendingCatchup } from '../lifecycle/pendingCatchup';
+import { trayBus } from '../tray/index';
 
 const CRON_KEY = 'insights-nightly';
 
@@ -28,6 +31,8 @@ export interface ScheduleInsightsDeps {
   logger?: Pick<Logger, 'info' | 'warn'>;
   /** Test seam — replace node-cron.schedule. */
   cronImpl?: { schedule: typeof cron.schedule };
+  /** Phase 12 / Plan 12-02 — seal-guard hook (BG-04). */
+  dbHolder?: Pick<DbHolder, 'db'>;
 }
 
 /**
@@ -51,6 +56,13 @@ export function scheduleInsights(
   const task = cronImpl.schedule(
     expr,
     async () => {
+      // Phase 12 / Plan 12-02 — sealed-DB guard (BG-04).
+      const db = deps.dbHolder?.db;
+      if (deps.dbHolder && !db) {
+        pendingCatchup.add('insights');
+        trayBus.setBadge();
+        return;
+      }
       const today = computeLocalYmd(tz, new Date());
       if (_lastFiredYmd === today) {
         logger?.info(

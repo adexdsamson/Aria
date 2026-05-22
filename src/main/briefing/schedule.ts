@@ -23,6 +23,9 @@ import cron from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import { registerLifecycleCallbacks } from '../lifecycle/powerMonitor';
+import type { DbHolder } from '../ipc/onboarding';
+import { pendingCatchup } from '../lifecycle/pendingCatchup';
+import { trayBus } from '../tray/index';
 
 const CRON_KEY = 'briefing';
 
@@ -34,6 +37,12 @@ export interface ScheduleBriefingDeps {
   logger?: Pick<Logger, 'info' | 'warn'>;
   /** Test seam — replace node-cron.schedule (default is the real cron). */
   cronImpl?: { schedule: typeof cron.schedule };
+  /**
+   * Phase 12 / Plan 12-02 — seal-guard hook. When provided, the cron
+   * callback inspects dbHolder.db and silently skips (registering a
+   * catchup ticket + tray badge) when the DB is sealed.
+   */
+  dbHolder?: Pick<DbHolder, 'db'>;
 }
 
 /**
@@ -65,6 +74,14 @@ export function scheduleBriefing(
   const task = cronImpl.schedule(
     expr,
     async () => {
+      // Phase 12 / Plan 12-02 — sealed-DB guard (BG-04). Runs BEFORE any
+      // DB access. Silent-skip + register catchup ticket + tray badge.
+      const db = deps.dbHolder?.db;
+      if (deps.dbHolder && !db) {
+        pendingCatchup.add('briefing');
+        trayBus.setBadge();
+        return;
+      }
       const today = computeLocalYmd(tz, new Date());
       if (_lastFiredDate === today) {
         logger?.info(
