@@ -99,6 +99,34 @@ import {
   startKnowledgeFolderLifecycle,
   stopKnowledgeFolderLifecycle,
 } from './folder-ingestion/lifecycle';
+import { createFolderRegistry } from './folder-ingestion/folder-registry';
+import { createFolderIngestionService } from './folder-ingestion/ingestion-service';
+import { PARSERS } from './folder-ingestion/parsers/index';
+import { strategyC } from './rag/chunk-strategies';
+import {
+  readBgPref,
+  reconcileAutoLaunchOnBoot,
+} from './background/prefs';
+import { registerBackgroundHandlers } from './ipc/background';
+
+import {
+  decideCloseAction,
+  decideWindowAllClosed,
+} from './background/window-decisions';
+// Re-export so existing callers (and tests that import from this module)
+// continue to find the helpers at this path. The actual implementations
+// live in ./background/window-decisions so they can be unit-tested without
+// loading the Electron bootstrap.
+export { decideCloseAction, decideWindowAllClosed };
+
+/**
+ * Phase 12 / Plan 12-01 — module-level flag set true by the before-quit
+ * handler. The close-handler interception (Decision 1) only hides the
+ * window when this flag is false; once it flips true (Cmd-Q, app.quit(),
+ * Quit tray menu item from 12-02), the close handler stops intercepting
+ * and the window destroys normally.
+ */
+let appIsQuitting = false;
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -223,18 +251,55 @@ function applyCsp(): void {
   });
 }
 
-function createMainWindow(): BrowserWindow {
+function resolveBrandIcon(): string | undefined {
+  // Brand icon — mirrors src/renderer/components/editorial/MonogramSquare.tsx
+  // (ivory squircle + serif "A" + gold rule). Source-of-truth SVG lives at
+  // build/icon.svg; Electron accepts SVG natively on Linux. On Windows/macOS
+  // the file is still passed but Electron silently falls back to the default
+  // when it cannot rasterise — distributable builds should ship a generated
+  // .ico / .icns under build/ via electron-builder (TODO).
+  try {
+    const candidate = path.join(__dirname, '../../build/icon.svg');
+    return require('node:fs').existsSync(candidate) ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function createMainWindow(
+  closeToTrayReader: () => boolean = () => true,
+): BrowserWindow {
+  const brandIcon = resolveBrandIcon();
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     autoHideMenuBar: true,
-    title: 'Aria',
+    title: 'Aria — chief of staff',
+    ...(brandIcon ? { icon: brandIcon } : {}),
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
       preload: path.join(__dirname, '../preload/index.js'),
     },
+  });
+
+  // Phase 12 / Plan 12-01 — close-handler interception. Branches via the
+  // pure decideCloseAction helper so the logic is unit-testable. The
+  // closeToTray pref reader is closured so the runtime path uses the live
+  // dbHolder; pre-unlock the reader returns the conservative default
+  // (true → hide into tray).
+  win.on('close', (e) => {
+    const action = decideCloseAction({
+      platform: process.platform,
+      closeToTray: closeToTrayReader(),
+      appIsQuitting,
+    });
+    if (action === 'hide') {
+      e.preventDefault();
+      win.hide();
+      // 12-03: maybeShowFirstCloseToast(win, dbHolder.db, logger)
+    }
   });
 
   // In dev, electron-vite serves the renderer; otherwise load the built file.
@@ -271,6 +336,11 @@ async function bootstrap(): Promise<void> {
   //      tests/static/single-entitlement-gate-site.test.ts.
   let entitlementService: EntitlementService | null = null;
   registerHandlers(ipcMain, { logger, dataDir, dbHolder });
+
+  // Phase 12 / Plan 12-01 — register background-activity handlers once at
+  // bootstrap. Pre-unlock reads return BG_PREF_DEFAULTS (no stub-then-real
+  // pattern; defaults-only path is safe under a sealed vault).
+  registerBackgroundHandlers(ipcMain, dbHolder, logger);
 
   // Lazily bootstrap entitlement once the DB is unlocked. The bootstrap
   // method is itself idempotent and concurrency-safe.
@@ -319,48 +389,46 @@ async function bootstrap(): Promise<void> {
   const bootPoll = setInterval(() => {
     if (dbHolder.db) {
       clearInterval(bootPoll);
+      // Phase 12 / Plan 12-01 — converge OS autoLaunch to the DB pref once
+      // the vault is unlocked. DB wins on disagreement.
+      try {
+        reconcileAutoLaunchOnBoot(dbHolder.db, logger);
+      } catch (err) {
+        logger.warn(
+          { scope: 'background-prefs', err: (err as Error).message },
+          'reconcileAutoLaunchOnBoot threw at bootstrap',
+        );
+      }
       void tryBootstrapEntitlement();
       // Plan 10-02: start knowledge folder lifecycle once DB is unlocked.
       if (!lifecycleBooted) {
         lifecycleBooted = true;
         const kfDb = dbHolder.db;
-        // Lazy import to avoid circular deps; registry + ingestion created inline.
-        void import('./folder-ingestion/folder-registry').then(({ createFolderRegistry }) =>
-          import('./folder-ingestion/ingestion-service').then(({ createFolderIngestionService }) =>
-            import('./folder-ingestion/parsers/index').then(({ PARSERS }) =>
-              import('./rag/chunk-strategies').then(({ strategyC }) => {
-                const kfRegistry = createFolderRegistry(kfDb);
-                const kfIngestion = createFolderIngestionService({
-                  db: kfDb,
-                  logger,
-                  registry: kfRegistry,
-                  parsers: PARSERS,
-                  strategy: strategyC,
-                });
-                // Plan 10 post-UAT fix: registerHandlers() ran pre-unlock so
-                // the knowledge IPC block in ipc/index.ts was skipped (db was
-                // null) and added the channels to its skip-set permanently.
-                // Wire them now with the same registry+ingestion the lifecycle
-                // owns. Mirrors the entitlement re-registration pattern above.
-                const { dialog } = require('electron') as { dialog: import('electron').Dialog };
-                registerKnowledgeFolderIpc({
-                  ipcMain,
-                  registry: kfRegistry,
-                  ingestionService: kfIngestion,
-                  dialog,
-                  logger,
-                  db: kfDb,
-                });
-                return startKnowledgeFolderLifecycle({
-                  db: kfDb,
-                  registry: kfRegistry,
-                  ingestionService: kfIngestion,
-                  logger,
-                });
-              }),
-            ),
-          ),
-        ).catch((err) => {
+        const kfRegistry = createFolderRegistry(kfDb);
+        const kfIngestion = createFolderIngestionService({
+          db: kfDb,
+          logger,
+          registry: kfRegistry,
+          parsers: PARSERS,
+          strategy: strategyC,
+        });
+        // registerHandlers() ran pre-unlock so the knowledge IPC block was
+        // skipped (db was null). Wire the handlers now that db is live.
+        const { dialog } = require('electron') as { dialog: import('electron').Dialog };
+        registerKnowledgeFolderIpc({
+          ipcMain,
+          registry: kfRegistry,
+          ingestionService: kfIngestion,
+          dialog,
+          logger,
+          db: kfDb,
+        });
+        void startKnowledgeFolderLifecycle({
+          db: kfDb,
+          registry: kfRegistry,
+          ingestionService: kfIngestion,
+          logger,
+        }).catch((err) => {
           logger.warn(
             { scope: 'knowledge-lifecycle', err: (err as Error).message },
             'knowledge folder lifecycle failed to start',
@@ -415,7 +483,15 @@ async function bootstrap(): Promise<void> {
     probe: probeOllama,
   });
 
-  const mainWindow = createMainWindow();
+  // Phase 12 / Plan 12-01 — closeToTray reader closes over dbHolder so the
+  // close handler always sees the live pref. Pre-unlock returns the
+  // conservative default (true → hide).
+  const closeToTrayReader = (): boolean =>
+    readBgPref(dbHolder.db, 'closeToTray', true);
+  const mainWindow = createMainWindow(closeToTrayReader);
+  // Store the reader so the window-all-closed handler can reuse it.
+  (globalThis as { __ariaCloseToTrayReader?: () => boolean }).__ariaCloseToTrayReader =
+    closeToTrayReader;
 
   // Plan 08-04 Task 5 — start electron-updater after the main window exists.
   // Skip in dev (no auto-updates from a vite dev server). Skip on test boot
@@ -434,7 +510,7 @@ async function bootstrap(): Promise<void> {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow(closeToTrayReader);
   });
 }
 
@@ -452,9 +528,31 @@ app.whenReady().then(bootstrap).catch((err) => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // Phase 12 / Plan 12-01 — conditional on closeToTray pref. The reader
+  // is installed by bootstrap; if bootstrap hasn't run yet (shouldn't be
+  // reachable in practice) fall back to the conservative default (stay
+  // alive, matching closeToTray=true default).
+  const reader =
+    (globalThis as { __ariaCloseToTrayReader?: () => boolean })
+      .__ariaCloseToTrayReader ?? (() => true);
+  let closeToTray = true;
+  try {
+    closeToTray = reader();
+  } catch {
+    closeToTray = true;
+  }
+  const action = decideWindowAllClosed({
+    platform: process.platform,
+    closeToTray,
+  });
+  if (action === 'quit') app.quit();
 });
 
 app.on('before-quit', () => {
+  // Phase 12 / Plan 12-01 — flip the flag so the close-handler stops
+  // intercepting and the window destroys normally (Cmd-Q escape path, quit
+  // tray menu item from 12-02, etc.). Order matters: set the flag BEFORE
+  // any other before-quit work so concurrent close events see the new state.
+  appIsQuitting = true;
   void stopKnowledgeFolderLifecycle(getLogger());
 });
