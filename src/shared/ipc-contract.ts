@@ -166,6 +166,9 @@ export const CHANNELS = {
   // Research secrets
   RESEARCH_SECRETS_SET: 'aria:research:secrets-set',
   RESEARCH_SECRETS_HAS: 'aria:research:secrets-has',
+  // Phase 12 Background activity (12-01)
+  BG_GET_PREFS: 'aria:background:get-prefs',
+  BG_SET_PREFS: 'aria:background:set-prefs',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -1017,6 +1020,10 @@ export interface AriaApi {
   researchSecretsSet(req: { provider: 'brave' | 'exa'; key: string }): Promise<{ ok: true } | IpcError>;
   researchSecretsHas(req: unknown): Promise<{ hasBrave: boolean; hasExa: boolean } | IpcError>;
 
+  // Phase 12 Background activity (12-01)
+  backgroundGetPrefs(): Promise<BackgroundPrefsDto | IpcError>;
+  backgroundSetPrefs(req: BackgroundPrefsPatchDto): Promise<BackgroundPrefsDto | IpcError>;
+
   /** Subscription helper — wraps ipcRenderer.on for RESEARCH_REPORT_DONE. */
   onResearchReportDone?: (cb: (payload: { jobId: string; reportId: string }) => void) => () => void;
 }
@@ -1399,6 +1406,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   RESEARCH_REPORT_DONE: 'researchReportDone',
   RESEARCH_SECRETS_SET: 'researchSecretsSet',
   RESEARCH_SECRETS_HAS: 'researchSecretsHas',
+  // Phase 12 Background activity (12-01)
+  BG_GET_PREFS: 'backgroundGetPrefs',
+  BG_SET_PREFS: 'backgroundSetPrefs',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1500,4 +1510,29 @@ export interface ResearchFeedbackDto {
   thumb: 1 | -1 | null;
   note: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 12 Background activity DTOs (12-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Full background-activity preference shape. `firstCloseToastShown` is
+ * main-process-internal (used by 12-03 to gate the one-time toast); it is
+ * returned by BG_GET_PREFS for completeness but cannot be set from the
+ * renderer (omitted from BackgroundPrefsPatchDto).
+ */
+export interface BackgroundPrefsDto {
+  autoLaunch: boolean;
+  closeToTray: boolean;
+  notificationsEnabled: boolean;
+  firstCloseToastShown: boolean;
+}
+
+/** Renderer-supplied partial patch. All keys optional; extra keys rejected
+ *  by the Zod schema in registerBackgroundHandlers. */
+export interface BackgroundPrefsPatchDto {
+  autoLaunch?: boolean;
+  closeToTray?: boolean;
+  notificationsEnabled?: boolean;
 }
