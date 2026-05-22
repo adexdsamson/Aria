@@ -34,6 +34,7 @@ import { runMigrationsWithBackup } from '../release/backup-hook';
 import { reapInterruptedOnStartup } from '../approvals/persist';
 import { recoverInflightSends } from '../integrations/send';
 import { migrateLegacyGoogleTokensToProviderTokens } from '../secrets/safeStorage';
+import { fireOnUnlock } from '../lifecycle/onUnlock';
 
 export interface DbHolder {
   db: Db | null;
@@ -207,6 +208,10 @@ export function registerOnboardingHandlers(
       // Persist the vault AFTER a successful open+migrate — order matters.
       sealVault(dailyPassword, pendingMnemonic, vaultPathOf(dataDir), appSalt);
       dbHolder.set(db);
+      // Phase 12 / Plan 12-02 Task 2 — fire unlock callbacks IMMEDIATELY
+      // after dbHolder.set(db). Subscribers (tray catchup-drain, etc.)
+      // observe the fresh handle. fireOnUnlock never throws.
+      void fireOnUnlock(db, logger);
       // RESEARCH Pattern 2 — convert any stale 'generating' rows BEFORE the
       // approvals IPC layer can be invoked. (IPC handlers register at boot;
       // the DB only becomes reachable at this point via dbHolder.set().)
@@ -259,6 +264,9 @@ export function registerOnboardingHandlers(
           expectedDrops: {},
         });
         dbHolder.set(db);
+        // Phase 12 / Plan 12-02 Task 2 — fire unlock callbacks (tray
+        // catchup-drain etc.) IMMEDIATELY after dbHolder.set(db).
+        void fireOnUnlock(db, logger);
         await runApprovalStartupRecovery(db, logger);
         await deps.onDbReady?.(db);
         logger.info({ event: 'onboarding.unlocked' });

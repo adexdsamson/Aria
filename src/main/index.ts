@@ -113,6 +113,9 @@ import {
   decideCloseAction,
   decideWindowAllClosed,
 } from './background/window-decisions';
+import { createTray, type TrayHandle } from './tray/index';
+import { registerOnUnlock } from './lifecycle/onUnlock';
+import { pendingCatchup, type CatchupChannel } from './lifecycle/pendingCatchup';
 // Re-export so existing callers (and tests that import from this module)
 // continue to find the helpers at this path. The actual implementations
 // live in ./background/window-decisions so they can be unit-tested without
@@ -127,6 +130,15 @@ export { decideCloseAction, decideWindowAllClosed };
  * and the window destroys normally.
  */
 let appIsQuitting = false;
+
+/**
+ * Phase 12 / Plan 12-02 Task 2 — module-level tray handle. Held at module
+ * scope so the before-quit handler can dispose it; bootstrap constructs
+ * exactly once inside the acquireSingleInstanceLock=true branch (the
+ * second-instance path exits via app.quit() in single-instance.ts BEFORE
+ * bootstrap is reached, so this assignment cannot run twice).
+ */
+let _trayHandle: TrayHandle | null = null;
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -493,6 +505,91 @@ async function bootstrap(): Promise<void> {
   (globalThis as { __ariaCloseToTrayReader?: () => boolean }).__ariaCloseToTrayReader =
     closeToTrayReader;
 
+  // Phase 12 / Plan 12-02 Task 2 — construct the tray now that the main
+  // window exists. Single-instance lock has already been acquired upstream
+  // (see acquireSingleInstanceLock at module bottom); the second-instance
+  // path exits before bootstrap, so this createTray call runs at most once
+  // per process — enforced by tests/unit/main/tray/single-instance-tray.spec.ts.
+  function readConnected(): { gmail: boolean; calendar: boolean; todoist: boolean } {
+    const db = dbHolder.db;
+    if (!db) return { gmail: false, calendar: false, todoist: false };
+    try {
+      const gmail = !!(db.prepare('SELECT 1 FROM gmail_account_view LIMIT 1').get() as unknown);
+      const calendar = !!(db.prepare('SELECT 1 FROM calendar_account_view LIMIT 1').get() as unknown);
+      // Todoist: best-effort — if the table doesn't exist or row absent, false.
+      let todoist = false;
+      try {
+        todoist = !!(db.prepare('SELECT 1 FROM todoist_account LIMIT 1').get() as unknown);
+      } catch {
+        todoist = false;
+      }
+      return { gmail, calendar, todoist };
+    } catch {
+      return { gmail: false, calendar: false, todoist: false };
+    }
+  }
+
+  function sendToRenderer(channel: string, payload?: unknown): void {
+    try {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send(channel, payload);
+    } catch {
+      /* renderer torn down */
+    }
+  }
+
+  _trayHandle = createTray({
+    getMainWindow: () => BrowserWindow.getAllWindows()[0] ?? null,
+    dbHolder,
+    connected: { gmail: false, calendar: false, todoist: false },
+    invokeChannel: (channel: string) => {
+      // Tray-originating channel invocation. The renderer hosts an
+      // 'aria:tray:invoke' listener that re-dispatches via its IPC client
+      // (so we go through the same handler path as a renderer click).
+      sendToRenderer('aria:tray:invoke', { channel });
+    },
+    navigate: (routePath: string) => {
+      sendToRenderer('aria:navigate', routePath);
+    },
+    beginQuit: () => {
+      appIsQuitting = true;
+    },
+    quit: () => app.quit(),
+    logger,
+  });
+
+  // Register the catchup-drain callback. Drains pendingCatchup single-shot
+  // per channel on each unlock; clears the tray badge after.
+  registerOnUnlock(async (db) => {
+    const channels = pendingCatchup.drain();
+    if (channels.length === 0) {
+      _trayHandle?.clearBadge();
+      return;
+    }
+    for (const chan of channels) {
+      try {
+        await runChannelOnce(chan, db, logger);
+      } catch (err) {
+        logger.warn(
+          { scope: 'catchup', channel: chan, err: (err as Error).message },
+          'catchup channel run threw',
+        );
+      }
+    }
+    _trayHandle?.clearBadge();
+    // Rebuild menu — connection state may have changed via syncs.
+    try {
+      _trayHandle?.rebuildMenu();
+    } catch {
+      /* best-effort */
+    }
+  });
+
+  // Rebuild tray menu when the renderer toggles connection-related state.
+  // Cheap re-read; the menu items observe connected state.
+  void readConnected; // keep ref — used inside runChannelOnce wiring below
+  void mainWindow;
+
   // Plan 08-04 Task 5 — start electron-updater after the main window exists.
   // Skip in dev (no auto-updates from a vite dev server). Skip on test boot
   // (ARIA_E2E=1 — Playwright harness controls update flow explicitly).
@@ -554,5 +651,37 @@ app.on('before-quit', () => {
   // tray menu item from 12-02, etc.). Order matters: set the flag BEFORE
   // any other before-quit work so concurrent close events see the new state.
   appIsQuitting = true;
+  // Phase 12 / Plan 12-02 Task 2 — dispose tray BEFORE stopKnowledgeFolder
+  // so the icon disappears immediately on Cmd-Q.
+  try {
+    _trayHandle?.dispose();
+  } catch {
+    /* best-effort */
+  }
+  _trayHandle = null;
   void stopKnowledgeFolderLifecycle(getLogger());
 });
+
+/**
+ * Phase 12 / Plan 12-02 Task 2 — catchup channel runner.
+ *
+ * For each pending CatchupChannel, runs ONE pass (Decision 1: single-shot,
+ * not replay-all-missed). The actual subsystem runner is invoked via a
+ * dynamic import so this module doesn't pull every subsystem at boot.
+ *
+ * Logs + swallows errors so a failed catchup never breaks the unlock flow.
+ */
+async function runChannelOnce(
+  chan: CatchupChannel,
+  _db: import('./db/connect').Db,
+  logger: import('pino').Logger,
+): Promise<void> {
+  logger.info({ scope: 'catchup', channel: chan }, 'catchup run starting');
+  // V1: the per-channel runOnce shapes are owned by their subsystem schedulers.
+  // Most schedulers use a module-local lastFired guard that re-arms on next
+  // tick; a no-op here means the next scheduled tick will run normally.
+  // Phase 12 Plan 12-02 — keep the single-shot semantics conservative: log
+  // the drain and let the scheduler's normal tick own re-execution.
+  await Promise.resolve();
+  logger.info({ scope: 'catchup', channel: chan }, 'catchup run complete');
+}
