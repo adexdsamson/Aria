@@ -261,7 +261,7 @@ Plans:
 **Requirements:** new — BG-01 close-to-tray (Win+Mac), BG-02 auto-launch on login w/ Settings toggle, BG-03 native OS notification on briefing complete (click→/briefing), BG-04 silent cron skip when DB sealed + tray badge + first-unlock catchup, BG-05 rich tray menu (Show/Generate briefing/Sync now submenu/Open approvals/Quit), BG-06 platform tray icon assets (.ico for Win, Template PNG @1x/@2x for Mac), BG-07 first-X close-to-tray discoverability toast (one-time, on first window close with closeToTray=true), BG-08 Settings → Behaviour section UI surfacing the three background prefs (autoLaunch, closeToTray, notificationsEnabled) using the editorial Checkbox primitive.
 **Depends on:** Phase 8 (user_prefs), Phase 9 (settings UI shell)
 **Context:** see [12-CONTEXT.md](phases/12-background-activity-tray-and-autolaunch/12-CONTEXT.md) — 6 decisions locked.
-**Plans:** 0/TBD plans executed
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 12 to break down)
