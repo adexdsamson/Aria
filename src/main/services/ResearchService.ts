@@ -46,16 +46,43 @@ export interface ResearchServiceDeps {
 // ---------------------------------------------------------------------------
 
 export const ResearchSynthesisSchema = z.object({
-  summary: z.string().describe('3-5 sentence executive summary'),
+  summary: z.object({
+    executive: z.string().describe(
+      'Comprehensive 8-12 sentence executive overview covering what was found, why it matters, and the single most important insight. Be specific — name companies, cite numbers, reference concrete examples from the sources.',
+    ),
+    keyTakeaways: z.array(z.string()).min(3).max(7).describe(
+      'The 3-7 most important specific insights as crisp, concrete bullet points. Each must include a specific fact, number, or named example.',
+    ),
+  }),
   findings: z
     .array(
       z.object({
-        heading: z.string(),
-        body: z.string(),
+        heading: z.string().describe('Clear, specific heading that names the insight'),
+        analysis: z.string().describe(
+          'In-depth analytical paragraphs (200-400 words). Synthesize what multiple sources say, note agreements and contradictions, include specific data points, company names, market sizes, percentages. Avoid vague language.',
+        ),
+        keyPoints: z.array(z.string()).min(2).max(6).describe(
+          'Concrete bullet points — each a specific fact, stat, or actionable takeaway directly from the sources',
+        ),
+        actionableInsights: z.array(z.string()).min(1).max(4).describe(
+          'What should the reader DO or DECIDE based on this finding? Specific, concrete actions.',
+        ),
         sourceUrls: z.array(z.string()),
       }),
     )
+    .min(3)
     .max(10),
+  recommendations: z
+    .array(
+      z.object({
+        action: z.string().describe('Specific, concrete action to take'),
+        rationale: z.string().describe('Why this matters, what evidence supports it'),
+        priority: z.enum(['critical', 'high', 'medium', 'low']),
+        timeframe: z.string().describe('e.g. "This week", "Within 30 days", "Q3 2025"'),
+      }),
+    )
+    .min(2)
+    .max(8),
   sources: z
     .array(
       z.object({
@@ -201,22 +228,39 @@ export async function runResearchJob(
     .filter((r) => r.content !== null);
 
   // 6. Build prompt
-  const feedbackCtx = opts?.feedbackContext ? `\n\nFeedback guidance: ${opts.feedbackContext}` : '';
+  const feedbackCtx = opts?.feedbackContext
+    ? `\n\nUSER FEEDBACK TO ADDRESS IN THIS RUN:\n${opts.feedbackContext}\nMake sure this version directly addresses the feedback above.`
+    : '';
   const docBlock = pageContents
     .map(
       (p, i) =>
-        `<document index="${i + 1}" url="${p.url}" title="${p.title}">\n${p.content}\n</document>`,
+        `<document index="${i + 1}" url="${p.url}" title="${p.title}">\n${(p.content ?? '').slice(0, 6000)}\n</document>`,
     )
     .join('\n\n');
-  const prompt = `You are a research analyst. Research topic: "${job.title}"
-Goals: ${job.goals}
-Domains of interest: ${domains.join(', ') || 'general'}${feedbackCtx}
 
-Based on the following web documents, synthesize a research report.
-Provide an executive summary, key findings with source URLs, a sources list, and relevant metrics.
-Rate your confidence from 0-100.
+  const prompt = `You are a senior research analyst and strategic advisor producing a high-quality intelligence report for a busy executive. Your reports are known for being dense with specific, actionable insights — not summaries of summaries.
 
-${docBlock}`;
+RESEARCH TOPIC: "${job.title}"
+GOALS: ${job.goals || 'General deep-dive research'}
+DOMAINS OF INTEREST: ${domains.join(', ') || 'not restricted'}${feedbackCtx}
+
+STRICT QUALITY REQUIREMENTS:
+1. Be SPECIFIC. Name companies, products, people, dates, dollar amounts, percentages. Never write "some companies" when you can name them.
+2. Be ANALYTICAL. Don't just restate what sources say — synthesize, compare, find patterns, surface contradictions.
+3. Be ACTIONABLE. Every finding must connect to a decision the reader can make.
+4. CITE DENSELY. Reference specific sources for every claim. If two sources disagree, say so.
+5. DEPTH OVER BREADTH. Three well-developed findings beat ten shallow ones.
+6. The executive summary must be substantive — 8-12 sentences that a CEO could brief a board with.
+7. Key takeaways must be specific facts or insights, not generic statements like "the market is growing".
+8. Each finding's analysis should be 200-400 words of dense synthesis.
+9. Recommendations must be concrete actions with clear rationale, not platitudes.
+
+QUALITY BAR: If you find yourself writing something like "research suggests that X is important" — stop and rewrite it with a specific example, number, or named source. Vague observations have no place in this report.
+
+WEB SOURCES TO SYNTHESIZE:
+${docBlock}
+
+Produce a research report that a demanding executive would find genuinely useful for making decisions.`;
 
   try {
     // 7. generateObject with ResearchSynthesisSchema
@@ -233,43 +277,50 @@ ${docBlock}`;
 
     // 8. Write research_report_section rows
     const now = new Date().toISOString();
-
-    // Summary section
-    const summarySecId = crypto.randomUUID();
-    db.prepare(
+    const insert = db.prepare(
       `INSERT INTO research_report_section (id, report_id, section_type, ordinal, content_json, created_at)
-       VALUES (?, ?, 'summary', 0, ?, ?)`,
-    ).run(summarySecId, reportId, JSON.stringify({ summary: object.summary }), now);
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
 
-    // Findings sections
-    for (let i = 0; i < object.findings.length; i++) {
-      const secId = crypto.randomUUID();
-      db.prepare(
-        `INSERT INTO research_report_section (id, report_id, section_type, ordinal, content_json, created_at)
-         VALUES (?, ?, 'findings', ?, ?, ?)`,
-      ).run(secId, reportId, i + 1, JSON.stringify(object.findings[i]), now);
+    // Summary section — rich object with executive text + key takeaways
+    insert.run(
+      crypto.randomUUID(), reportId, 'summary', 0,
+      JSON.stringify(object.summary), now,
+    );
+
+    // Findings — stored as a SINGLE array row so Array.isArray check in renderer works
+    insert.run(
+      crypto.randomUUID(), reportId, 'findings', 1,
+      JSON.stringify(object.findings), now,
+    );
+
+    // Recommendations section
+    if (object.recommendations.length > 0) {
+      insert.run(
+        crypto.randomUUID(), reportId, 'recommendations', 50,
+        JSON.stringify(object.recommendations), now,
+      );
     }
 
     // Sources section
-    const sourcesSecId = crypto.randomUUID();
-    db.prepare(
-      `INSERT INTO research_report_section (id, report_id, section_type, ordinal, content_json, created_at)
-       VALUES (?, ?, 'sources', 100, ?, ?)`,
-    ).run(sourcesSecId, reportId, JSON.stringify({ sources: object.sources }), now);
+    insert.run(
+      crypto.randomUUID(), reportId, 'sources', 100,
+      JSON.stringify(object.sources), now,
+    );
 
     // Metrics section
     if (object.metrics.length > 0) {
-      const metricsSecId = crypto.randomUUID();
-      db.prepare(
-        `INSERT INTO research_report_section (id, report_id, section_type, ordinal, content_json, created_at)
-         VALUES (?, ?, 'metrics', 200, ?, ?)`,
-      ).run(metricsSecId, reportId, JSON.stringify({ metrics: object.metrics }), now);
+      insert.run(
+        crypto.randomUUID(), reportId, 'metrics', 200,
+        JSON.stringify({ metrics: object.metrics }), now,
+      );
     }
 
     // Set report.status='done' + job.status='done'
+    // Store the executive summary text in the summary column for the report card
     db.prepare(
       `UPDATE research_report SET status = 'done', summary = ?, confidence_score = ?, generated_at = ? WHERE id = ?`,
-    ).run(object.summary, object.confidenceScore, now, reportId);
+    ).run(object.summary.executive, object.confidenceScore, now, reportId);
     db.prepare(`UPDATE research_job SET status = 'done', updated_at = ? WHERE id = ?`).run(
       now,
       jobId,
