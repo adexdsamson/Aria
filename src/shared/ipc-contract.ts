@@ -169,6 +169,11 @@ export const CHANNELS = {
   // Phase 12 Background activity (12-01)
   BG_GET_PREFS: 'aria:background:get-prefs',
   BG_SET_PREFS: 'aria:background:set-prefs',
+  // Phase 12 / Plan 12-03 — renderer navigation push (owned by 12-03).
+  // Main process sends this channel via webContents.send to route the renderer
+  // to an allowlisted path (/briefing, /approvals). T-12-10: path is hardcoded
+  // at the call site (no user-controlled value in the payload).
+  NAVIGATE: 'aria:navigate',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -1026,6 +1031,14 @@ export interface AriaApi {
 
   /** Subscription helper — wraps ipcRenderer.on for RESEARCH_REPORT_DONE. */
   onResearchReportDone?: (cb: (payload: { jobId: string; reportId: string }) => void) => () => void;
+
+  /**
+   * Phase 12 / Plan 12-03 — renderer-side navigate subscription.
+   * Main process sends aria:navigate with an allowlisted path string.
+   * Renderer subscribes via this helper and routes programmatically.
+   * Returns an unsubscribe function. Allowlist enforced in App.tsx.
+   */
+  onNavigate?: (cb: (path: string) => void) => () => void;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1409,6 +1422,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   // Phase 12 Background activity (12-01)
   BG_GET_PREFS: 'backgroundGetPrefs',
   BG_SET_PREFS: 'backgroundSetPrefs',
+  // Phase 12 / Plan 12-03 — push-only navigate channel. Overridden in preload
+  // with a real ipcRenderer.on subscription (like ENTITLEMENT_STATE_CHANGED).
+  NAVIGATE: 'onNavigate',
 } as const;
 
 // ---------------------------------------------------------------------------
