@@ -1,16 +1,30 @@
 /**
- * Onboarding wizard state machine — 3 steps:
- *   1. show     — render mnemonic, gated by "I've written these down"
- *   2. confirm  — 3-word position challenge
- *   3. password — daily-unlock password (min 8 chars), then seal vault + open DB
+ * Onboarding wizard state machine — 5 steps:
+ *   1. name        — display name for personalized UnlockScreen greeting
+ *   2. show        — render mnemonic, gated by "I've written these down"
+ *   3. confirm     — 3-word position challenge
+ *   4. news-picker — country + sectors for the briefing
+ *   5. password    — daily-unlock password (min 8 chars), then seal vault + open DB
+ *
+ * The display name is buffered in state and persisted via `profileSet` inside
+ * `seal()` right alongside the existing `newsSetBundle` write. Quick 260523-eaf.
  */
 import { useEffect, useState } from 'react';
 import { MnemonicShow } from './MnemonicShow';
 import { MnemonicConfirm } from './MnemonicConfirm';
 import { CountrySectorPicker } from './CountrySectorPicker';
+import { NameStep } from './NameStep';
 import { AppLogo, Button, Card } from '../../components/editorial';
 
-type Step = 'loading' | 'show' | 'confirm' | 'news-picker' | 'password' | 'sealing' | 'done';
+type Step =
+  | 'loading'
+  | 'name'
+  | 'show'
+  | 'confirm'
+  | 'news-picker'
+  | 'password'
+  | 'sealing'
+  | 'done';
 
 export interface OnboardingWizardProps {
   onComplete: () => void;
@@ -18,6 +32,7 @@ export interface OnboardingWizardProps {
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Element {
   const [step, setStep] = useState<Step>('loading');
+  const [displayName, setDisplayName] = useState('');
   const [words, setWords] = useState<string[]>([]);
   const [positions, setPositions] = useState<number[]>([]);
   const [password, setPassword] = useState('');
@@ -36,7 +51,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
       if (cancelled) return;
       setWords(res.mnemonic.split(' '));
       setPositions(res.positions);
-      setStep('show');
+      setStep('name');
     })();
     return () => {
       cancelled = true;
@@ -51,6 +66,25 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
       passphrase: password,
     } as never)) as { ok?: true; error?: string };
     if (res.ok) {
+      // Quick 260523-eaf — persist the display name first. profile.json
+      // lives outside the encrypted DB so this could technically run
+      // earlier, but writing it here keeps wizard persistence in one place
+      // and mirrors the newsSelection pattern. Non-blocking on failure —
+      // UnlockScreen falls back to the generic greeting.
+      if (displayName.trim().length > 0) {
+        try {
+          const profRes = (await window.aria.profileSet({
+            displayName: displayName.trim(),
+          })) as { ok: boolean; error?: string } | { error: string };
+          if ('error' in profRes || ('ok' in profRes && !profRes.ok)) {
+            // eslint-disable-next-line no-console
+            console.warn('profileSet failed post-seal; greeting will fall back', profRes);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('profileSet threw post-seal; greeting will fall back', err);
+        }
+      }
       // Post-UAT correction: DB is only open after seal succeeds. Persist
       // the buffered news selection here; non-blocking on failure — user
       // can re-pick via Settings → News Sources.
@@ -77,6 +111,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
   }
 
   if (step === 'loading') return <p data-testid="onboarding-loading">Preparing…</p>;
+  if (step === 'name') {
+    return (
+      <NameStep
+        initialValue={displayName}
+        onContinue={(name) => {
+          setDisplayName(name);
+          setStep('show');
+        }}
+      />
+    );
+  }
   if (step === 'show') {
     return (
       <MnemonicShow
@@ -133,7 +178,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
             marginBottom: 6,
           }}
         >
-          Step 4 of 4 · seal your vault
+          Step 5 of 5 · seal your vault
         </div>
         <h1
           style={{

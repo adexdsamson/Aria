@@ -31,6 +31,8 @@ interface AriaStub {
   onboardingUnlock: ReturnType<typeof vi.fn>;
   onboardingStatus: ReturnType<typeof vi.fn>;
   newsSetBundle: ReturnType<typeof vi.fn>;
+  profileSet: ReturnType<typeof vi.fn>;
+  profileGet: ReturnType<typeof vi.fn>;
 }
 
 const WORDS =
@@ -48,20 +50,29 @@ function installAria(): AriaStub {
     onboardingUnlock: vi.fn().mockResolvedValue({ ok: true }),
     onboardingStatus: vi.fn().mockResolvedValue({ sealed: false, unlocked: false }),
     newsSetBundle: vi.fn().mockResolvedValue({ ok: true }),
+    profileSet: vi.fn().mockResolvedValue({ ok: true }),
+    profileGet: vi.fn().mockResolvedValue({ displayName: null }),
   };
   (globalThis as unknown as { window: { aria: AriaStub } }).window.aria = stub;
   return stub;
 }
 
 async function advanceThroughMnemonic(): Promise<void> {
-  // Step 1: MnemonicShow — tick the ack checkbox, then click Continue.
+  // Quick 260523-eaf — Step 1: NameStep — type a name and Continue.
+  const nameInput = await screen.findByTestId('name-input');
+  fireEvent.change(nameInput, { target: { value: 'Adex' } });
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('name-submit'));
+  });
+
+  // Step 2: MnemonicShow — tick the ack checkbox, then click Continue.
   const ack = await screen.findByTestId('mnemonic-ack');
   fireEvent.click(ack);
   await act(async () => {
     fireEvent.click(screen.getByTestId('mnemonic-continue'));
   });
 
-  // Step 2: MnemonicConfirm — fill 3 inputs with the right words, submit.
+  // Step 3: MnemonicConfirm — fill 3 inputs with the right words, submit.
   const inputs = await screen.findAllByTestId(/confirm-input-\d/);
   for (let i = 0; i < POSITIONS.length; i++) {
     fireEvent.change(inputs[i], { target: { value: WORDS[POSITIONS[i]] } });

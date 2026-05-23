@@ -39,7 +39,7 @@ export function MnemonicShow({ words, onContinue }: MnemonicShowProps): JSX.Elem
           marginBottom: 6,
         }}
       >
-        Step 1 of 4 · recovery phrase
+        Step 2 of 5 · recovery phrase
       </div>
       <h1
         style={{

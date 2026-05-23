@@ -24,11 +24,24 @@ export interface UnlockScreenProps {
 }
 
 function greetingForHour(h: number): string {
-  if (h < 5) return 'Late evening.';
-  if (h < 12) return 'Good morning.';
-  if (h < 17) return 'Good afternoon.';
-  if (h < 22) return 'Good evening.';
-  return 'Quiet hours.';
+  if (h < 5) return 'Late evening';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  if (h < 22) return 'Good evening';
+  return 'Quiet hours';
+}
+
+/**
+ * Quick 260523-eaf — render the time-of-day greeting, personalized when
+ * the user provided a display name during onboarding. Falls back to the
+ * generic form when `displayName` is null/empty (fresh install, restore
+ * from mnemonic, profile.json read failure).
+ */
+function formatGreeting(base: string, displayName: string | null): string {
+  if (displayName && displayName.trim().length > 0) {
+    return `${base}, ${displayName.trim()}.`;
+  }
+  return `${base}.`;
 }
 
 function formatDate(d: Date): string {
@@ -49,15 +62,36 @@ export function UnlockScreen({ onUnlocked }: UnlockScreenProps): JSX.Element {
   const [failures, setFailures] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const now = useMemo(() => new Date(), []);
-  const greeting = greetingForHour(now.getHours());
+  const greetingBase = greetingForHour(now.getHours());
+  const greeting = formatGreeting(greetingBase, displayName);
   const dateLabel = formatDate(now);
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // Quick 260523-eaf — fetch the display name once on mount. PROFILE_GET
+  // runs pre-unlock (no DB dependency) and returns `null` on any failure,
+  // so the greeting safely falls back to the generic form.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = (await window.aria.profileGet()) as { displayName: string | null } | { error: string };
+        if (cancelled) return;
+        if ('displayName' in res) setDisplayName(res.displayName);
+      } catch {
+        // Swallow — generic greeting is the safe fallback.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function submit(): Promise<void> {
