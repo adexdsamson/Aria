@@ -19,18 +19,18 @@ import { getLogger } from './log/pino';
 /**
  * Dev-only `.env.local` loader (UAT Gap 3).
  *
- * Production builds inject `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` via
- * electron-vite `define` (or the user's shell). In `pnpm dev` neither path
- * applies, so `process.env.GOOGLE_*` is `undefined` and the first OAuth
- * attempt throws `OAuthConfigMissingError` (renderer silently swallows it —
- * see IntegrationsSection error surfacing fix).
+ * Production builds get `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `MS_OAUTH_*`
+ * baked into the bundle via electron-vite `define` (see
+ * electron.vite.config.ts — quick 260523-f73). In `pnpm dev` `define` runs
+ * against the dev process's env which has not yet read `.env.local`, so this
+ * loader fills the gap by populating `process.env` before any module reads
+ * `process.env.GOOGLE_*`. The user's explicit shell exports always win.
  *
- * This loader runs BEFORE any module that reads `process.env.GOOGLE_*`. It is
- * a minimal ~10-line parser — we deliberately do NOT add `dotenv` as a
- * dependency. Existing env vars (shell exports) always win. Secrets are NEVER
- * logged — only the count of variables loaded.
+ * Minimal ~10-line parser — we deliberately do NOT add `dotenv` as a
+ * dependency. Secrets are NEVER logged — only the count of variables loaded.
  *
- * Packaged builds (no ELECTRON_RENDERER_URL) skip this entirely.
+ * Packaged builds (no ELECTRON_RENDERER_URL) skip this entirely; the
+ * `define`-baked literals are already substituted into the compiled bundle.
  */
 function loadDotEnvLocalInDev(): void {
   if (!process.env['ELECTRON_RENDERER_URL']) return; // dev-only
