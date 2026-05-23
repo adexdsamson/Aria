@@ -169,6 +169,10 @@ export const CHANNELS = {
   // Phase 12 Background activity (12-01)
   BG_GET_PREFS: 'aria:background:get-prefs',
   BG_SET_PREFS: 'aria:background:set-prefs',
+  // Quick 260523-eaf — user profile (display name shown on UnlockScreen).
+  // Stored in plaintext `profile.json` sibling to vault.json; readable pre-unlock.
+  PROFILE_GET: 'aria:profile:get',
+  PROFILE_SET: 'aria:profile:set',
   // Phase 12 / Plan 12-03 — renderer navigation push (owned by 12-03).
   // Main process sends this channel via webContents.send to route the renderer
   // to an allowlisted path (/briefing, /approvals). T-12-10: path is hardcoded
@@ -1029,6 +1033,10 @@ export interface AriaApi {
   backgroundGetPrefs(): Promise<BackgroundPrefsDto | IpcError>;
   backgroundSetPrefs(req: BackgroundPrefsPatchDto): Promise<BackgroundPrefsDto | IpcError>;
 
+  // Quick 260523-eaf — user profile (UnlockScreen personalization).
+  profileGet(): Promise<{ displayName: string | null } | IpcError>;
+  profileSet(req: { displayName: string }): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+
   /** Subscription helper — wraps ipcRenderer.on for RESEARCH_REPORT_DONE. */
   onResearchReportDone?: (cb: (payload: { jobId: string; reportId: string }) => void) => () => void;
 
@@ -1422,6 +1430,9 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   // Phase 12 Background activity (12-01)
   BG_GET_PREFS: 'backgroundGetPrefs',
   BG_SET_PREFS: 'backgroundSetPrefs',
+  // Quick 260523-eaf — user profile.
+  PROFILE_GET: 'profileGet',
+  PROFILE_SET: 'profileSet',
   // Phase 12 / Plan 12-03 — push-only navigate channel. Overridden in preload
   // with a real ipcRenderer.on subscription (like ENTITLEMENT_STATE_CHANGED).
   NAVIGATE: 'onNavigate',

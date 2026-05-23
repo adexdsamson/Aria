@@ -75,7 +75,7 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
           marginBottom: 6,
         }}
       >
-        Step 3 of 4 · personalise your briefing
+        Step 4 of 5 · personalise your briefing
       </div>
       <h1
         style={{

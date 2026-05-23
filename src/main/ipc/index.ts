@@ -27,6 +27,7 @@ import {
 import { registerBackupHandlers } from './backup';
 import { registerSecretsHandlers } from './secrets';
 import { registerOllamaHandlers } from './ollama';
+import { registerProfileHandlers } from './profile';
 import { registerAskHandlers } from './ask';
 import { registerDiagnosticsHandlers } from './diagnostics';
 import { registerGmailHandlers } from './gmail';
@@ -128,6 +129,13 @@ export function registerHandlers(
       },
     });
     onboardingChannels.forEach((c) => skip.add(c));
+  }
+
+  // Quick 260523-eaf — profile handlers run pre-unlock (no DB dependency).
+  const profileChannels = [CHANNELS.PROFILE_GET, CHANNELS.PROFILE_SET];
+  if (dataDir && !profileChannels.every((c) => skip.has(c))) {
+    registerProfileHandlers(ipcMain, { logger, dataDir });
+    profileChannels.forEach((c) => skip.add(c));
   }
 
   const backupChannels = [CHANNELS.BACKUP_CREATE, CHANNELS.BACKUP_RESTORE];

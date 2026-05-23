@@ -66,7 +66,7 @@ export function MnemonicConfirm({
           marginBottom: 6,
         }}
       >
-        Step 2 of 4 · confirm recovery phrase
+        Step 3 of 5 · confirm recovery phrase
       </div>
       <h1
         style={{
