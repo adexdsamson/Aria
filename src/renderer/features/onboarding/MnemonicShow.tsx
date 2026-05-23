@@ -5,7 +5,7 @@
  * `pendingMnemonic` until seal). Phase 9 Plan 05: editorial re-skin.
  */
 import { useState } from 'react';
-import { AppLogo, Button, Card } from '../../components/editorial';
+import { AppLogo, Button, Card, Checkbox } from '../../components/editorial';
 
 export interface MnemonicShowProps {
   words: string[];
@@ -123,24 +123,14 @@ export function MnemonicShow({ words, onContinue }: MnemonicShowProps): JSX.Elem
           Aria cannot recover this phrase for you. Write it down — don&apos;t screenshot.
         </p>
       </Card>
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginTop: 16,
-          fontFamily: 'var(--f-body)',
-          color: 'var(--ink)',
-        }}
-      >
-        <input
-          type="checkbox"
+      <div style={{ marginTop: 8 }}>
+        <Checkbox
+          data-testid="mnemonic-ack"
           checked={acknowledged}
           onChange={(e) => setAcknowledged(e.target.checked)}
-          data-testid="mnemonic-ack"
+          label="I've written these words down somewhere safe."
         />
-        I&apos;ve written these words down somewhere safe.
-      </label>
+      </div>
       <div style={{ marginTop: 16 }}>
         <Button
           variant="primary"

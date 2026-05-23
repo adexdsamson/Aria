@@ -60,7 +60,6 @@ html {
 }
 body { background: var(--ivory); color: var(--ink); min-height: 100vh; }
 
-/* Paper overlay */
 body::before {
   content: "";
   position: fixed; inset: 0;
@@ -76,7 +75,6 @@ p { margin: 0; }
 a { color: inherit; text-decoration: none; }
 ::selection { background: rgba(184,134,11,0.2); color: var(--ink); }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 8px; border: 2px solid var(--ivory); }
@@ -103,25 +101,15 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid transparent; cursor: pointer;
   transition: all var(--t); white-space: nowrap; text-decoration: none;
 }
-.btn-primary {
-  background: var(--gold); color: #fff;
-  box-shadow: 0 1px 2px rgba(26,26,26,0.04);
-}
+.btn-primary { background: var(--gold); color: #fff; box-shadow: 0 1px 2px rgba(26,26,26,0.04); }
 .btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(184,134,11,0.22); }
 .btn-primary:active { transform: translateY(0); }
-.btn-outline {
-  background: transparent; color: var(--ink); border-color: var(--rule-strong);
-}
+.btn-outline { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
 .btn-outline:hover { border-color: var(--gold); color: var(--gold); background: rgba(184,134,11,0.04); }
 .btn-ghost { background: transparent; color: var(--gray); border: none; }
 .btn-ghost:hover { color: var(--ink); }
 
-/* Download button variants */
-.btn-dl {
-  background: var(--ink); color: var(--ivory);
-  border: 1px solid var(--ink);
-  gap: 0.625rem;
-}
+.btn-dl { background: var(--ink); color: var(--ivory); border: 1px solid var(--ink); gap: 0.625rem; }
 .btn-dl:hover { background: var(--ink-soft); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,26,26,0.18); }
 .btn-dl .dl-os { font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.6; }
 .btn-dl .dl-label { font-size: 0.9rem; font-weight: 500; }
@@ -142,8 +130,7 @@ a { color: inherit; text-decoration: none; }
   width: 28px; height: 28px; border-radius: 6px;
   background: var(--ivory); border: 1px solid var(--rule);
   display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 2px rgba(26,26,26,0.04);
-  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(26,26,26,0.04); flex-shrink: 0;
 }
 .brand-letter {
   font-family: var(--f-display); font-weight: 500; font-size: 18px;
@@ -161,45 +148,36 @@ a { color: inherit; text-decoration: none; }
 }
 .topnav nav a:hover { color: var(--gold); }
 .topnav .actions { display: flex; gap: 0.75rem; align-items: center; }
-@media (max-width: 768px) {
-  .topnav nav { display: none; }
-  .topnav .actions .btn-ghost-nav { display: none; }
-}
+@media (max-width: 768px) { .topnav nav { display: none; } }
 
 /* ── Hero ───────────────────────────────────────────────────────────── */
-.hero { padding: 6rem 2rem 4rem; border-bottom: 1px solid var(--rule); }
+.hero { padding: 5rem 2rem 0; border-bottom: 1px solid var(--rule); }
 .hero-inner { max-width: 80rem; margin: 0 auto; }
 
 .hero-masthead {
-  display: grid; grid-template-columns: 1fr auto 1fr;
-  gap: 1.5rem; align-items: center;
-  padding-bottom: 1.5rem; border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 1.25rem; border-bottom: 1px solid var(--rule);
   margin-bottom: 3rem;
 }
-.hero-masthead .mast-left,
-.hero-masthead .mast-right {
-  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.22em;
+.mast-tag {
+  font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.22em;
   text-transform: uppercase; color: var(--gray);
 }
-.hero-masthead .mast-right { text-align: right; }
-.hero-masthead .mast-center {
+.mast-center {
   font-family: var(--f-display); font-style: italic; font-size: 1rem; color: var(--gold);
 }
-@media (max-width: 700px) {
-  .hero-masthead { grid-template-columns: 1fr; text-align: center; }
-  .hero-masthead .mast-right { text-align: center; }
-}
+@media (max-width: 600px) { .mast-center { display: none; } }
 
 .hero-grid {
-  display: grid; grid-template-columns: 1.4fr 1fr;
-  gap: 4rem; align-items: end;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5rem; align-items: center; padding-bottom: 4rem;
 }
-@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 2rem; } }
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 2.5rem; } }
 
 .hero h1 {
-  font-size: clamp(3rem, 8.5vw, 7.5rem);
-  line-height: 0.95; font-weight: 500; letter-spacing: -0.03em;
-  margin-bottom: 1.25rem;
+  font-size: clamp(2.75rem, 7vw, 6rem);
+  line-height: 0.97; font-weight: 500; letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
 }
 .hero h1 .it { font-style: italic; color: var(--ink-soft); font-weight: 400; }
 .hero h1 .gold-underline { position: relative; display: inline-block; }
@@ -210,42 +188,34 @@ a { color: inherit; text-decoration: none; }
 
 .hero .lede {
   font-family: var(--f-display); font-style: italic;
-  font-size: 1.5rem; line-height: 1.45; color: var(--gray);
-  max-width: 30em; margin-top: 1.5rem;
+  font-size: 1.375rem; line-height: 1.5; color: var(--gray);
+  margin-bottom: 2.5rem;
 }
 
-.hero .cta-row {
-  display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
-  margin-top: 2.5rem;
-}
-.hero .dl-pair { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.hero .cta-row { display: flex; gap: 0.875rem; align-items: center; flex-wrap: wrap; }
 .hero .meta-line {
-  font-family: var(--f-mono); font-size: 0.7rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--gray-soft); display: flex; align-items: center; gap: 0.75rem;
-  margin-top: 0.5rem; width: 100%;
+  font-family: var(--f-mono); font-size: 0.68rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--gray-soft); display: flex; align-items: center; gap: 0.625rem;
+  margin-top: 1rem; width: 100%;
 }
 .hero .meta-line .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
 
-/* Hero aside */
+/* Hero preview card */
 .hero-preview {
   position: relative;
   border: 1px solid var(--rule); border-top: 2px solid var(--gold);
-  border-radius: 8px; background: var(--paper);
+  border-radius: 10px; background: var(--paper);
   padding: 1.5rem 1.75rem;
-  box-shadow: 0 12px 40px rgba(26,26,26,0.08);
+  box-shadow: 0 16px 48px rgba(26,26,26,0.1);
   transform: rotate(-1deg);
-}
-.hero-preview::before {
-  content: ""; position: absolute; top: -1rem; left: 2rem;
-  width: 60px; height: 1px; background: var(--gold);
 }
 .hero-preview .eyebrow {
   font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.2em;
   text-transform: uppercase; color: var(--gold); margin-bottom: 0.5rem;
 }
-.hero-preview h3 { font-size: 1.625rem; line-height: 1.15; margin-bottom: 0.75rem; }
-.hero-preview p { font-size: 0.95rem; line-height: 1.6; color: var(--gray); }
+.hero-preview h3 { font-size: 1.5rem; line-height: 1.2; margin-bottom: 0.625rem; font-weight: 500; }
+.hero-preview p { font-size: 0.9rem; line-height: 1.6; color: var(--gray); }
 .hero-preview .signature {
   margin-top: 1.25rem; padding-top: 1rem;
   border-top: 1px dotted var(--rule);
@@ -254,75 +224,69 @@ a { color: inherit; text-decoration: none; }
   display: flex; justify-content: space-between;
 }
 
+/* ── App preview / video section ───────────────────────────────────── */
+.video-section {
+  padding: 0 2rem 5rem; background: var(--ivory);
+}
+.video-wrap {
+  max-width: 80rem; margin: 0 auto;
+  position: relative;
+}
+
 /* ── Strip ──────────────────────────────────────────────────────────── */
 .strip {
   border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-  padding: 1.5rem 0; background: var(--ivory-deep); overflow: hidden;
+  padding: 1.25rem 0; background: var(--ivory-deep); overflow: hidden;
 }
 .strip-inner {
   max-width: 80rem; margin: 0 auto;
-  display: flex; align-items: center; gap: 3rem;
-  padding: 0 2rem; flex-wrap: wrap; justify-content: center;
+  display: flex; align-items: center; gap: 0;
+  padding: 0 2rem; flex-wrap: wrap; justify-content: space-around;
 }
 .strip-item {
-  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em;
+  font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.18em;
   text-transform: uppercase; color: var(--gray);
-  display: flex; align-items: center; gap: 0.75rem;
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.5rem 1rem;
 }
-.strip-item .glyph {
-  font-family: var(--f-display); font-style: italic; color: var(--gold); font-size: 1.125rem;
-}
+.strip-item .glyph { font-family: var(--f-display); font-style: italic; color: var(--gold); font-size: 1.125rem; }
 
 /* ── Sections ───────────────────────────────────────────────────────── */
-section.section { padding: 8rem 2rem; border-bottom: 1px solid var(--rule); }
+section.section { padding: 6rem 2rem; border-bottom: 1px solid var(--rule); }
 section.dark { background: var(--ink); color: var(--ivory); }
 
-.sec-eyebrow {
-  display: flex; align-items: center; gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.sec-eyebrow .sec-rule { width: 60px; height: 1px; background: var(--rule); }
+.sec-eyebrow { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+.sec-eyebrow .sec-rule { width: 48px; height: 1px; background: var(--rule); }
 .sec-eyebrow .sec-rule-flex { flex: 1; height: 1px; background: var(--rule); }
 section.dark .sec-eyebrow .sec-rule,
-section.dark .sec-eyebrow .sec-rule-flex { background: rgba(212,168,75,0.4); }
-.sec-eyebrow .num {
-  font-family: var(--f-display); font-style: italic; font-size: 1.5rem;
-  color: var(--gold); line-height: 1;
-}
-.sec-eyebrow .lbl {
-  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.22em;
-  text-transform: uppercase; color: var(--gold);
-}
+section.dark .sec-eyebrow .sec-rule-flex { background: rgba(212,168,75,0.35); }
+.sec-eyebrow .num { font-family: var(--f-display); font-style: italic; font-size: 1.5rem; color: var(--gold); line-height: 1; }
+.sec-eyebrow .lbl { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
 
-.sec-h {
-  font-size: clamp(2.25rem, 4.5vw, 3.5rem); line-height: 1.05;
-  font-weight: 500; letter-spacing: -0.025em;
-  max-width: 18em; margin-bottom: 1rem;
-}
+.sec-h { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.05; font-weight: 500; letter-spacing: -0.025em; max-width: 20em; margin-bottom: 0.75rem; }
 .sec-h em { font-style: italic; color: var(--gray); font-weight: 400; }
 section.dark .sec-h em { color: var(--gold-light); }
-.sec-sub {
-  font-family: var(--f-display); font-style: italic;
-  font-size: 1.25rem; line-height: 1.5; color: var(--gray);
-  max-width: 30em; margin-bottom: 3rem;
-}
-section.dark .sec-sub { color: rgba(255,255,255,0.7); }
+.sec-sub { font-family: var(--f-display); font-style: italic; font-size: 1.125rem; line-height: 1.5; color: var(--gray); max-width: 36em; margin-bottom: 3rem; }
+section.dark .sec-sub { color: rgba(255,255,255,0.65); }
 
 /* ── How it works ───────────────────────────────────────────────────── */
-.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin-top: 2rem; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; }
 @media (max-width: 900px) { .steps { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+
 .step { padding-top: 1.25rem; border-top: 1px solid var(--rule); }
 .step .n {
-  font-family: var(--f-display); font-size: 3rem; font-weight: 500;
-  color: var(--gold); line-height: 1; font-style: italic;
-  margin-bottom: 0.75rem;
+  font-family: var(--f-display); font-size: 2.75rem; font-weight: 500;
+  color: var(--gold); line-height: 1; font-style: italic; margin-bottom: 0.625rem;
 }
-.step h4 { font-size: 1.25rem; line-height: 1.25; margin-bottom: 0.5rem; font-weight: 500; }
-.step p { font-size: 0.95rem; line-height: 1.65; color: var(--gray); }
+.step h4 { font-size: 1.125rem; line-height: 1.25; margin-bottom: 0.375rem; font-weight: 500; }
+.step p { font-size: 0.9rem; line-height: 1.6; color: var(--gray); }
+
+/* Step icons */
+.step-icon { margin-bottom: 0.875rem; }
 
 /* ── Feature blocks ─────────────────────────────────────────────────── */
-.feature { display: grid; gap: 4rem; align-items: center; margin-bottom: 8rem; }
+.feature { display: grid; gap: 4rem; align-items: center; margin-bottom: 6rem; }
 .feature:last-child { margin-bottom: 0; }
 .feature.flip { grid-template-columns: 1fr 1.1fr; }
 .feature.flip .feat-visual { order: 1; }
@@ -330,30 +294,20 @@ section.dark .sec-sub { color: rgba(255,255,255,0.7); }
 .feature:not(.flip) { grid-template-columns: 1.1fr 1fr; }
 @media (max-width: 900px) {
   .feature, .feature.flip { grid-template-columns: 1fr; gap: 2rem; }
-  .feature.flip .feat-visual,
-  .feature.flip .feat-copy { order: 0; }
+  .feature.flip .feat-visual, .feature.flip .feat-copy { order: 0; }
 }
 
-.feat-copy h3 {
-  font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.1;
-  font-weight: 500; letter-spacing: -0.02em; margin-bottom: 1rem;
-}
+.feat-copy h3 { font-size: clamp(1.625rem, 2.75vw, 2.25rem); line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
 .feat-copy h3 em { font-style: italic; color: var(--gray); }
-.feat-copy p {
-  font-size: 1.0625rem; line-height: 1.75; color: var(--ink-soft);
-  max-width: 32em; margin-bottom: 1.5rem;
-}
-.feat-copy ul { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.feat-copy p { font-size: 1rem; line-height: 1.7; color: var(--ink-soft); margin-bottom: 1.25rem; }
+.feat-copy ul { list-style: none; padding: 0; margin: 0; }
 .feat-copy li {
-  display: grid; grid-template-columns: 20px 1fr; gap: 0.75rem;
-  padding: 0.6rem 0; border-top: 1px dotted var(--rule);
-  font-size: 0.95rem; color: var(--ink-soft);
+  display: grid; grid-template-columns: 16px 1fr; gap: 0.75rem;
+  padding: 0.5rem 0; border-top: 1px dotted var(--rule);
+  font-size: 0.9rem; color: var(--ink-soft);
 }
 .feat-copy li:last-child { border-bottom: 1px dotted var(--rule); }
-.feat-copy li .swatch {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
-  margin-top: 0.65rem; justify-self: start;
-}
+.feat-copy li .swatch { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); margin-top: 0.6rem; justify-self: start; }
 
 /* Mocks */
 .mock {
@@ -379,7 +333,7 @@ section.dark .sec-sub { color: rgba(255,255,255,0.7); }
 .draft-block {
   background: var(--ivory); border: 1px dashed var(--rule);
   padding: 14px 18px; border-radius: 4px;
-  font-family: Georgia, serif; font-size: 14px; line-height: 1.7;
+  font-family: Georgia, serif; font-size: 13.5px; line-height: 1.7;
   color: var(--ink); white-space: pre-wrap;
 }
 .q-bubble {
@@ -399,37 +353,17 @@ section.dark .sec-sub { color: rgba(255,255,255,0.7); }
 /* ── Trust ──────────────────────────────────────────────────────────── */
 .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 2rem; }
 @media (max-width: 900px) { .trust-grid { grid-template-columns: 1fr; } }
-.trust-card {
-  padding: 2rem 1.75rem; border-top: 2px solid var(--gold-light);
-  background: rgba(255,255,255,0.04);
-}
-.trust-card .glyph {
-  font-family: var(--f-display); font-style: italic; font-size: 2.5rem;
-  color: var(--gold-light); line-height: 1; margin-bottom: 0.75rem;
-}
-.trust-card h4 { font-size: 1.375rem; margin-bottom: 0.75rem; font-weight: 500; color: var(--ivory); }
-.trust-card p { color: rgba(255,255,255,0.7); font-size: 0.95rem; line-height: 1.65; }
+.trust-card { padding: 2rem 1.75rem; border-top: 2px solid var(--gold-light); background: rgba(255,255,255,0.04); }
+.trust-card .glyph { font-family: var(--f-display); font-style: italic; font-size: 2.5rem; color: var(--gold-light); line-height: 1; margin-bottom: 0.75rem; }
+.trust-card h4 { font-size: 1.25rem; margin-bottom: 0.625rem; font-weight: 500; color: var(--ivory); }
+.trust-card p { color: rgba(255,255,255,0.65); font-size: 0.9rem; line-height: 1.6; }
 
 /* ── Download section ───────────────────────────────────────────────── */
-.dl-section {
-  padding: 8rem 2rem; border-bottom: 1px solid var(--rule);
-  text-align: center;
-}
-.dl-section h2 {
-  font-size: clamp(2.25rem, 4.5vw, 3.5rem); line-height: 1.05;
-  font-weight: 500; letter-spacing: -0.025em;
-  max-width: 18em; margin: 0 auto 1rem;
-}
+.dl-section { padding: 6rem 2rem; border-bottom: 1px solid var(--rule); text-align: center; }
+.dl-section h2 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.05; font-weight: 500; letter-spacing: -0.025em; max-width: 18em; margin: 0 auto 0.75rem; }
 .dl-section h2 em { font-style: italic; color: var(--gray); font-weight: 400; }
-.dl-section p {
-  font-family: var(--f-display); font-style: italic;
-  font-size: 1.25rem; line-height: 1.5; color: var(--gray);
-  max-width: 30em; margin: 0 auto 3rem;
-}
-.dl-cards {
-  display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
-  margin-bottom: 2rem;
-}
+.dl-section > p { font-family: var(--f-display); font-style: italic; font-size: 1.125rem; line-height: 1.5; color: var(--gray); max-width: 30em; margin: 0 auto 2.5rem; }
+.dl-cards { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
 .dl-card {
   background: var(--paper); border: 1px solid var(--rule);
   border-radius: 10px; padding: 2rem 2.25rem;
@@ -438,11 +372,8 @@ section.dark .sec-sub { color: rgba(255,255,255,0.7); }
   transition: all var(--t);
 }
 .dl-card:hover { box-shadow: 0 8px 32px rgba(26,26,26,0.08); border-color: var(--rule-strong); }
-.dl-card .platform-label {
-  font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.22em;
-  text-transform: uppercase; color: var(--gold); margin-bottom: 0.75rem;
-}
-.dl-card .platform-name { font-family: var(--f-display); font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
+.dl-card .platform-label { font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.625rem; }
+.dl-card .platform-name { font-family: var(--f-display); font-size: 1.375rem; font-weight: 500; margin-bottom: 0.25rem; }
 .dl-card .platform-detail { font-size: 0.875rem; color: var(--gray); margin-bottom: 1.5rem; }
 .dl-card a.dl-btn {
   display: flex; align-items: center; gap: 0.5rem;
@@ -452,97 +383,43 @@ section.dark .sec-sub { color: rgba(255,255,255,0.7); }
   transition: all var(--t); text-decoration: none;
 }
 .dl-card a.dl-btn:hover { background: var(--ink-soft); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,26,26,0.15); }
-.dl-card a.dl-btn svg { flex-shrink: 0; }
-.dl-note {
-  font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.15em;
-  text-transform: uppercase; color: var(--gray-soft);
-  margin-top: 2rem; display: flex; align-items: center; gap: 0.75rem; justify-content: center;
-}
+.dl-note { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gray-soft); margin-top: 2rem; display: flex; align-items: center; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
 .dl-note .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
 
 /* ── FAQ ────────────────────────────────────────────────────────────── */
-.faq-item { border-top: 1px solid var(--rule); padding: 1.25rem 0; }
+.faq-item { border-top: 1px solid var(--rule); padding: 1.125rem 0; }
 .faq-item:last-child { border-bottom: 1px solid var(--rule); }
-.faq-q {
-  all: unset; cursor: pointer;
-  display: flex; align-items: center; gap: 1rem; width: 100%;
-  font-family: var(--f-display); font-size: 1.25rem; line-height: 1.3; font-weight: 500;
-}
-.faq-q .marker {
-  font-family: var(--f-display); font-style: italic;
-  color: var(--gold); font-size: 1.5rem; line-height: 1;
-  transition: transform var(--t); user-select: none;
-}
+.faq-q { all: unset; cursor: pointer; display: flex; align-items: center; gap: 1rem; width: 100%; font-family: var(--f-display); font-size: 1.125rem; line-height: 1.3; font-weight: 500; }
+.faq-q .marker { font-family: var(--f-display); font-style: italic; color: var(--gold); font-size: 1.5rem; line-height: 1; transition: transform var(--t); user-select: none; }
 .faq-item.open .faq-q .marker { transform: rotate(45deg); }
-.faq-a {
-  padding-top: 0.75rem; padding-left: 2rem;
-  max-width: 38em; color: var(--gray); line-height: 1.7; font-size: 1rem;
-  display: none;
-}
+.faq-a { padding-top: 0.625rem; padding-left: 2rem; max-width: 36em; color: var(--gray); line-height: 1.65; font-size: 0.95rem; display: none; }
 .faq-item.open .faq-a { display: block; }
 
 /* ── Footer ─────────────────────────────────────────────────────────── */
-footer.bottom { padding: 5rem 2rem 3rem; background: var(--ink); color: var(--ivory); }
-footer.bottom .f-inner {
-  max-width: 80rem; margin: 0 auto;
-  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem;
-}
+footer.bottom { padding: 4rem 2rem 2.5rem; background: var(--ink); color: var(--ivory); }
+footer.bottom .f-inner { max-width: 80rem; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; }
 @media (max-width: 720px) { footer.bottom .f-inner { grid-template-columns: 1fr 1fr; } }
-footer h5 {
-  font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em;
-  text-transform: uppercase; color: var(--gold-light); margin-bottom: 1rem;
-}
+footer h5 { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-light); margin-bottom: 1rem; }
 footer ul { list-style: none; padding: 0; margin: 0; }
-footer li { padding: 0.35rem 0; }
-footer a { color: rgba(255,255,255,0.8); font-size: 0.9rem; transition: color var(--t); }
+footer li { padding: 0.3rem 0; }
+footer a { color: rgba(255,255,255,0.75); font-size: 0.9rem; transition: color var(--t); }
 footer a:hover { color: var(--gold-light); }
-.f-brand-word { font-family: var(--f-display); font-size: 2.25rem; font-weight: 500; }
-.f-brand-mark {
-  width: 36px; height: 36px; border-radius: 8px;
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.f-brand-letter {
-  font-family: var(--f-display); font-weight: 500; font-size: 22px;
-  line-height: 1; color: var(--ivory); position: relative; padding-bottom: 2px;
-}
-.f-brand-letter::after {
-  content: ""; position: absolute; left: 20%; right: 20%; bottom: 14%;
-  height: 1.5px; background: var(--gold-light);
-}
-.f-brand-p { color: rgba(255,255,255,0.6); max-width: 22em; line-height: 1.6; margin-top: 0.75rem; font-size: 0.95rem; }
-.f-signup {
-  display: flex; margin-top: 1rem;
-  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 6px; overflow: hidden;
-}
-.f-signup input {
-  all: unset; flex: 1; padding: 0.75rem 1rem;
-  font-family: var(--f-body); font-size: 0.875rem; color: var(--ivory);
-}
+.f-brand-word { font-family: var(--f-display); font-size: 2rem; font-weight: 500; }
+.f-brand-mark { width: 34px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.f-brand-letter { font-family: var(--f-display); font-weight: 500; font-size: 20px; line-height: 1; color: var(--ivory); position: relative; padding-bottom: 2px; }
+.f-brand-letter::after { content: ""; position: absolute; left: 20%; right: 20%; bottom: 14%; height: 1.5px; background: var(--gold-light); }
+.f-brand-p { color: rgba(255,255,255,0.55); max-width: 22em; line-height: 1.6; margin-top: 0.625rem; font-size: 0.9rem; }
+.f-signup { display: flex; margin-top: 1rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; }
+.f-signup input { all: unset; flex: 1; padding: 0.625rem 1rem; font-family: var(--f-body); font-size: 0.875rem; color: var(--ivory); }
 .f-signup input::placeholder { color: rgba(255,255,255,0.4); font-style: italic; }
-.f-signup button {
-  all: unset; cursor: pointer; background: var(--gold); color: #fff;
-  padding: 0.75rem 1rem; font-family: var(--f-mono); font-size: 0.7rem;
-  letter-spacing: 0.18em; text-transform: uppercase; transition: background var(--t);
-}
+.f-signup button { all: unset; cursor: pointer; background: var(--gold); color: #fff; padding: 0.625rem 1rem; font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; transition: background var(--t); }
 .f-signup button:hover { background: var(--gold-light); }
-.f-legal {
-  max-width: 80rem; margin: 4rem auto 0; padding-top: 2rem;
-  border-top: 1px solid rgba(255,255,255,0.12);
-  display: flex; justify-content: space-between; align-items: center;
-  font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.18em;
-  text-transform: uppercase; color: rgba(255,255,255,0.5);
-  flex-wrap: wrap; gap: 1rem;
-}
+.f-legal { max-width: 80rem; margin: 3rem auto 0; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; font-family: var(--f-mono); font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.45); flex-wrap: wrap; gap: 1rem; }
 
 /* ── Scroll-reveal ──────────────────────────────────────────────────── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .reveal { opacity: 0; }
-.reveal.visible { animation: fadeUp 0.55s cubic-bezier(.2,.6,.2,1) forwards; }
+.reveal.visible { animation: fadeUp 0.5s cubic-bezier(.2,.6,.2,1) forwards; }
 .reveal-d1 { animation-delay: 0.05s; }
 .reveal-d2 { animation-delay: 0.12s; }
 .reveal-d3 { animation-delay: 0.20s; }
@@ -551,13 +428,11 @@ footer a:hover { color: var(--gold-light); }
 </head>
 <body>
 
-<!-- Top nav -->
+<!-- ── Nav ──────────────────────────────────────────────────────────── -->
 <header class="topnav">
   <div class="topnav-inner">
     <a class="brand" href="#">
-      <div class="brand-mark">
-        <span class="brand-letter">A</span>
-      </div>
+      <div class="brand-mark"><span class="brand-letter">A</span></div>
       <span class="brand-word">Aria</span>
     </a>
     <nav>
@@ -565,7 +440,6 @@ footer a:hover { color: var(--gold-light); }
       <a href="#features">Features</a>
       <a href="#trust">Trust</a>
       <a href="#download">Download</a>
-      <a href="#faq">FAQ</a>
     </nav>
     <div class="actions">
       <a href="#download" class="btn btn-primary" style="min-height:36px;padding:0 16px;font-size:13px">Download</a>
@@ -573,57 +447,44 @@ footer a:hover { color: var(--gold-light); }
   </div>
 </header>
 
-<!-- HERO -->
+<!-- ── Hero ─────────────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-masthead reveal">
-      <div class="mast-left">Early Access · Build 0.1.0 · 2026</div>
-      <div class="mast-center">A Local-First Desktop Assistant</div>
-      <div class="mast-right">macOS &amp; Windows</div>
+      <span class="mast-tag">Early Access · v0.1.0 · 2026</span>
+      <span class="mast-center">A Local-First Desktop Assistant</span>
+      <span class="mast-tag">macOS &amp; Windows</span>
     </div>
 
     <div class="hero-grid">
       <div>
         <h1 class="reveal reveal-d1">
-          A chief of staff who lives <span class="it">on your desk</span>, not in someone else's <span class="gold-underline">cloud</span>.
+          A chief of staff who lives <span class="it">on your desk</span>,<br>not in someone else's <span class="gold-underline">cloud</span>.
         </h1>
         <p class="lede reveal reveal-d2">
-          Aria reads your mail and calendar, drafts replies in your voice, extracts every commitment from a meeting, and writes you one quiet briefing each morning. Every send asks you first.
+          One briefing every morning. Every send asks you first.
         </p>
         <div class="cta-row reveal reveal-d3">
-          <div class="dl-pair">
-            <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria.Setup.0.1.0.exe" class="btn btn-dl">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/>
-                <path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-              <span>
-                <span class="dl-os">Windows</span>
-                <span class="dl-label" style="display:block;line-height:1.2">Download .exe</span>
-              </span>
-            </a>
-            <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria-0.1.0-arm64.dmg" class="btn btn-dl">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M8 2C4.686 2 2 4.686 2 8s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6z" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/>
-                <path d="M8 5v4.5M6 8l2 1.5L10 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>
-                <span class="dl-os">macOS · Apple Silicon</span>
-                <span class="dl-label" style="display:block;line-height:1.2">Download .dmg</span>
-              </span>
-            </a>
-          </div>
+          <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria.Setup.0.1.0.exe" class="btn btn-dl">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span><span class="dl-os">Windows</span><span class="dl-label" style="display:block;line-height:1.2">Download .exe</span></span>
+          </a>
+          <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria-0.1.0-arm64.dmg" class="btn btn-dl">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2C4.686 2 2 4.686 2 8s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6z" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5" fill="none"/><path d="M8 5v4.5M6 8l2 1.5L10 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><span class="dl-os">macOS · Apple Silicon</span><span class="dl-label" style="display:block;line-height:1.2">Download .dmg</span></span>
+          </a>
           <div class="meta-line">
             <span class="dot"></span>
-            <span>Early access build · unsigned · free to try</span>
+            <span>Free early access · unsigned build</span>
           </div>
         </div>
       </div>
 
+      <!-- Hero preview card -->
       <aside class="hero-preview reveal reveal-d2">
-        <div class="eyebrow">Aria · 07:00, this morning</div>
+        <div class="eyebrow">Aria · 07:00 this morning</div>
         <h3>Marcus is waiting on you on the term sheet.</h3>
-        <p>The drag-along threshold and the Maple side letter are the only two open items on the deal. He has held tomorrow at 9 for a final call. A draft reply is sitting in your approval queue.</p>
+        <p>The drag-along threshold and the side letter are the only two open items. A draft reply is in your approval queue.</p>
         <div class="signature">
           <span>Inbox · 07:14</span>
           <span style="color:var(--gold)">● flagged</span>
@@ -633,95 +494,423 @@ footer a:hover { color: var(--gold-light); }
   </div>
 </section>
 
-<!-- TRUST STRIP -->
-<div class="strip">
-  <div class="strip-inner">
-    <div class="strip-item"><span class="glyph">❦</span> Local-first by design</div>
-    <div class="strip-item"><span class="glyph">§</span> No SaaS · no telemetry</div>
-    <div class="strip-item"><span class="glyph">¶</span> Encrypted SQLite, your machine only</div>
-    <div class="strip-item"><span class="glyph">†</span> Every send asks you first</div>
+<!-- ── App Preview ─────────────────────────────────────────────────────── -->
+<div class="video-section">
+  <div class="video-wrap reveal">
+    <style>
+      .app-carousel { position:relative; width:100%; max-width:780px; margin:0 auto; }
+      .app-carousel-slides { position:relative; width:100%; aspect-ratio:16/10; overflow:hidden; border-radius:12px; box-shadow:0 24px 64px rgba(26,26,26,0.18); }
+      .app-carousel-slides svg { position:absolute; inset:0; width:100%; height:100%; opacity:0; transition:opacity 0.7s ease; }
+      .app-carousel-slides svg.active { opacity:1; }
+      .app-carousel-dots { display:flex; justify-content:center; gap:8px; margin-top:1.25rem; }
+      .app-carousel-dots button { all:unset; width:28px; height:3px; background:rgba(184,134,11,0.25); border-radius:2px; cursor:pointer; transition:background 0.3s; }
+      .app-carousel-dots button.active { background:var(--gold); }
+      .carousel-label { text-align:center; margin-top:0.75rem; font-family:var(--f-mono); font-size:0.7rem; letter-spacing:0.15em; color:var(--gray-soft); text-transform:uppercase; }
+    </style>
+
+    <div class="app-carousel">
+      <div class="app-carousel-slides" id="carouselSlides">
+
+        <!-- Slide 1: Briefing -->
+        <svg id="slide-0" class="active" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 488">
+          <rect width="780" height="488" rx="0" fill="#FAFAF8"/>
+          <!-- Title bar -->
+          <rect width="780" height="38" fill="#F5F3F0"/>
+          <circle cx="22" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="40" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="58" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <text x="390" y="25" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#6B6B6B" text-anchor="middle" letter-spacing="2">ARIA — CHIEF OF STAFF</text>
+          <!-- Sidebar -->
+          <rect x="0" y="38" width="138" height="450" fill="#F5F3F0"/>
+          <text x="18" y="76" font-family="'Playfair Display',serif" font-size="20" fill="#B8860B" font-weight="600">A</text>
+          <text x="32" y="76" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#6B6B6B" letter-spacing="1">ria</text>
+          <rect x="0" y="96" width="4" height="26" fill="#B8860B"/>
+          <text x="16" y="114" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1A1A1A" letter-spacing="1.5">BRIEFING</text>
+          <text x="16" y="143" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+          <text x="16" y="172" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+          <text x="16" y="201" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+          <rect x="138" y="38" width="1" height="450" fill="#E8E4DF"/>
+          <!-- Main -->
+          <text x="162" y="78" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#B8860B" letter-spacing="2">FRIDAY · MAY 22, 2026</text>
+          <text x="162" y="112" font-family="'Playfair Display',serif" font-size="28" fill="#1A1A1A">Good morning, Alex.</text>
+          <text x="162" y="136" font-family="'Source Sans 3',sans-serif" font-size="13" fill="#6B6B6B">3 items need your attention today.</text>
+          <rect x="162" y="150" width="590" height="1" fill="#E8E4DF"/>
+          <text x="162" y="174" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">CALENDAR · TODAY</text>
+          <rect x="162" y="184" width="590" height="42" rx="4" fill="#F5F3F0"/>
+          <rect x="162" y="184" width="4" height="42" rx="2" fill="#1A1A1A" opacity="0.25"/>
+          <text x="176" y="201" font-family="'Source Sans 3',sans-serif" font-size="13" fill="#1A1A1A" font-weight="600">1:1 with CTO · Zoom</text>
+          <text x="176" y="219" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#6B6B6B">11:00 – 12:00</text>
+          <text x="162" y="248" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">EMAIL · 4 THREADS</text>
+          <rect x="162" y="258" width="590" height="42" rx="4" fill="#F5F3F0"/>
+          <rect x="162" y="258" width="4" height="42" rx="2" fill="#B8860B"/>
+          <text x="176" y="275" font-family="'Source Sans 3',sans-serif" font-size="13" fill="#1A1A1A" font-weight="600">Board deck — final version needed</text>
+          <text x="176" y="293" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#6B6B6B">Sarah K. · Reply by 14:00</text>
+          <rect x="162" y="316" width="590" height="64" rx="4" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+          <rect x="162" y="316" width="4" height="64" rx="2" fill="#B8860B"/>
+          <text x="176" y="334" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" letter-spacing="1.5">ONE THING THAT COULD BLOW UP TODAY</text>
+          <text x="176" y="354" font-family="'Playfair Display',serif" font-size="15" fill="#1A1A1A">Marcus needs the drag-along clause</text>
+          <text x="176" y="372" font-family="'Playfair Display',serif" font-size="15" fill="#1A1A1A" font-style="italic">and the side letter — before tomorrow's close.</text>
+          <rect x="162" y="414" width="128" height="32" rx="4" fill="#B8860B"/>
+          <text x="226" y="434" font-family="'Source Sans 3',sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="500">Open briefing</text>
+        </svg>
+
+        <!-- Slide 2: Triage -->
+        <svg id="slide-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 488">
+          <rect width="780" height="488" rx="0" fill="#FAFAF8"/>
+          <rect width="780" height="38" fill="#F5F3F0"/>
+          <circle cx="22" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="40" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="58" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <text x="390" y="25" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#6B6B6B" text-anchor="middle" letter-spacing="2">ARIA — CHIEF OF STAFF</text>
+          <rect x="0" y="38" width="138" height="450" fill="#F5F3F0"/>
+          <text x="18" y="76" font-family="'Playfair Display',serif" font-size="20" fill="#B8860B" font-weight="600">A</text>
+          <text x="32" y="76" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#6B6B6B" letter-spacing="1">ria</text>
+          <text x="16" y="114" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+          <rect x="0" y="129" width="4" height="26" fill="#B8860B"/>
+          <text x="16" y="147" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1A1A1A" letter-spacing="1.5">TRIAGE</text>
+          <text x="16" y="176" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+          <text x="16" y="205" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+          <rect x="138" y="38" width="1" height="450" fill="#E8E4DF"/>
+          <!-- Inbox list panel -->
+          <text x="162" y="78" font-family="'Playfair Display',serif" font-size="22" fill="#1A1A1A">Triage</text>
+          <text x="162" y="98" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">4 THREADS · 2 URGENT</text>
+          <rect x="162" y="110" width="240" height="350" fill="#F5F3F0" rx="4"/>
+          <rect x="162" y="110" width="4" height="52" fill="#B8860B"/>
+          <text x="176" y="132" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A" font-weight="600">Board deck — final</text>
+          <text x="176" y="150" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Sarah K.</text>
+          <text x="362" y="126" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8493A" text-anchor="end" letter-spacing="1">URGENT</text>
+          <rect x="162" y="162" width="240" height="1" fill="#E8E4DF"/>
+          <text x="176" y="184" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A" font-weight="500">Q2 investor update</text>
+          <text x="176" y="202" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Marcus R. · 3 replies</text>
+          <rect x="162" y="214" width="240" height="1" fill="#E8E4DF"/>
+          <text x="176" y="236" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A" opacity="0.55">Intro: James at Acme</text>
+          <text x="176" y="254" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Forward · no action</text>
+          <rect x="162" y="266" width="240" height="1" fill="#E8E4DF"/>
+          <text x="176" y="288" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A" opacity="0.45">Re: AWS credits Q3</text>
+          <text x="176" y="306" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Finance · FYI</text>
+          <!-- Draft panel -->
+          <rect x="412" y="110" width="338" height="350" fill="#FFFFFF" rx="4" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="428" y="134" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" letter-spacing="1.5">DRAFT REPLY · VOICE MATCH 94%</text>
+          <rect x="412" y="142" width="338" height="1" fill="#E8E4DF"/>
+          <text x="428" y="162" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#6B6B6B">To: marcus@aldridgeco.com</text>
+          <text x="428" y="180" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#6B6B6B">Re: Term sheet</text>
+          <rect x="428" y="192" width="308" height="120" rx="3" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="442" y="213" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">Marcus,</text>
+          <text x="442" y="234" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">Agreed on 1.2× and the 7-year sunset.</text>
+          <text x="442" y="254" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">I will concede board composition.</text>
+          <text x="442" y="274" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">Hold drag at 60%.</text>
+          <text x="442" y="300" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">— E</text>
+          <rect x="428" y="328" width="110" height="30" rx="4" fill="#B8860B"/>
+          <text x="483" y="347" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#fff" text-anchor="middle">Send to queue</text>
+          <rect x="548" y="328" width="66" height="30" rx="4" fill="none" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="581" y="347" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#6B6B6B" text-anchor="middle">Edit</text>
+          <text x="428" y="390" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="1">● FINANCIAL · FLAGGED FOR APPROVAL</text>
+        </svg>
+
+        <!-- Slide 3: Calendar -->
+        <svg id="slide-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 488">
+          <rect width="780" height="488" rx="0" fill="#FAFAF8"/>
+          <rect width="780" height="38" fill="#F5F3F0"/>
+          <circle cx="22" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="40" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="58" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <text x="390" y="25" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#6B6B6B" text-anchor="middle" letter-spacing="2">ARIA — CHIEF OF STAFF</text>
+          <rect x="0" y="38" width="138" height="450" fill="#F5F3F0"/>
+          <text x="18" y="76" font-family="'Playfair Display',serif" font-size="20" fill="#B8860B" font-weight="600">A</text>
+          <text x="32" y="76" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#6B6B6B" letter-spacing="1">ria</text>
+          <text x="16" y="114" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+          <text x="16" y="143" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+          <rect x="0" y="158" width="4" height="26" fill="#B8860B"/>
+          <text x="16" y="176" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1A1A1A" letter-spacing="1.5">CALENDAR</text>
+          <text x="16" y="205" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+          <rect x="138" y="38" width="1" height="450" fill="#E8E4DF"/>
+          <text x="162" y="78" font-family="'Playfair Display',serif" font-size="22" fill="#1A1A1A">Calendar</text>
+          <text x="162" y="98" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">MAY 19 – 24 · 2026</text>
+          <!-- Alert -->
+          <rect x="162" y="108" width="590" height="60" rx="4" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+          <rect x="162" y="108" width="4" height="60" rx="2" fill="#B8860B"/>
+          <text x="176" y="126" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" letter-spacing="1.5">ARIA NOTICES · THURSDAY IS STACKED</text>
+          <text x="176" y="146" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A">Five meetings 8:30 – 16:00. Draft a reschedule for the 15:00?</text>
+          <rect x="176" y="155" width="96" height="22" rx="3" fill="none" stroke="#B8860B" stroke-width="1"/>
+          <text x="224" y="169" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#B8860B" text-anchor="middle">Draft decline</text>
+          <rect x="280" y="155" width="110" height="22" rx="3" fill="none" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="335" y="169" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B" text-anchor="middle">Show alternatives</text>
+          <!-- Week grid header -->
+          <rect x="162" y="178" width="590" height="1" fill="#E8E4DF"/>
+          <text x="246" y="198" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">MON 19</text>
+          <text x="342" y="198" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">TUE 20</text>
+          <text x="438" y="198" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">WED 21</text>
+          <text x="534" y="198" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8493A" text-anchor="middle" letter-spacing="1">THU 22 ●</text>
+          <text x="630" y="198" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" text-anchor="middle" letter-spacing="1" font-weight="600">FRI 23</text>
+          <rect x="162" y="206" width="590" height="1" fill="#E8E4DF"/>
+          <line x1="294" y1="206" x2="294" y2="450" stroke="#E8E4DF" stroke-width="0.5"/>
+          <line x1="390" y1="206" x2="390" y2="450" stroke="#E8E4DF" stroke-width="0.5"/>
+          <line x1="486" y1="206" x2="486" y2="450" stroke="#E8E4DF" stroke-width="0.5"/>
+          <line x1="582" y1="206" x2="582" y2="450" stroke="#E8E4DF" stroke-width="0.5"/>
+          <!-- Monday events -->
+          <rect x="166" y="218" width="80" height="24" rx="2" fill="#1A1A1A" opacity="0.07"/>
+          <text x="168" y="233" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#1A1A1A">Team sync · 10:00</text>
+          <!-- Wednesday -->
+          <rect x="394" y="240" width="88" height="36" rx="2" fill="#1A1A1A" opacity="0.07"/>
+          <text x="396" y="255" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#1A1A1A">Investor call</text>
+          <text x="396" y="269" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">14:00 – 15:00</text>
+          <!-- Thursday stacked -->
+          <rect x="490" y="218" width="88" height="22" rx="2" fill="#B8493A" opacity="0.14"/>
+          <rect x="490" y="244" width="88" height="22" rx="2" fill="#B8493A" opacity="0.11"/>
+          <rect x="490" y="270" width="88" height="22" rx="2" fill="#B8493A" opacity="0.09"/>
+          <rect x="490" y="296" width="88" height="22" rx="2" fill="#B8493A" opacity="0.07"/>
+          <rect x="490" y="322" width="88" height="22" rx="2" fill="#B8493A" opacity="0.05"/>
+          <text x="492" y="232" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8493A">Board prep 8:30</text>
+          <text x="492" y="258" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8493A">1:1 CTO 10:00</text>
+          <text x="492" y="284" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8493A">Acme Q3 11:30</text>
+          <text x="492" y="310" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8493A">Focus 13:00</text>
+          <text x="492" y="336" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8493A">Finance 15:00</text>
+          <!-- Friday gold events -->
+          <rect x="586" y="228" width="88" height="28" rx="2" fill="#B8860B" opacity="0.14"/>
+          <text x="588" y="242" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#B8860B" font-weight="600">Marcus · 14:00</text>
+          <text x="588" y="254" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#B8860B">PREP READY</text>
+          <rect x="586" y="262" width="88" height="22" rx="2" fill="#1A1A1A" opacity="0.06"/>
+          <text x="588" y="276" font-family="'Source Sans 3',sans-serif" font-size="8.5" fill="#6B6B6B">Sarah · 15:30</text>
+        </svg>
+
+        <!-- Slide 4: Ask Aria -->
+        <svg id="slide-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 488">
+          <rect width="780" height="488" rx="0" fill="#FAFAF8"/>
+          <rect width="780" height="38" fill="#F5F3F0"/>
+          <circle cx="22" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="40" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <circle cx="58" cy="19" r="6" fill="#1A1A1A" opacity="0.12"/>
+          <text x="390" y="25" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#6B6B6B" text-anchor="middle" letter-spacing="2">ARIA — CHIEF OF STAFF</text>
+          <rect x="0" y="38" width="138" height="450" fill="#F5F3F0"/>
+          <text x="18" y="76" font-family="'Playfair Display',serif" font-size="20" fill="#B8860B" font-weight="600">A</text>
+          <text x="32" y="76" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#6B6B6B" letter-spacing="1">ria</text>
+          <text x="16" y="114" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+          <text x="16" y="143" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+          <text x="16" y="172" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+          <rect x="0" y="187" width="4" height="26" fill="#B8860B"/>
+          <text x="16" y="205" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1A1A1A" letter-spacing="1.5">ASK ARIA</text>
+          <rect x="138" y="38" width="1" height="450" fill="#E8E4DF"/>
+          <text x="162" y="78" font-family="'Playfair Display',serif" font-size="22" fill="#1A1A1A">Ask Aria</text>
+          <text x="162" y="98" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">LOCAL MODEL · 4.2s</text>
+          <rect x="162" y="106" width="590" height="1" fill="#E8E4DF"/>
+          <!-- User question -->
+          <rect x="520" y="120" width="232" height="44" rx="14" fill="#1A1A1A"/>
+          <text x="536" y="139" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#FAFAF8">What did Sarah commit to</text>
+          <text x="536" y="156" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#FAFAF8">on the board deck?</text>
+          <!-- Answer -->
+          <rect x="162" y="180" width="370" height="104" rx="6" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+          <rect x="162" y="180" width="4" height="104" rx="2" fill="#B8860B"/>
+          <text x="177" y="200" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">Sarah committed to deliver</text>
+          <text x="177" y="220" font-family="Georgia,serif" font-size="13" fill="#1A1A1A" font-weight="bold">v3 of the board deck</text>
+          <text x="177" y="240" font-family="Georgia,serif" font-size="13" fill="#1A1A1A">by Monday, leading with</text>
+          <text x="177" y="260" font-family="Georgia,serif" font-size="13" fill="#1A1A1A" font-weight="bold">revenue on slide 4.</text>
+          <text x="177" y="276" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B">— cited from 2 sources below</text>
+          <!-- Sources -->
+          <rect x="162" y="298" width="370" height="88" rx="4" fill="#FFFFFF" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="178" y="318" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" letter-spacing="1.5">SOURCES</text>
+          <rect x="162" y="326" width="370" height="1" fill="#E8E4DF"/>
+          <rect x="178" y="334" width="52" height="16" rx="2" fill="#1A1A1A" opacity="0.08"/>
+          <text x="204" y="345" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">MEETING</text>
+          <text x="236" y="345" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A">Board prep · 6 May 2026</text>
+          <rect x="162" y="358" width="370" height="1" fill="#E8E4DF"/>
+          <rect x="178" y="366" width="38" height="16" rx="2" fill="#1A1A1A" opacity="0.08"/>
+          <text x="197" y="377" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">EMAIL</text>
+          <text x="222" y="377" font-family="'Source Sans 3',sans-serif" font-size="12" fill="#1A1A1A">Sarah · "Board deck — v3 attached"</text>
+          <!-- Input bar -->
+          <rect x="162" y="428" width="558" height="40" rx="6" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+          <text x="180" y="452" font-family="'Source Sans 3',sans-serif" font-size="11.5" fill="#C7C2BB">Ask about your email, calendar, or meetings…</text>
+          <rect x="690" y="432" width="30" height="30" rx="4" fill="#B8860B"/>
+          <text x="705" y="451" font-family="'IBM Plex Mono',monospace" font-size="16" fill="#fff" text-anchor="middle">↑</text>
+        </svg>
+
+      </div>
+
+      <div class="app-carousel-dots" id="carouselDots">
+        <button class="active" onclick="goToSlide(0)" aria-label="The Briefing"></button>
+        <button onclick="goToSlide(1)" aria-label="The Triage"></button>
+        <button onclick="goToSlide(2)" aria-label="The Calendar"></button>
+        <button onclick="goToSlide(3)" aria-label="Ask Aria"></button>
+      </div>
+      <div class="carousel-label" id="carouselLabel">The Briefing</div>
+    </div>
+
+    <script>
+      (function() {
+        var labels = ['The Briefing', 'The Triage', 'The Calendar', 'Ask Aria'];
+        var current = 0;
+        var timer;
+        function goToSlide(n) {
+          document.getElementById('slide-' + current).classList.remove('active');
+          document.querySelectorAll('#carouselDots button')[current].classList.remove('active');
+          current = n;
+          document.getElementById('slide-' + current).classList.add('active');
+          document.querySelectorAll('#carouselDots button')[current].classList.add('active');
+          document.getElementById('carouselLabel').textContent = labels[current];
+          clearInterval(timer);
+          timer = setInterval(function() { goToSlide((current + 1) % 4); }, 3200);
+        }
+        window.goToSlide = goToSlide;
+        timer = setInterval(function() { goToSlide((current + 1) % 4); }, 3200);
+      })();
+    </script>
   </div>
 </div>
 
-<!-- HOW IT WORKS -->
+<!-- ── Trust strip ────────────────────────────────────────────────────── -->
+<div class="strip">
+  <div class="strip-inner">
+    <div class="strip-item">
+      <!-- Lock icon -->
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="var(--gold)" stroke-width="1.25"/><path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="var(--gold)" stroke-width="1.25" stroke-linecap="round"/></svg>
+      Local-first by design
+    </div>
+    <div class="strip-item">
+      <!-- Server-off icon -->
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="4" rx="1" stroke="var(--gold)" stroke-width="1.25"/><rect x="2" y="9" width="12" height="4" rx="1" stroke="var(--gold)" stroke-width="1.25"/><path d="M14 2L2 14" stroke="var(--gold)" stroke-width="1.25" stroke-linecap="round"/></svg>
+      No SaaS · no telemetry
+    </div>
+    <div class="strip-item">
+      <!-- Database icon -->
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="var(--gold)" stroke-width="1.25"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="var(--gold)" stroke-width="1.25"/><path d="M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="var(--gold)" stroke-width="1.25"/></svg>
+      Encrypted on your machine
+    </div>
+    <div class="strip-item">
+      <!-- Checkmark icon -->
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="var(--gold)" stroke-width="1.25"/><path d="M5.5 8l2 2 3-3" stroke="var(--gold)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Every send asks you first
+    </div>
+  </div>
+</div>
+
+<!-- ── How it works ───────────────────────────────────────────────────── -->
 <section class="section" id="how">
   <div style="max-width:64rem;margin:0 auto">
     <div class="sec-eyebrow reveal">
       <span class="sec-rule"></span>
       <span class="num">I</span>
-      <span class="lbl">How it works · four movements</span>
+      <span class="lbl">How it works</span>
       <span class="sec-rule-flex"></span>
     </div>
     <h2 class="sec-h reveal reveal-d1">A briefing on Monday <em>becomes a chief of staff by Friday.</em></h2>
-    <p class="sec-sub reveal reveal-d2">The wedge is the morning brief. From there, Aria takes on triage, drafting, and meeting capture — under your oversight, at the pace you allow.</p>
+    <p class="sec-sub reveal reveal-d2">The morning brief is the wedge. Triage, drafting, and meeting capture follow — at the pace you allow.</p>
 
     <div class="steps">
       <div class="step reveal reveal-d1">
+        <div class="step-icon">
+          <!-- Connect icon -->
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="8" cy="16" r="3.5" stroke="var(--gold)" stroke-width="1.5"/><circle cx="24" cy="8" r="3.5" stroke="var(--gold)" stroke-width="1.5"/><circle cx="24" cy="24" r="3.5" stroke="var(--gold)" stroke-width="1.5"/><path d="M11.5 16H14l3-8h3.5M11.5 16L14 16l3 8h3.5" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
         <div class="n">i.</div>
         <h4>Install &amp; connect</h4>
-        <p>A signed app for Mac and Windows. Connect Gmail, Outlook, your calendar, and Todoist. Read scope only at first.</p>
+        <p>Connect Gmail, Outlook, your calendar, and Todoist in a few clicks.</p>
       </div>
       <div class="step reveal reveal-d2">
+        <div class="step-icon">
+          <!-- Index icon -->
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="6" y="6" width="20" height="20" rx="3" stroke="var(--gold)" stroke-width="1.5"/><path d="M11 12h10M11 16h7M11 20h5" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
         <div class="n">ii.</div>
         <h4>Read &amp; index</h4>
-        <p>Aria reads the last 90 days locally. Everything is stored in one encrypted SQLite database on your machine. Nothing is uploaded.</p>
+        <p>Your last 90 days, stored in one encrypted database on your machine.</p>
       </div>
       <div class="step reveal reveal-d3">
+        <div class="step-icon">
+          <!-- Morning icon -->
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="5.5" stroke="var(--gold)" stroke-width="1.5"/><path d="M16 6v2M16 24v2M6 16h2M24 16h2M9.2 9.2l1.4 1.4M21.4 21.4l1.4 1.4M9.2 22.8l1.4-1.4M21.4 10.6l1.4-1.4" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
         <div class="n">iii.</div>
         <h4>Brief, every morning</h4>
-        <p>By 7am, Aria has written one briefing — agenda, urgent mail, action items, the one thing that could blow up — and is ready when you sit down.</p>
+        <p>One page waiting at 7am — agenda, urgent mail, the one thing that could blow up.</p>
       </div>
       <div class="step reveal reveal-d4">
+        <div class="step-icon">
+          <!-- Trust icon -->
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 5L7 9v8c0 5 4 9.5 9 11 5-1.5 9-6 9-11V9L16 5z" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 16l3 3 7-7" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
         <div class="n">iv.</div>
         <h4>Earn the leash</h4>
-        <p>Approve a few drafts. Reject the ones that miss your voice. Aria learns. After thirty days you choose how much rope she gets.</p>
+        <p>Approve a few drafts. Aria learns your voice. You choose how much she handles.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FEATURES -->
+<!-- ── Features ───────────────────────────────────────────────────────── -->
 <section class="section" id="features">
   <div style="max-width:80rem;margin:0 auto">
     <div class="sec-eyebrow reveal">
       <span class="sec-rule"></span>
       <span class="num">II</span>
-      <span class="lbl">Four deep capabilities</span>
+      <span class="lbl">Four capabilities</span>
       <span class="sec-rule-flex"></span>
     </div>
     <h2 class="sec-h reveal reveal-d1">Quiet on the surface. <em>Doing a great deal underneath.</em></h2>
-    <p class="sec-sub reveal reveal-d2">Four products in one application — sharing context, learning together, none of them louder than they need to be.</p>
 
     <!-- Feature 1: The Briefing -->
     <div class="feature reveal">
       <div class="feat-copy">
         <span class="smallcaps smallcaps-gold">The Briefing</span>
         <h3 style="margin-top:.5rem">One page, every morning, <em>before you've finished coffee.</em></h3>
-        <p>Pulled from calendar, inbox, action items, and the news you follow. Written in the voice of a thoughtful editor. Reads in under two minutes. Surfaces the one thing that could blow up the day at the top.</p>
+        <p>Pulled from your calendar, inbox, and the news you follow. Reads in under two minutes.</p>
         <ul>
-          <li><span class="swatch"></span><span>Generated locally; routed to a frontier model with PII redacted</span></li>
-          <li><span class="swatch"></span><span>Delivered at the time you choose; suspends on sleep, resumes on wake</span></li>
-          <li><span class="swatch"></span><span>Improves with feedback — "less of this", "more of that"</span></li>
+          <li><span class="swatch"></span><span>PII-redacted before reaching any frontier model</span></li>
+          <li><span class="swatch"></span><span>Delivered at the time you choose</span></li>
+          <li><span class="swatch"></span><span>Improves with your feedback over time</span></li>
         </ul>
       </div>
       <div class="feat-visual">
-        <div class="mock tilt">
-          <div class="mock-eyebrow">
-            <span class="smallcaps">The Morning · Vol. I, No. 87</span>
-            <span style="flex:1"></span>
-            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gray-soft);letter-spacing:0.1em">17 MAY 2026</span>
-          </div>
-          <div style="font-family:var(--f-display);font-size:1.625rem;line-height:1.1;font-weight:500;margin-bottom:.5rem">
-            Good morning,<br><em style="color:var(--gray)">Eleanor.</em>
-          </div>
-          <p style="color:var(--ink-soft);line-height:1.65;font-size:.9rem;margin-bottom:1rem">
-            <span style="font-family:var(--f-display);font-weight:500;float:left;font-size:2.5rem;line-height:.85;padding:.3rem .5rem 0 0">T</span>oday's edition turns on the close. The Series B language has moved from open to nearly signed; Marcus wants you for one final call this afternoon.
-          </p>
-          <div style="background:var(--ivory-deep);padding:12px 14px;border-left:2px solid var(--gold);border-radius:2px;margin-top:1rem">
-            <div class="smallcaps" style="color:var(--gold);margin-bottom:4px">One thing that could blow up today</div>
-            <div style="font-family:var(--f-display);font-size:1rem;line-height:1.3">Marcus needs you on the drag-along <em>and</em> the side letter before tomorrow's call.</div>
-          </div>
-        </div>
+        <figure aria-label="Aria daily briefing screen" style="margin:0;transform:rotate(-0.6deg)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" style="width:100%;max-width:640px;border-radius:10px;box-shadow:0 12px 40px rgba(26,26,26,0.10)">
+            <rect width="640" height="420" rx="10" fill="#FAFAF8" stroke="#E8E4DF" stroke-width="1"/>
+            <!-- Title bar -->
+            <rect width="640" height="32" rx="10" fill="#F5F3F0"/>
+            <rect width="640" height="16" y="16" fill="#F5F3F0"/>
+            <circle cx="18" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="32" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="46" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <!-- Sidebar -->
+            <rect x="0" y="32" width="118" height="388" fill="#F5F3F0"/>
+            <text x="15" y="62" font-family="'Playfair Display',serif" font-size="16" fill="#B8860B" font-weight="600">A</text>
+            <text x="27" y="62" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="1">ria</text>
+            <!-- Active nav -->
+            <rect x="0" y="80" width="3" height="22" fill="#B8860B"/>
+            <text x="13" y="95" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#1A1A1A" letter-spacing="1.5">BRIEFING</text>
+            <text x="13" y="122" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+            <text x="13" y="149" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+            <text x="13" y="176" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+            <rect x="118" y="32" width="1" height="388" fill="#E8E4DF"/>
+            <!-- Main content -->
+            <text x="138" y="64" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B8860B" letter-spacing="2">FRIDAY · MAY 22, 2026</text>
+            <text x="138" y="93" font-family="'Playfair Display',serif" font-size="22" fill="#1A1A1A">Good morning, Alex.</text>
+            <text x="138" y="113" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#6B6B6B">3 items need your attention today.</text>
+            <rect x="138" y="126" width="460" height="1" fill="#E8E4DF"/>
+            <!-- Calendar section -->
+            <text x="138" y="148" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">CALENDAR · TODAY</text>
+            <rect x="138" y="158" width="460" height="34" rx="4" fill="#F5F3F0"/>
+            <rect x="138" y="158" width="3" height="34" rx="2" fill="#1A1A1A" opacity="0.3"/>
+            <text x="150" y="172" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#1A1A1A" font-weight="600">1:1 with CTO · Zoom</text>
+            <text x="150" y="186" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B">11:00 – 12:00</text>
+            <text x="138" y="208" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="2">EMAIL · 4 THREADS</text>
+            <!-- Priority email -->
+            <rect x="138" y="218" width="460" height="34" rx="4" fill="#F5F3F0"/>
+            <rect x="138" y="218" width="3" height="34" rx="2" fill="#B8860B"/>
+            <text x="150" y="232" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#1A1A1A" font-weight="600">Board deck — final version needed</text>
+            <text x="150" y="246" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Sarah K. · Reply by 14:00</text>
+            <!-- Second email -->
+            <rect x="138" y="258" width="460" height="34" rx="4" fill="none"/>
+            <text x="150" y="272" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#1A1A1A">Q2 investor update thread</text>
+            <text x="150" y="286" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B">Marcus R. · 3 new replies</text>
+            <!-- Alert box -->
+            <rect x="138" y="305" width="460" height="52" rx="4" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+            <rect x="138" y="305" width="3" height="52" rx="2" fill="#B8860B"/>
+            <text x="150" y="320" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8860B" letter-spacing="1.5">ONE THING THAT COULD BLOW UP TODAY</text>
+            <text x="150" y="337" font-family="'Playfair Display',serif" font-size="12" fill="#1A1A1A">Marcus needs the drag-along clause</text>
+            <text x="150" y="351" font-family="'Playfair Display',serif" font-size="12" fill="#1A1A1A" font-style="italic">before tomorrow's close.</text>
+            <!-- CTA -->
+            <rect x="138" y="375" width="108" height="26" rx="4" fill="#B8860B"/>
+            <text x="192" y="392" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#fff" text-anchor="middle" font-weight="500">Open briefing</text>
+          </svg>
+        </figure>
       </div>
     </div>
 
@@ -730,38 +919,71 @@ footer a:hover { color: var(--gold-light); }
       <div class="feat-copy">
         <span class="smallcaps smallcaps-gold">The Triage</span>
         <h3 style="margin-top:.5rem">Urgent. Action. <em>For your information. Noise.</em></h3>
-        <p>Aria scores every incoming message — urgency, sender importance, the action required — and tells you why she put each one where she did. Drafts replies in your voice for the ones that need them. You approve every send.</p>
+        <p>Aria scores every message, drafts replies in your voice, and waits for your approval before anything sends.</p>
         <ul>
-          <li><span class="swatch"></span><span>Voice learned from your last 50 sent messages per relationship tier</span></li>
-          <li><span class="swatch"></span><span>Sensitivity classifier holds risky drafts for explicit confirmation</span></li>
-          <li><span class="swatch"></span><span>Correct a classification once; Aria remembers for that sender</span></li>
+          <li><span class="swatch"></span><span>Voice learned from your sent messages</span></li>
+          <li><span class="swatch"></span><span>Sensitive drafts held for explicit confirmation</span></li>
+          <li><span class="swatch"></span><span>Correct once — Aria remembers for that sender</span></li>
         </ul>
       </div>
       <div class="feat-visual">
-        <div class="mock tilt-right">
-          <div class="mock-eyebrow">
-            <span class="smallcaps">Reply · in your voice</span>
-            <span style="flex:1"></span>
-            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gold);letter-spacing:.1em">VOICE MATCH 94%</span>
-          </div>
-          <div style="font-size:.85rem;color:var(--gray);margin-bottom:.5rem">
-            <strong style="color:var(--ink);font-weight:500">To:</strong> marcus@aldridgeco.com<br>
-            <strong style="color:var(--ink);font-weight:500">Subject:</strong> Re: Term sheet
-          </div>
-          <div class="draft-block">Marcus,
-
-Thanks — agreed on 1.2x and the 7-year sunset. I will concede board composition.
-
-For drag, hold at 60% — I want headroom in case we add a strategic later.
-
-— E</div>
-          <div style="display:flex;gap:8px;margin-top:1rem;align-items:center">
-            <span class="btn btn-primary" style="min-height:32px;padding:0 12px;font-size:12px;cursor:default">Send to queue</span>
-            <span class="btn btn-ghost" style="min-height:32px;padding:0 8px;font-size:12px;cursor:default">Edit</span>
-            <span style="flex:1"></span>
-            <span style="font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;color:var(--gray-soft)">● FINANCIAL · FLAGGED</span>
-          </div>
-        </div>
+        <figure aria-label="Aria email triage screen" style="margin:0;transform:rotate(0.6deg)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" style="width:100%;max-width:640px;border-radius:10px;box-shadow:0 12px 40px rgba(26,26,26,0.10)">
+            <rect width="640" height="420" rx="10" fill="#FAFAF8" stroke="#E8E4DF" stroke-width="1"/>
+            <rect width="640" height="32" rx="10" fill="#F5F3F0"/>
+            <rect width="640" height="16" y="16" fill="#F5F3F0"/>
+            <circle cx="18" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="32" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="46" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <rect x="0" y="32" width="118" height="388" fill="#F5F3F0"/>
+            <text x="15" y="62" font-family="'Playfair Display',serif" font-size="16" fill="#B8860B" font-weight="600">A</text>
+            <text x="27" y="62" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="1">ria</text>
+            <text x="13" y="95" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+            <rect x="0" y="108" width="3" height="22" fill="#B8860B"/>
+            <text x="13" y="122" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#1A1A1A" letter-spacing="1.5">TRIAGE</text>
+            <text x="13" y="149" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+            <text x="13" y="176" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+            <rect x="118" y="32" width="1" height="388" fill="#E8E4DF"/>
+            <!-- Left: inbox list -->
+            <text x="138" y="64" font-family="'Playfair Display',serif" font-size="18" fill="#1A1A1A">Triage</text>
+            <text x="138" y="80" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" letter-spacing="1.5">4 THREADS · 2 URGENT</text>
+            <rect x="138" y="90" width="195" height="305" fill="#F5F3F0" rx="4"/>
+            <!-- Row 1 urgent -->
+            <rect x="138" y="90" width="3" height="52" fill="#B8860B"/>
+            <text x="150" y="108" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A" font-weight="600">Board deck — final</text>
+            <text x="150" y="122" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">Sarah K.</text>
+            <text x="292" y="101" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8493A" text-anchor="end" letter-spacing="1">URGENT</text>
+            <rect x="138" y="142" width="195" height="1" fill="#E8E4DF"/>
+            <!-- Row 2 -->
+            <text x="150" y="160" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A" font-weight="500">Q2 investor update</text>
+            <text x="150" y="174" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">Marcus R. · 3 replies</text>
+            <rect x="138" y="189" width="195" height="1" fill="#E8E4DF"/>
+            <!-- Row 3 -->
+            <text x="150" y="207" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A" opacity="0.6">Intro: James at Acme</text>
+            <text x="150" y="221" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">Forward — no action</text>
+            <rect x="138" y="236" width="195" height="1" fill="#E8E4DF"/>
+            <!-- Row 4 -->
+            <text x="150" y="254" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A" opacity="0.5">Re: AWS credits Q3</text>
+            <text x="150" y="268" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">Finance · FYI</text>
+            <!-- Right: draft panel -->
+            <rect x="342" y="90" width="256" height="305" fill="#FFFFFF" rx="4" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="356" y="110" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8860B" letter-spacing="1.5">DRAFT REPLY · VOICE MATCH 94%</text>
+            <rect x="342" y="117" width="256" height="1" fill="#E8E4DF"/>
+            <text x="356" y="134" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">To: marcus@aldridgeco.com</text>
+            <text x="356" y="148" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B">Re: Term sheet</text>
+            <rect x="356" y="158" width="228" height="88" rx="3" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="364" y="173" font-family="Georgia,serif" font-size="10.5" fill="#1A1A1A">Marcus,</text>
+            <text x="364" y="190" font-family="Georgia,serif" font-size="10.5" fill="#1A1A1A">Agreed on 1.2× and the 7-year</text>
+            <text x="364" y="205" font-family="Georgia,serif" font-size="10.5" fill="#1A1A1A">sunset. I will concede board</text>
+            <text x="364" y="220" font-family="Georgia,serif" font-size="10.5" fill="#1A1A1A">composition. Hold drag at 60%.</text>
+            <text x="364" y="235" font-family="Georgia,serif" font-size="10.5" fill="#1A1A1A">— E</text>
+            <rect x="356" y="258" width="84" height="24" rx="4" fill="#B8860B"/>
+            <text x="398" y="274" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#fff" text-anchor="middle">Send to queue</text>
+            <rect x="448" y="258" width="50" height="24" rx="4" fill="none" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="473" y="274" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#6B6B6B" text-anchor="middle">Edit</text>
+            <text x="356" y="305" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" letter-spacing="1">● FINANCIAL · FLAGGED</text>
+          </svg>
+        </figure>
       </div>
     </div>
 
@@ -770,71 +992,158 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
       <div class="feat-copy">
         <span class="smallcaps smallcaps-gold">The Calendar</span>
         <h3 style="margin-top:.5rem">She notices the stacks <em>before you do.</em></h3>
-        <p>A unified view across Google and Microsoft. Honors your rules — no meetings after four, fifteen-minute buffers, Tuesday afternoon for focus. Detects conflicts, drafts polite declines, suggests alternatives. Never writes to your calendar without you.</p>
+        <p>Unified Google + Microsoft view. Honors your rules, detects conflicts, and never writes without you.</p>
         <ul>
-          <li><span class="swatch"></span><span>Natural-language scheduling: "move my 3pm to Thursday"</span></li>
-          <li><span class="swatch"></span><span>Meeting prep briefs fifteen minutes before each event</span></li>
-          <li><span class="swatch"></span><span>Conflict alerts surfaced in the briefing — not as interruptions</span></li>
+          <li><span class="swatch"></span><span>"Move my 3pm to Thursday"</span></li>
+          <li><span class="swatch"></span><span>Meeting prep brief 15 min before each event</span></li>
+          <li><span class="swatch"></span><span>Conflict alerts in the briefing, not as interruptions</span></li>
         </ul>
       </div>
       <div class="feat-visual">
-        <div class="mock tilt">
-          <div class="mock-eyebrow">
-            <span class="smallcaps">This week · Aria notices</span>
-          </div>
-          <div style="padding:12px 14px;background:var(--ivory-deep);border-left:2px solid var(--gold);border-radius:2px;margin-bottom:12px">
-            <div class="smallcaps" style="color:var(--gold);margin-bottom:4px;font-size:.65rem">Thursday is a stack</div>
-            <div style="font-size:.95rem;color:var(--ink-soft);line-height:1.5">Five meetings in a row, 8:30 to 4:00. Draft a reschedule for the 3pm?</div>
-            <div style="display:flex;gap:8px;margin-top:10px">
-              <span class="btn btn-outline" style="min-height:26px;padding:0 10px;font-size:11px;cursor:default">Draft decline</span>
-              <span class="btn btn-ghost" style="min-height:26px;padding:0 10px;font-size:11px;cursor:default">Show alternatives</span>
-            </div>
-          </div>
-          <div class="agenda-row"><span class="t">10:30</span><span>Acme — Q3 partnership review</span><span class="meta">PREP READY</span></div>
-          <div class="agenda-row"><span class="t">12:00</span><span>Lunch · David Yoo</span><span class="meta">MOVED · 12:15</span></div>
-          <div class="agenda-row"><span class="t">14:00</span><span class="it">Focus block</span><span></span></div>
-          <div class="agenda-row"><span class="t">15:30</span><span>Board prep · Sarah Chen</span><span class="meta">PREP READY</span></div>
-        </div>
+        <figure aria-label="Aria calendar week view" style="margin:0;transform:rotate(-0.6deg)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" style="width:100%;max-width:640px;border-radius:10px;box-shadow:0 12px 40px rgba(26,26,26,0.10)">
+            <rect width="640" height="420" rx="10" fill="#FAFAF8" stroke="#E8E4DF" stroke-width="1"/>
+            <rect width="640" height="32" rx="10" fill="#F5F3F0"/>
+            <rect width="640" height="16" y="16" fill="#F5F3F0"/>
+            <circle cx="18" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="32" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="46" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <rect x="0" y="32" width="118" height="388" fill="#F5F3F0"/>
+            <text x="15" y="62" font-family="'Playfair Display',serif" font-size="16" fill="#B8860B" font-weight="600">A</text>
+            <text x="27" y="62" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="1">ria</text>
+            <text x="13" y="95" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+            <text x="13" y="122" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+            <rect x="0" y="135" width="3" height="22" fill="#B8860B"/>
+            <text x="13" y="149" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#1A1A1A" letter-spacing="1.5">CALENDAR</text>
+            <text x="13" y="176" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">ASK ARIA</text>
+            <rect x="118" y="32" width="1" height="388" fill="#E8E4DF"/>
+            <!-- Header -->
+            <text x="138" y="64" font-family="'Playfair Display',serif" font-size="18" fill="#1A1A1A">Calendar</text>
+            <text x="138" y="80" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" letter-spacing="2">MAY 19 – 24 · 2026</text>
+            <!-- Conflict alert -->
+            <rect x="138" y="90" width="460" height="54" rx="4" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+            <rect x="138" y="90" width="3" height="54" rx="2" fill="#B8860B"/>
+            <text x="150" y="107" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8860B" letter-spacing="1.5">ARIA NOTICES · THURSDAY</text>
+            <text x="150" y="122" font-family="'Source Sans 3',sans-serif" font-size="11" fill="#1A1A1A">Five meetings stacked 8:30 – 16:00. Draft a reschedule for the 15:00?</text>
+            <rect x="150" y="131" width="78" height="20" rx="3" fill="none" stroke="#B8860B" stroke-width="1"/>
+            <text x="189" y="145" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#B8860B" text-anchor="middle">Draft decline</text>
+            <rect x="236" y="131" width="90" height="20" rx="3" fill="none" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="281" y="145" font-family="'Source Sans 3',sans-serif" font-size="9" fill="#6B6B6B" text-anchor="middle">Show alternatives</text>
+            <!-- Week day headers -->
+            <rect x="138" y="154" width="460" height="1" fill="#E8E4DF"/>
+            <text x="168" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">MON</text>
+            <text x="234" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">TUE</text>
+            <text x="300" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">WED</text>
+            <text x="366" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8493A" text-anchor="middle" letter-spacing="1">THU ●</text>
+            <text x="432" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#1A1A1A" text-anchor="middle" letter-spacing="1" font-weight="600">FRI 22</text>
+            <text x="498" y="170" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">SAT</text>
+            <rect x="138" y="176" width="460" height="1" fill="#E8E4DF"/>
+            <!-- Grid columns -->
+            <line x1="201" y1="176" x2="201" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <line x1="267" y1="176" x2="267" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <line x1="333" y1="176" x2="333" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <line x1="399" y1="176" x2="399" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <line x1="465" y1="176" x2="465" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <line x1="531" y1="176" x2="531" y2="390" stroke="#E8E4DF" stroke-width="0.5"/>
+            <!-- Events: Monday -->
+            <rect x="142" y="188" width="55" height="20" rx="2" fill="#1A1A1A" opacity="0.08"/>
+            <text x="144" y="201" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#1A1A1A">Team sync</text>
+            <!-- Wednesday -->
+            <rect x="270" y="200" width="59" height="30" rx="2" fill="#1A1A1A" opacity="0.08"/>
+            <text x="272" y="213" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#1A1A1A">Investor</text>
+            <text x="272" y="225" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#1A1A1A">call</text>
+            <!-- Thursday stacked - red highlight -->
+            <rect x="336" y="183" width="59" height="18" rx="2" fill="#B8493A" opacity="0.15"/>
+            <rect x="336" y="204" width="59" height="18" rx="2" fill="#B8493A" opacity="0.12"/>
+            <rect x="336" y="225" width="59" height="18" rx="2" fill="#B8493A" opacity="0.10"/>
+            <rect x="336" y="246" width="59" height="18" rx="2" fill="#B8493A" opacity="0.08"/>
+            <rect x="336" y="267" width="59" height="18" rx="2" fill="#B8493A" opacity="0.06"/>
+            <text x="338" y="195" font-family="'Source Sans 3',sans-serif" font-size="7.5" fill="#B8493A">Board prep</text>
+            <text x="338" y="216" font-family="'Source Sans 3',sans-serif" font-size="7.5" fill="#B8493A">1:1 CTO</text>
+            <text x="338" y="237" font-family="'Source Sans 3',sans-serif" font-size="7.5" fill="#B8493A">Acme call</text>
+            <text x="338" y="258" font-family="'Source Sans 3',sans-serif" font-size="7.5" fill="#B8493A">Focus</text>
+            <text x="338" y="279" font-family="'Source Sans 3',sans-serif" font-size="7.5" fill="#B8493A">Finance</text>
+            <!-- Friday today -->
+            <rect x="403" y="195" width="58" height="22" rx="2" fill="#B8860B" opacity="0.15"/>
+            <text x="405" y="209" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#B8860B" font-weight="600">Marcus · 14:00</text>
+            <rect x="403" y="222" width="58" height="18" rx="2" fill="#1A1A1A" opacity="0.06"/>
+            <text x="405" y="234" font-family="'Source Sans 3',sans-serif" font-size="8" fill="#6B6B6B">Sarah · 15:30</text>
+          </svg>
+        </figure>
       </div>
     </div>
 
     <!-- Feature 4: Ask Aria -->
     <div class="feature flip reveal">
       <div class="feat-copy">
-        <span class="smallcaps smallcaps-gold">The Reader</span>
-        <h3 style="margin-top:.5rem">A natural-language reader <em>over your own history.</em></h3>
-        <p>"What did we agree with Acme last quarter?" "Who haven't I replied to in a week?" Indexed locally, queried locally — the question never leaves your machine, and every answer cites its sources.</p>
+        <span class="smallcaps smallcaps-gold">Ask Aria</span>
+        <h3 style="margin-top:.5rem">A reader <em>over your own history.</em></h3>
+        <p>"What did we agree with Acme?" Indexed locally, answered locally — every answer cites its sources.</p>
         <ul>
-          <li><span class="swatch"></span><span>Indexed by a 274 MB embedding model running on your laptop</span></li>
-          <li><span class="swatch"></span><span>Hybrid BM25 + vector retrieval; cites every claim</span></li>
-          <li><span class="swatch"></span><span>One keystroke: ⌘K from anywhere in the application</span></li>
+          <li><span class="swatch"></span><span>274 MB embedding model, runs on your laptop</span></li>
+          <li><span class="swatch"></span><span>Hybrid BM25 + vector search; cites every claim</span></li>
+          <li><span class="swatch"></span><span>⌘K from anywhere in the app</span></li>
         </ul>
       </div>
       <div class="feat-visual">
-        <div class="mock tilt-right">
-          <div class="mock-eyebrow">
-            <span class="smallcaps">Ask Aria</span>
-            <span style="flex:1"></span>
-            <span style="font-family:var(--f-mono);font-size:10px;color:var(--gray-soft);letter-spacing:.1em">LOCAL · 4.2s</span>
-          </div>
-          <div style="text-align:right;margin-bottom:14px">
-            <span class="q-bubble">What did Sarah commit to on Q3?</span>
-          </div>
-          <div style="font-family:Georgia,serif;font-size:.95rem;line-height:1.7;color:var(--ink-soft);margin-bottom:12px">
-            Sarah committed to two items: deliver <strong style="color:var(--ink)">v3 of the board deck</strong> by Monday (done) and lead with <strong style="color:var(--ink)">revenue, not pipeline, on slide 4</strong>.
-          </div>
-          <div style="background:var(--ivory-deep);padding:12px 14px;border-radius:4px">
-            <div class="smallcaps" style="color:var(--gold);margin-bottom:8px">Sources</div>
-            <div class="citation"><span class="src-kind">MEETING</span><span style="flex:1">Board prep · 6 May 2026</span></div>
-            <div class="citation"><span class="src-kind">EMAIL</span><span style="flex:1">Sarah Chen · "Board deck — v3 attached"</span></div>
-          </div>
-        </div>
+        <figure aria-label="Aria Ask Aria chat screen" style="margin:0;transform:rotate(0.6deg)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" style="width:100%;max-width:640px;border-radius:10px;box-shadow:0 12px 40px rgba(26,26,26,0.10)">
+            <rect width="640" height="420" rx="10" fill="#FAFAF8" stroke="#E8E4DF" stroke-width="1"/>
+            <rect width="640" height="32" rx="10" fill="#F5F3F0"/>
+            <rect width="640" height="16" y="16" fill="#F5F3F0"/>
+            <circle cx="18" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="32" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <circle cx="46" cy="16" r="5" fill="#1A1A1A" opacity="0.12"/>
+            <rect x="0" y="32" width="118" height="388" fill="#F5F3F0"/>
+            <text x="15" y="62" font-family="'Playfair Display',serif" font-size="16" fill="#B8860B" font-weight="600">A</text>
+            <text x="27" y="62" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#6B6B6B" letter-spacing="1">ria</text>
+            <text x="13" y="95" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">BRIEFING</text>
+            <text x="13" y="122" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">TRIAGE</text>
+            <text x="13" y="149" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#8A8784" letter-spacing="1.5">CALENDAR</text>
+            <rect x="0" y="162" width="3" height="22" fill="#B8860B"/>
+            <text x="13" y="176" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#1A1A1A" letter-spacing="1.5">ASK ARIA</text>
+            <rect x="118" y="32" width="1" height="388" fill="#E8E4DF"/>
+            <!-- Header -->
+            <text x="138" y="64" font-family="'Playfair Display',serif" font-size="18" fill="#1A1A1A">Ask Aria</text>
+            <text x="138" y="80" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#6B6B6B" letter-spacing="2">LOCAL · 4.2s</text>
+            <rect x="138" y="88" width="460" height="1" fill="#E8E4DF"/>
+            <!-- User question bubble -->
+            <rect x="420" y="100" width="178" height="36" rx="12" fill="#1A1A1A"/>
+            <path d="M598 136 L590 136 L590 136" fill="#1A1A1A"/>
+            <text x="437" y="117" font-family="'Source Sans 3',sans-serif" font-size="10.5" fill="#FAFAF8">What did Sarah commit</text>
+            <text x="437" y="130" font-family="'Source Sans 3',sans-serif" font-size="10.5" fill="#FAFAF8">to on the board deck?</text>
+            <!-- Answer block -->
+            <rect x="138" y="152" width="300" height="86" rx="6" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+            <rect x="138" y="152" width="3" height="86" rx="2" fill="#B8860B"/>
+            <text x="150" y="170" font-family="Georgia,serif" font-size="11" fill="#1A1A1A">Sarah committed to deliver</text>
+            <text x="150" y="186" font-family="Georgia,serif" font-size="11" fill="#1A1A1A" font-weight="600">v3 of the board deck</text>
+            <text x="150" y="202" font-family="Georgia,serif" font-size="11" fill="#1A1A1A">by Monday, leading with</text>
+            <text x="150" y="218" font-family="Georgia,serif" font-size="11" fill="#1A1A1A" font-weight="600">revenue on slide 4.</text>
+            <text x="150" y="232" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8860B">— cited from 2 sources</text>
+            <!-- Sources -->
+            <rect x="138" y="250" width="300" height="70" rx="4" fill="#FFFFFF" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="150" y="268" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#B8860B" letter-spacing="1.5">SOURCES</text>
+            <rect x="150" y="276" width="278" height="1" fill="#E8E4DF"/>
+            <rect x="150" y="285" width="42" height="14" rx="2" fill="#1A1A1A" opacity="0.08"/>
+            <text x="171" y="295" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">MEETING</text>
+            <text x="198" y="295" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A">Board prep · 6 May 2026</text>
+            <rect x="150" y="305" width="278" height="1" fill="#E8E4DF"/>
+            <rect x="150" y="311" width="32" height="14" rx="2" fill="#1A1A1A" opacity="0.08"/>
+            <text x="166" y="321" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#6B6B6B" text-anchor="middle" letter-spacing="1">EMAIL</text>
+            <text x="188" y="321" font-family="'Source Sans 3',sans-serif" font-size="10" fill="#1A1A1A">Sarah · "Board deck — v3 attached"</text>
+            <!-- Input bar -->
+            <rect x="138" y="375" width="432" height="32" rx="6" fill="#F5F3F0" stroke="#E8E4DF" stroke-width="1"/>
+            <text x="154" y="395" font-family="'Source Sans 3',sans-serif" font-size="10.5" fill="#C7C2BB">Ask about your email, calendar, or meetings…</text>
+            <rect x="548" y="379" width="24" height="24" rx="4" fill="#B8860B"/>
+            <text x="560" y="395" font-family="'IBM Plex Mono',monospace" font-size="13" fill="#fff" text-anchor="middle">↑</text>
+          </svg>
+        </figure>
       </div>
     </div>
   </div>
 </section>
 
-<!-- TRUST -->
+<!-- ── Trust ──────────────────────────────────────────────────────────── -->
 <section class="section dark" id="trust">
   <div style="max-width:64rem;margin:0 auto">
     <div class="sec-eyebrow reveal">
@@ -843,46 +1152,54 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
       <span class="lbl">The deal we make with you</span>
       <span class="sec-rule-flex"></span>
     </div>
-    <h2 class="sec-h reveal reveal-d1" style="color:var(--ivory)">A premium product makes <em>promises it can keep.</em></h2>
-    <p class="sec-sub reveal reveal-d2">Aria does not earn its place by being clever. It earns its place by being trustworthy. Three commitments that hold for every customer, every feature, every release.</p>
+    <h2 class="sec-h reveal reveal-d1" style="color:var(--ivory)">Trustworthy by design. <em>Not just by policy.</em></h2>
 
     <div class="trust-grid">
       <div class="trust-card reveal reveal-d1">
-        <div class="glyph">i.</div>
+        <!-- Lock icon -->
+        <div style="margin-bottom:1rem">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="8" y="18" width="24" height="16" rx="3" stroke="var(--gold-light)" stroke-width="1.5"/><path d="M13 18v-5a7 7 0 0 1 14 0v5" stroke="var(--gold-light)" stroke-width="1.5" stroke-linecap="round"/><circle cx="20" cy="26" r="2.5" fill="var(--gold-light)"/></svg>
+        </div>
         <h4>Your data, on your machine.</h4>
-        <p>One encrypted SQLite database. SQLCipher whole-DB AES-256. The key is in your OS keychain. We do not run a server that holds your mail.</p>
+        <p>One AES-256 encrypted database. Key in your OS keychain. We run no server that holds your mail.</p>
       </div>
       <div class="trust-card reveal reveal-d2">
-        <div class="glyph">ii.</div>
+        <!-- Route icon -->
+        <div style="margin-bottom:1rem">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="12" cy="20" r="5" stroke="var(--gold-light)" stroke-width="1.5"/><circle cx="32" cy="12" r="4" stroke="var(--gold-light)" stroke-width="1.5"/><circle cx="32" cy="28" r="4" stroke="var(--gold-light)" stroke-width="1.5"/><path d="M17 20h4l4-8h3M17 20h4l4 8h3" stroke="var(--gold-light)" stroke-width="1.5" stroke-linecap="round"/><text x="8" y="23.5" font-family="monospace" font-size="7" fill="var(--gold-light)">AI</text></svg>
+        </div>
         <h4>Hybrid routing, by default.</h4>
-        <p>PII and sensitive content route to a small model running locally. Only redacted, scoped context ever reaches a frontier model. Every decision is logged for you to inspect.</p>
+        <p>PII routes to a local model. Only redacted context reaches the frontier. Every decision is logged.</p>
       </div>
       <div class="trust-card reveal reveal-d3">
-        <div class="glyph">iii.</div>
+        <!-- Approve icon -->
+        <div style="margin-bottom:1rem">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="8" y="10" width="24" height="20" rx="3" stroke="var(--gold-light)" stroke-width="1.5"/><path d="M14 20l4 4 8-8" stroke="var(--gold-light)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
         <h4>Every send asks you first.</h4>
-        <p>No autonomous outbound communication. No calendar writes without you. The sensitivity classifier holds risky drafts even when you've opted into auto-approve.</p>
+        <p>No autonomous outbound. No calendar writes without you. Sensitive drafts always require explicit confirmation.</p>
       </div>
     </div>
 
-    <div style="margin-top:4rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;gap:1rem;flex-wrap:wrap" class="reveal">
+    <div style="margin-top:3.5rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;gap:1rem;flex-wrap:wrap" class="reveal">
       <span class="smallcaps" style="color:var(--gold-light)">What we don't do</span>
-      <span style="font-family:var(--f-display);font-style:italic;font-size:1.0625rem;color:rgba(255,255,255,0.7)">
-        No telemetry · no analytics · no third-party SDKs · no targeted advertising · no model training on your content · no shadow profile.
+      <span style="font-family:var(--f-display);font-style:italic;font-size:1rem;color:rgba(255,255,255,0.65)">
+        No telemetry · no analytics · no model training on your content · no shadow profile.
       </span>
     </div>
   </div>
 </section>
 
-<!-- DOWNLOAD -->
+<!-- ── Download ───────────────────────────────────────────────────────── -->
 <section class="dl-section" id="download">
-  <div class="sec-eyebrow reveal" style="justify-content:center;margin-bottom:2rem">
+  <div class="sec-eyebrow reveal" style="justify-content:center;margin-bottom:1.5rem">
     <span class="sec-rule"></span>
     <span class="num">IV</span>
-    <span class="lbl">Download the early access build</span>
+    <span class="lbl">Download</span>
     <span class="sec-rule"></span>
   </div>
   <h2 class="reveal reveal-d1">Get Aria on <em>your machine today.</em></h2>
-  <p class="reveal reveal-d2">Early access — unsigned build, free to try. Windows may show a SmartScreen warning; macOS requires a right-click → Open on first launch.</p>
+  <p class="reveal reveal-d2">Free early access. Windows may show a SmartScreen prompt; macOS requires right-click → Open on first launch.</p>
 
   <div class="dl-cards reveal reveal-d3">
     <div class="dl-card">
@@ -890,17 +1207,16 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
       <div class="platform-name">Aria for Windows</div>
       <div class="platform-detail">NSIS installer · v0.1.0 · Windows 10+</div>
       <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria.Setup.0.1.0.exe" class="dl-btn">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
         Download .exe
       </a>
     </div>
-
     <div class="dl-card" style="border-top: 2px solid var(--gold);">
       <div class="platform-label">macOS · Apple Silicon</div>
       <div class="platform-name">Aria for Mac</div>
       <div class="platform-detail">DMG · v0.1.0 · arm64 · macOS 12+</div>
       <a href="https://github.com/adexdsamson/Aria/releases/download/dev-306d256/Aria-0.1.0-arm64.dmg" class="dl-btn">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 7h3V3h4v4h3L8 12z"/><rect x="3" y="13" width="10" height="1.5" rx="0.75"/></svg>
         Download .dmg
       </a>
     </div>
@@ -911,26 +1227,24 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
     <span>Windows: click "More info → Run anyway" at SmartScreen</span>
     <span class="dot"></span>
     <span>macOS: right-click the app → Open on first launch</span>
-    <span class="dot"></span>
-    <span>All builds via GitHub Releases</span>
   </div>
 </section>
 
-<!-- FAQ -->
+<!-- ── FAQ ───────────────────────────────────────────────────────────── -->
 <section class="section" id="faq">
   <div style="max-width:48rem;margin:0 auto">
     <div class="sec-eyebrow reveal">
       <span class="sec-rule"></span>
       <span class="num">V</span>
-      <span class="lbl">Frequently asked</span>
+      <span class="lbl">FAQ</span>
       <span class="sec-rule-flex"></span>
     </div>
-    <h2 class="sec-h reveal reveal-d1">The questions we hear <em>most often.</em></h2>
+    <h2 class="sec-h reveal reveal-d1">Questions we hear <em>most often.</em></h2>
     <div id="faq-list" style="margin-top:2rem"></div>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ── Footer ────────────────────────────────────────────────────────── -->
 <footer class="bottom">
   <div class="f-inner">
     <div>
@@ -938,9 +1252,9 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
         <div class="f-brand-mark"><span class="f-brand-letter">A</span></div>
         <span class="f-brand-word">Aria</span>
       </div>
-      <p class="f-brand-p">A chief of staff who lives on your desk. Local-first by design. Available for macOS and Windows.</p>
-      <h5 style="margin-top:2rem">Get the launch note</h5>
-      <form class="f-signup" onsubmit="event.preventDefault();this.querySelector('button').textContent='Subscribed ✓'">
+      <p class="f-brand-p">A chief of staff who lives on your desk. Local-first. macOS and Windows.</p>
+      <h5 style="margin-top:1.5rem">Get the launch note</h5>
+      <form class="f-signup" onsubmit="event.preventDefault();this.querySelector('button').textContent='✓'">
         <input type="email" placeholder="your@email.com" required />
         <button type="submit">Subscribe</button>
       </form>
@@ -957,7 +1271,7 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
     <div>
       <h5>Trust</h5>
       <ul>
-        <li><a href="#trust">How privacy works</a></li>
+        <li><a href="#trust">Privacy</a></li>
         <li><a href="https://github.com/adexdsamson/Aria" target="_blank" rel="noopener">Source on GitHub</a></li>
       </ul>
     </div>
@@ -970,28 +1284,26 @@ For drag, hold at 60% — I want headroom in case we add a strategic later.
     </div>
   </div>
   <div class="f-legal">
-    <span>© Aria · 2026 · A local-first tool</span>
-    <span style="display:flex;gap:1rem;align-items:center"><span style="color:var(--gold-light)">❦</span> Made with care</span>
+    <span>© Aria · 2026</span>
+    <span style="display:flex;gap:1rem;align-items:center"><span style="color:var(--gold-light)">❦</span> Local-first by design</span>
   </div>
 </footer>
 
 <script>
-/* ── FAQ ───────────────────────────────────────────────────────────── */
+/* ── FAQ ─────────────────────────────────────────────────────────────── */
 const FAQ = [
   { q: "Is my email and calendar data sent to your servers?",
-    a: "No. Everything ingested from your accounts is stored in one encrypted SQLite database on your machine. We do not run a server that holds your data. The only thing that leaves the device is scoped prompts to a frontier API (Anthropic, OpenAI, or Google), with PII redacted and sensitive content routed to a small model running locally instead." },
+    a: "No. Everything is stored in an encrypted SQLite database on your machine. The only thing that leaves is scoped, PII-redacted prompts to a frontier API — sensitive content routes to a local model instead." },
   { q: "What happens when the internet is down?",
-    a: "Aria stays usable. The local model handles classification, redaction, and the Ask Aria reader without any connection. The morning briefing falls back to last-synced data. The frontier-API features pause until you're back online, then resume." },
+    a: "Aria stays usable. The local model handles classification and Ask Aria queries. The morning briefing falls back to last-synced data. Frontier features resume when you're back online." },
   { q: "Can I trust the drafts to sound like me?",
-    a: "Probably, after a few weeks. Aria's voice model learns from your last fifty sent messages per relationship tier. Every edit you make to a draft, every rejection, every approval — all of it refines the model. After thirty days most users report a 90%+ approval rate without edits." },
-  { q: "What stops Aria from sending something I would regret?",
-    a: "Three guardrails. First: no outbound communication ever happens without your explicit approval. Second: a sensitivity classifier holds anything containing financial, legal, HR, or urgent-tone language for explicit confirmation. Third: every action is logged in an audit you can inspect." },
-  { q: "How does the hybrid LLM routing actually work?",
-    a: "Every prompt is classified for sensitivity before routing. PII and sensitive content go to Llama 3.1 8B running locally via Ollama. General reasoning goes to a frontier model with sensitive bits replaced by tokens that are restored on response. The routing log is visible in Settings." },
+    a: "After a few weeks, yes. Aria's voice model learns from your sent messages. After 30 days most users approve drafts without edits." },
+  { q: "What stops Aria from sending something I'd regret?",
+    a: "Three things: (1) nothing sends without explicit approval, (2) a sensitivity classifier holds financial/legal/HR drafts, (3) every action is logged in an audit you can inspect." },
   { q: "The macOS build says it can't be opened. What do I do?",
-    a: "This is a Gatekeeper warning on unsigned builds. Right-click (or Control-click) the Aria app in your Applications folder and choose Open from the context menu. Confirm once — you won't see the prompt again." },
+    a: "Right-click (or Control-click) the Aria app and choose Open. Confirm once — you won't see the prompt again." },
   { q: "What if I want to stop using Aria?",
-    a: "Your local database stays exactly where it is. Aria stops generating new content but the indexed history, drafts, action items, and recaps all remain readable. You own the data entirely." },
+    a: "Your database stays exactly where it is. You own the data entirely." },
 ];
 
 const faqList = document.getElementById('faq-list');
@@ -1006,13 +1318,20 @@ FAQ.forEach((item) => {
   faqList.appendChild(el);
 });
 
-/* ── Scroll-reveal ─────────────────────────────────────────────────── */
+/* ── Video: show player when file exists ────────────────────────────── */
+const video = document.getElementById('aria-video');
+const placeholder = document.getElementById('video-placeholder');
+fetch('assets/aria-demo.mp4', { method: 'HEAD' })
+  .then(r => { if (r.ok) { video.src = 'assets/aria-demo.mp4'; video.style.display = 'block'; placeholder.style.display = 'none'; } })
+  .catch(() => {});
+
+/* ── Scroll-reveal ───────────────────────────────────────────────────── */
 const io = new IntersectionObserver((entries) => {
   entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
-}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+}, { threshold: 0.07, rootMargin: '0px 0px -32px 0px' });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-/* ── Smooth scroll ─────────────────────────────────────────────────── */
+/* ── Smooth scroll ───────────────────────────────────────────────────── */
 document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', (e) => {
     const id = a.getAttribute('href').slice(1);
