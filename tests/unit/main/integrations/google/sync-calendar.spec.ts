@@ -5,6 +5,11 @@
  * pipeline makes real SQLCipher available, but the gmail spec established the
  * shim convention for engine-level unit tests; the CHECK constraint + real DB
  * cases live in calendar-tz.spec.ts).
+ *
+ * Quick task 260523-a5w — sync lifted off the dropped `calendar_account` base
+ * table onto `provider_account` + `provider_sync_state` + `calendar_account_view`.
+ * The shim reflects the new SQL surface; the assertions still inspect the
+ * conceptual account state, just now read out of the lifted tables.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PQueueImport from 'p-queue';
@@ -20,7 +25,8 @@ import {
 import { TokenInvalidError } from '../../../../../src/main/integrations/google/auth';
 
 // ============================================================================
-// In-memory Db shim (mirrors sync-gmail.spec.ts)
+// In-memory Db shim (mirrors sync-gmail.spec.ts; 260523-a5w lift to
+// provider_account + provider_sync_state)
 // ============================================================================
 
 interface AccountRow {
@@ -37,12 +43,20 @@ function createInMemoryDb(initial?: AccountRow) {
   const db = {
     prepare(sql: string) {
       const s = sql.trim();
-      if (/^SELECT email, sync_token FROM calendar_account/.test(s)) {
+      // calendar_account_view existence check (provider_account row probe).
+      if (/^SELECT email FROM calendar_account_view WHERE email = \?/.test(s)) {
         return {
-          get: () =>
-            accountState.row
-              ? { email: accountState.row.email, sync_token: accountState.row.sync_token }
+          get: (email: string) =>
+            accountState.row && accountState.row.email === email
+              ? { email: accountState.row.email }
               : undefined,
+        };
+      }
+      // provider_sync_state cursor read.
+      if (/^SELECT cursor[\s\S]*FROM provider_sync_state/.test(s)) {
+        return {
+          get: (_accountId: string) =>
+            accountState.row ? { cursor: accountState.row.sync_token } : undefined,
         };
       }
       if (/^INSERT OR REPLACE INTO calendar_event/.test(s)) {
@@ -59,19 +73,39 @@ function createInMemoryDb(initial?: AccountRow) {
           },
         };
       }
-      if (/^UPDATE calendar_account\s+SET sync_token/.test(s)) {
+      // provider_sync_state cursor write (upsertProviderSyncState helper).
+      if (/^INSERT OR REPLACE INTO provider_sync_state/.test(s)) {
         return {
-          run: (row: { sync_token: string; last_synced_at: string }) => {
+          run: (
+            _providerKey: string,
+            _accountId: string,
+            _resource: string,
+            cursor: string | null,
+            lastSyncAt: string | null,
+            _lastError: string | null,
+          ) => {
             if (!accountState.row) throw new Error('no calendar_account row to update');
-            accountState.row.sync_token = row.sync_token;
-            accountState.row.last_synced_at = row.last_synced_at;
+            accountState.row.sync_token = cursor;
+            if (lastSyncAt) accountState.row.last_synced_at = lastSyncAt;
             accountState.row.last_error = null;
           },
         };
       }
-      if (/^UPDATE calendar_account SET last_error/.test(s)) {
+      // provider_account success-path UPDATE (clears last_error, bumps last_synced_at).
+      if (/^UPDATE provider_account[\s\S]*last_error = NULL/.test(s)) {
         return {
-          run: (reason: string) => {
+          run: (lastSyncedAt: string, _accountId: string) => {
+            if (accountState.row) {
+              accountState.row.last_synced_at = lastSyncedAt;
+              accountState.row.last_error = null;
+            }
+          },
+        };
+      }
+      // provider_account error-path UPDATE (recordError).
+      if (/^UPDATE provider_account[\s\S]*SET status = \?/.test(s)) {
+        return {
+          run: (_status: string, reason: string, _lastErrorAt: string, _accountId: string) => {
             if (accountState.row) accountState.row.last_error = reason;
           },
         };
@@ -148,7 +182,7 @@ describe('CalendarSync.tick', () => {
     });
     client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-fresh' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(db._inspect.events().size).toBe(3);
@@ -165,7 +199,7 @@ describe('CalendarSync.tick', () => {
     const client = makeFakeClient();
     client.listEvents.mockResolvedValue({ items: [timedEvent('e1')], nextSyncToken: 'st-2' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(db._inspect.events().has('e1')).toBe(true);
@@ -184,7 +218,7 @@ describe('CalendarSync.tick', () => {
       .mockResolvedValueOnce({ items: [timedEvent('p1')], nextPageToken: 'p2' })
       .mockResolvedValueOnce({ items: [timedEvent('p2-evt')], nextSyncToken: 'st-3' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(client.listEvents).toHaveBeenCalledTimes(2);
@@ -208,7 +242,7 @@ describe('CalendarSync.tick', () => {
     client.listEvents.mockResolvedValueOnce({ items: [], nextSyncToken: 'st-new' });
     client.listEventsWindow.mockResolvedValue({ items: [timedEvent('r1')] });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(db._inspect.events().has('r1')).toBe(true);
@@ -225,7 +259,7 @@ describe('CalendarSync.tick', () => {
     const client = makeFakeClient();
     client.listEvents.mockRejectedValue(new TokenInvalidError({ reason: 'expired' }));
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await expect(sync.tick()).rejects.toBeInstanceOf(TokenInvalidError);
     expect(db._inspect.account()?.last_error).toBe('token-expired');
   });
@@ -248,7 +282,7 @@ describe('CalendarSync.tick', () => {
       return origPrepare(sql);
     };
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await expect(sync.tick()).rejects.toThrow('simulated write failure');
     expect(db._inspect.events().size).toBe(0);
     expect(db._inspect.account()?.sync_token).toBe('st-keep');
@@ -278,7 +312,7 @@ describe('CalendarSync.tick', () => {
       nextSyncToken: 'st-2',
     });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(db._inspect.events().has('ev1')).toBe(false);
@@ -296,7 +330,7 @@ describe('CalendarSync.tick', () => {
     client.listEvents.mockResolvedValue({ items: [timedEvent('eq')], nextSyncToken: 'st-2' });
 
     const addSpy = vi.spyOn(queue, 'add');
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     // ≥ 1 for listEvents + ≥ 1 for the DB transaction.
@@ -318,7 +352,7 @@ describe('CalendarSync.tick', () => {
       .mockResolvedValueOnce({ items: [timedEvent('b2')], nextPageToken: 'bp3' })
       .mockResolvedValueOnce({ items: [timedEvent('b3')], nextSyncToken: 'st-paged' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(client.listEvents).toHaveBeenCalledTimes(3);
@@ -342,7 +376,7 @@ describe('CalendarSync.tick', () => {
     client.listEventsWindow.mockResolvedValue({ items: [] });
     client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-empty' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(client.listEvents).toHaveBeenCalledTimes(1);
@@ -366,7 +400,7 @@ describe('CalendarSync.tick', () => {
       nextPageToken: 'never-ending',
     }));
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     // MAX_PAGES is 50 in the implementation.
@@ -387,7 +421,7 @@ describe('CalendarSync.tick', () => {
     client.listEventsWindow.mockResolvedValue({ items: [] });
     client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-fresh' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
 
     expect(client.listEvents).toHaveBeenCalledTimes(1);
@@ -420,7 +454,7 @@ describe('CalendarSync.tick', () => {
     });
     client.listEvents.mockResolvedValue({ items: [], nextSyncToken: 'st-bs' });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await expect(sync.tick()).resolves.toBeUndefined();
 
     // Only the real event is inserted; tombstone is silently dropped.
@@ -448,7 +482,7 @@ describe('CalendarSync.tick', () => {
         nextSyncToken: 'st-final',
       });
 
-    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue } });
+    const sync = createCalendarSync({ db: db as never, client, scheduler: { queue }, accountId: 'me@x.com' });
     await sync.tick();
     expect(db._inspect.events().has('to-cancel')).toBe(true);
 
@@ -478,6 +512,7 @@ describe('CalendarSync.tick', () => {
       db: db as never,
       client,
       scheduler: { queue },
+      accountId: 'me@x.com',
       logger: { info: vi.fn(), warn, debug: vi.fn() },
     });
     await sync.tick();
