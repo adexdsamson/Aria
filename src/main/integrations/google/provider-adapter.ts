@@ -5,7 +5,13 @@ import {
   type CalendarClient,
   type CalendarEventRaw,
 } from '../google/calendar';
-import { createGmailClient, type GmailClient, type GmailMessageMetadata, type HistoryEntry } from '../google/gmail';
+import {
+  createGmailClient,
+  HistoryInvalidatedError,
+  type GmailClient,
+  type GmailMessageMetadata,
+  type HistoryEntry,
+} from '../google/gmail';
 import { getOAuth2Client } from '../google/auth';
 import type {
   CanonicalEvent,
@@ -140,18 +146,28 @@ async function listMessagesDelta(
   cursor?: string | null,
 ): Promise<DeltaResult<CanonicalMessage>> {
   if (cursor) {
-    const history = await client.listHistory({ startHistoryId: cursor });
-    const ids = collectAddedIds(history.history);
-    const items: CanonicalMessage[] = [];
-    for (const id of ids) {
-      items.push(canonicalMessageFromGmail(await client.getMessageMetadata(id)));
+    try {
+      const history = await client.listHistory({ startHistoryId: cursor });
+      const ids = collectAddedIds(history.history);
+      const items: CanonicalMessage[] = [];
+      for (const id of ids) {
+        items.push(canonicalMessageFromGmail(await client.getMessageMetadata(id)));
+      }
+      return {
+        items,
+        tombstones: collectDeletedIds(history.history),
+        cursor: history.historyId,
+        hadFullResync: false,
+      };
+    } catch (err) {
+      // Gmail retains history for ~7 days. If the stored historyId is older
+      // than the retention window, Gmail returns 404/notFound on
+      // history.list and the client wraps it in HistoryInvalidatedError.
+      // Recover by falling through to the full-window resync below, which
+      // re-anchors the cursor at the current historyId via getProfile —
+      // same pattern the legacy sync-gmail.ts uses. Anything else re-throws.
+      if (!(err instanceof HistoryInvalidatedError)) throw err;
     }
-    return {
-      items,
-      tombstones: collectDeletedIds(history.history),
-      cursor: history.historyId,
-      hadFullResync: false,
-    };
   }
 
   const profile = await client.getProfile();
