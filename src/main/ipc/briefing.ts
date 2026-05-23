@@ -44,6 +44,9 @@ import {
   getOAuth2Client,
 } from '../integrations/google/auth';
 import { createCalendarClient, type CalendarClient } from '../integrations/google/calendar';
+import { BrowserWindow } from 'electron';
+import { showBriefingReadyNotification } from '../tray/notify';
+import { readBgPref } from '../background/prefs';
 
 export interface BriefingHandlerDeps {
   logger: Logger;
@@ -139,8 +142,9 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     if (!db) return { ok: false, error: 'db-locked' };
     const { tz } = readSettings();
     try {
+      let briefingPayload: import('../../shared/ipc-contract').BriefingPayload | null = null;
       await scheduler.queue.add(async () => {
-        await runBriefing({
+        briefingPayload = await runBriefing({
           db,
           date,
           userTz: tz,
@@ -149,6 +153,33 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
           logger,
         });
       });
+      // Phase 12 / Plan 12-03 — notify on briefing completion (BG-06).
+      // Fires at most once per dateKey (dedupe in notify.ts). Gated on
+      // notificationsEnabled pref. Falls back to tray badge if permission denied.
+      try {
+        const win = BrowserWindow.getAllWindows()[0] ?? null;
+        if (win && briefingPayload) {
+          const p = briefingPayload as import('../../shared/ipc-contract').BriefingPayload;
+          showBriefingReadyNotification(
+            win,
+            {
+              emails: p.email?.length ?? 0,
+              events: p.calendar?.length ?? 0,
+              news: p.news?.length ?? 0,
+            },
+            date,
+            {
+              notificationsEnabled: readBgPref(db, 'notificationsEnabled', true),
+              logger,
+            },
+          );
+        }
+      } catch (notifErr) {
+        logger.warn(
+          { scope: 'briefing-notify', err: (notifErr as Error).message },
+          'showBriefingReadyNotification threw (non-fatal)',
+        );
+      }
       return { ok: true, date };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
