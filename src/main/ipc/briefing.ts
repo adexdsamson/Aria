@@ -282,6 +282,29 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
       });
       const fresh = readBriefing(db, today);
       if (!fresh) return { ok: false as const, error: 'regenerate-no-row' };
+      // Phase 12 / Plan 12-03 — mirror the runOnce notification hook on the
+      // regenerate path. The dedupe Set in notify.ts resets on app restart, so
+      // this fires at most once per dateKey per session (same as GENERATE_NOW).
+      try {
+        const win = BrowserWindow.getAllWindows()[0] ?? null;
+        if (win) {
+          showBriefingReadyNotification(
+            win,
+            {
+              emails: fresh.email?.length ?? 0,
+              events: fresh.calendar?.length ?? 0,
+              news: fresh.news?.length ?? 0,
+            },
+            today,
+            { notificationsEnabled: readBgPref(db, 'notificationsEnabled', true), logger },
+          );
+        }
+      } catch (notifErr) {
+        logger.warn(
+          { scope: 'briefing-notify', err: (notifErr as Error).message },
+          'showBriefingReadyNotification threw on regenerate (non-fatal)',
+        );
+      }
       return fresh;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
