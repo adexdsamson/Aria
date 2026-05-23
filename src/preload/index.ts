@@ -33,6 +33,18 @@ const api = buildApi();
   return () => ipcRenderer.removeListener(CHANNELS.ENTITLEMENT_STATE_CHANGED, handler);
 };
 
+// Phase 12 / Plan 12-03 — aria:navigate push channel.
+// Overrides the auto-mapped invoke stub with a real ipcRenderer.on listener.
+// Main process sends this channel (hardcoded paths only — T-12-10).
+// Returns an unsubscribe function for cleanup in useEffect.
+// The allowlist (['/briefing', '/approvals']) is enforced in App.tsx.
+(api as unknown as Record<string, ((cb: (path: string) => void) => () => void)>)
+  .onNavigate = (cb: (path: string) => void) => {
+  const handler = (_e: unknown, path: string) => cb(path);
+  ipcRenderer.on(CHANNELS.NAVIGATE, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.NAVIGATE, handler);
+};
+
 // E2E-only escape hatches; gated by ARIA_E2E env var so production builds
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.
