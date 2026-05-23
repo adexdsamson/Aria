@@ -4,12 +4,21 @@
  * `CalendarSync.tick()` is the unit-of-work driven by the 15-minute cron in
  * `ipc/calendar.ts`. Responsibilities:
  *
- *   1. Read calendar_account row. If sync_token IS NULL → fullResyncWindow().
+ *   1. Read sync cursor from `provider_sync_state` (provider_key='google',
+ *      resource='calendar', account_id=this.accountId). If cursor IS NULL →
+ *      fullResyncWindow().
  *   2. Page-loop client.listEvents({ syncToken, pageToken }) accumulating items.
  *   3. On SyncTokenInvalidatedError → fullResyncWindow() and return.
- *   4. On TokenInvalidError → write last_error = `token-${reason}` and re-throw.
- *   5. In a single db.transaction(...): upsert each event row + advance
- *      sync_token + last_synced_at. Atomic cursor advance (Pitfall 11 / T-02-02-04).
+ *   4. On TokenInvalidError → update provider_account.status='needs-auth' +
+ *      last_error=`token-${reason}` and re-throw.
+ *   5. In a single db.transaction(...): upsert each event row (tagged with
+ *      provider_key='google' + account_id) + advance cursor in
+ *      provider_sync_state. Atomic cursor advance (Pitfall 11 / T-02-02-04).
+ *
+ * Migration 014 dropped the legacy singleton `calendar_account` base table.
+ * `calendar_account_view` is a read-only view over `provider_account` and is
+ * NOT writable; cursor state lives in `provider_sync_state`. Quick task
+ * 260523-a5w lifted this file off the dropped base table.
  *
  * `fullResyncWindow()` (M2 pinned, two-step bootstrap):
  *   step 1: listEventsWindow({ timeMin: now-1d, timeMax: now+30d,
@@ -42,6 +51,7 @@ import type {
 } from './calendar';
 import { SyncTokenInvalidatedError } from './calendar';
 import { TokenInvalidError } from './auth';
+import { upsertProviderSyncState } from '../microsoft/provider-account';
 
 type Db = Database.Database;
 
@@ -49,6 +59,15 @@ export interface CalendarSyncDeps {
   db: Db;
   client: CalendarClient;
   scheduler: { queue: InstanceType<typeof PQueueImport> };
+  /**
+   * Quick task 260523-a5w — Google calendar account_id is the email address
+   * (singleton-style upsert in `CALENDAR_CONNECT`). Required so each tick can
+   * (a) read its cursor from provider_sync_state for this account, (b) tag
+   * inserted calendar_event rows with provider_key='google' + account_id, and
+   * (c) update provider_account error state by composite key.
+   * Throws at construction if missing (loud failure, not silent).
+   */
+  accountId: string;
   logger?: Pick<Logger, 'info' | 'warn' | 'debug'>;
   now?: () => Date;
   /** Backfill window lower bound in days before now. Default 1. */
@@ -167,11 +186,19 @@ export class CalendarSync {
   private readonly now: () => Date;
   private readonly windowDaysBack: number;
   private readonly windowDaysForward: number;
+  /** Quick task 260523-a5w — required to tag rows + key cursor state. */
+  private readonly accountId: string;
 
   constructor(deps: CalendarSyncDeps) {
+    if (!deps.accountId || typeof deps.accountId !== 'string') {
+      // Loud failure at construction — caller (buildSync in ipc/calendar.ts)
+      // is responsible for resolving the connected Google calendar account_id.
+      throw new Error('CalendarSync: accountId is required (provider_account email)');
+    }
     this.db = deps.db;
     this.client = deps.client;
     this.scheduler = deps.scheduler;
+    this.accountId = deps.accountId;
     this.logger = deps.logger;
     this.now = deps.now ?? (() => new Date());
     this.windowDaysBack = deps.windowDaysBack ?? 1;
@@ -362,11 +389,33 @@ export class CalendarSync {
 
   // ------------------------- DB helpers (single-writer) -------------------------
 
+  /**
+   * Quick task 260523-a5w — read cursor from provider_sync_state (post-014
+   * shape) + verify the provider_account row still exists. `email` is the
+   * account_id by Google convention (singleton upsert on connect). Returns
+   * null only if the account row has been disconnected mid-flight.
+   */
   private readAccount(): { email: string; sync_token: string | null } | null {
-    const row = this.db
-      .prepare('SELECT email, sync_token FROM calendar_account WHERE id = 1')
-      .get() as { email: string; sync_token: string | null } | undefined;
-    return row ?? null;
+    // Confirm the provider_account row is still present — disconnect is
+    // racy with cron ticks. calendar_account_view is the migration-014/125
+    // compat shim over provider_account WHERE provider_key='google' AND
+    // capabilities_json.calendar=1.
+    const acctRow = this.db
+      .prepare(
+        `SELECT email FROM calendar_account_view WHERE email = ? LIMIT 1`,
+      )
+      .get(this.accountId) as { email: string } | undefined;
+    if (!acctRow) return null;
+    const cursorRow = this.db
+      .prepare(
+        `SELECT cursor
+           FROM provider_sync_state
+          WHERE provider_key = 'google'
+            AND account_id = ?
+            AND resource = 'calendar'`,
+      )
+      .get(this.accountId) as { cursor: string | null } | undefined;
+    return { email: acctRow.email, sync_token: cursorRow?.cursor ?? null };
   }
 
   private applyRowsAndAdvanceCursor(
@@ -408,29 +457,54 @@ export class CalendarSync {
 
     const tx = this.db.transaction(() => {
       if (upserts.length > 0) {
+        // Quick task 260523-a5w — tag each row with provider_key='google' +
+        // account_id so the calendar read-path JOIN to provider_account
+        // (ipc/calendar.ts:CALENDAR_LIST_EVENTS_RANGE) matches. Without
+        // these two columns the read path filters every Google row out
+        // (`WHERE e.provider_key IS NOT NULL AND e.account_id IS NOT NULL`).
+        // recurrence_unsupported defaults to 0 for v1 — Google adapter does
+        // not yet derive unsupported-recurrence detection; the Microsoft
+        // adapter is the only writer that sets this bit today.
         const stmt = this.db.prepare(
           `INSERT OR REPLACE INTO calendar_event
            (id, calendar_id, summary, location, start_at_utc, end_at_utc, start_date, end_date,
             start_timezone, attendees, status, recurring_id, updated_at, fetched_at,
-            etag, i_cal_uid, sequence, organizer_email, organizer_self, recurrence_json)
+            etag, i_cal_uid, sequence, organizer_email, organizer_self, recurrence_json,
+            recurrence_unsupported, provider_key, account_id)
            VALUES (@id, @calendar_id, @summary, @location, @start_at_utc, @end_at_utc,
                    @start_date, @end_date, @start_timezone, @attendees, @status,
                    @recurring_id, @updated_at, @fetched_at,
-                   @etag, @i_cal_uid, @sequence, @organizer_email, @organizer_self, @recurrence_json)`,
+                   @etag, @i_cal_uid, @sequence, @organizer_email, @organizer_self, @recurrence_json,
+                   0, 'google', @account_id)`,
         );
-        for (const r of upserts) stmt.run(r);
+        for (const r of upserts) stmt.run({ ...r, account_id: this.accountId });
       }
       if (deletes.length > 0) {
         const del = this.db.prepare(`DELETE FROM calendar_event WHERE id = ?`);
         for (const id of deletes) del.run(id);
       }
+      // Quick task 260523-a5w — cursor lives in provider_sync_state (014).
+      upsertProviderSyncState(this.db, {
+        providerKey: 'google',
+        accountId: this.accountId,
+        resource: 'calendar',
+        cursor: newSyncToken,
+        lastSyncAt: fetchedAtIso,
+        lastError: null,
+      });
+      // Mirror Microsoft adapter: clear last_error + bump last_synced_at on
+      // the provider_account row so the Settings UI status chip reflects
+      // success without waiting on the next status poll.
       this.db
         .prepare(
-          `UPDATE calendar_account
-           SET sync_token = @sync_token, last_synced_at = @last_synced_at, last_error = NULL
-           WHERE id = 1`,
+          `UPDATE provider_account
+              SET last_error = NULL,
+                  last_error_at = NULL,
+                  last_synced_at = ?,
+                  status = CASE WHEN status IN ('degraded', 'needs-auth') THEN 'ok' ELSE status END
+            WHERE provider_key = 'google' AND account_id = ?`,
         )
-        .run({ sync_token: newSyncToken, last_synced_at: fetchedAtIso });
+        .run(fetchedAtIso, this.accountId);
     });
     tx();
   }
@@ -447,9 +521,23 @@ export class CalendarSync {
       'calendar sync recorded error',
     );
     try {
+      // Quick task 260523-a5w — record error against provider_account by
+      // composite key (provider_key, account_id). Token errors flip status
+      // to 'needs-auth'; everything else marks the account 'degraded'. The
+      // UI Settings chip + Calendar read-path JOIN filter (`status IN
+      // ('ok', 'degraded')`) already understand both states.
+      const isTokenError = value.startsWith('token-');
+      const nextStatus = isTokenError ? 'needs-auth' : 'degraded';
+      const nowIso = this.now().toISOString();
       this.db
-        .prepare('UPDATE calendar_account SET last_error = ? WHERE id = 1')
-        .run(value);
+        .prepare(
+          `UPDATE provider_account
+              SET status = ?,
+                  last_error = ?,
+                  last_error_at = ?
+            WHERE provider_key = 'google' AND account_id = ?`,
+        )
+        .run(nextStatus, value, nowIso, this.accountId);
     } catch {
       /* best-effort */
     }
