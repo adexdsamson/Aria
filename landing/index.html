@@ -1318,12 +1318,24 @@ FAQ.forEach((item) => {
   faqList.appendChild(el);
 });
 
-/* ── Video: show player when file exists ────────────────────────────── */
-const video = document.getElementById('aria-video');
-const placeholder = document.getElementById('video-placeholder');
-fetch('assets/aria-demo.mp4', { method: 'HEAD' })
-  .then(r => { if (r.ok) { video.src = 'assets/aria-demo.mp4'; video.style.display = 'block'; placeholder.style.display = 'none'; } })
-  .catch(() => {});
+/* ── Video: replace SVG carousel with player when file exists ─────────── */
+const carousel = document.querySelector('.app-carousel');
+if (carousel) {
+  fetch('assets/aria-demo.mp4', { method: 'HEAD' })
+    .then(r => {
+      if (!r.ok) return;
+      const video = document.createElement('video');
+      video.src = 'assets/aria-demo.mp4';
+      video.autoplay = true;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.setAttribute('aria-label', 'Aria — 30-second product demo');
+      video.style.cssText = 'display:block;width:100%;max-width:780px;margin:0 auto;border-radius:12px;box-shadow:0 24px 64px rgba(26,26,26,0.18);aspect-ratio:16/10;background:#0d0d0d;';
+      carousel.replaceWith(video);
+    })
+    .catch(() => {});
+}
 
 /* ── Scroll-reveal ───────────────────────────────────────────────────── */
 const io = new IntersectionObserver((entries) => {
