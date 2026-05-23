@@ -62,7 +62,16 @@ export function registerCalendarHandlers(ipcMain: IpcMain, deps: CalendarHandler
       client = createCalendarClient(oauth);
     }
     if (!client) return null;
-    return createCalendarSync({ db, client, scheduler, logger });
+    // Quick task 260523-a5w — CalendarSync now requires the connected Google
+    // calendar account_id (email). Resolve from calendar_account_view (the
+    // migration-014/125 compat shim over provider_account). If no row,
+    // sync is not connected — return null (matches the historical 'not-
+    // connected' contract that runTick converts to { ok: false, ... }).
+    const acctRow = db
+      .prepare('SELECT email FROM calendar_account_view LIMIT 1')
+      .get() as { email: string } | undefined;
+    if (!acctRow) return null;
+    return createCalendarSync({ db, client, scheduler, logger, accountId: acctRow.email });
   }
 
   async function runTick(): Promise<{ ok: true } | { ok: false; error: string }> {

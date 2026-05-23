@@ -73,17 +73,26 @@ function isErr(v: unknown): v is IpcError {
 }
 
 /**
- * The legacy Gmail/Calendar/Todoist rows duplicate the unified AccountRow list
- * when a provider already has an entry. We keep them mounted so they can still
- * surface disconnected-state Connect buttons and expired/revoked banners, but
- * collapse the visible card when AccountRow already represents the provider
- * cleanly. The legacy rows opt in via `hideWhenHealthy`.
+ * Quick task 260523-a5w — switched from health-based to PRESENCE-based gating.
+ *
+ * Before: the legacy Gmail/Calendar/Todoist rows hid only when an account was
+ * `status === 'ok' && !lastError`. Any time the account had `lastError` set or
+ * `status === 'degraded' | 'needs-auth'`, the legacy card reappeared as a
+ * second box even though `AccountRow` already renders the provider, email,
+ * status chip, and lastError banner — producing the "duplicate empty box"
+ * UX bug.
+ *
+ * After: hide whenever ANY AccountRow of the provider is mounted, regardless
+ * of status. The legacy row's internal `hasBanner` check still surfaces the
+ * connect-error / pre-OAuth disclosure / verification-pending banners during
+ * the disconnected-but-attempting-to-connect flow, so the user still sees
+ * actionable inline state when no provider_account row exists yet.
  */
-function hasHealthyAccount(
+function hasAccount(
   accounts: ProviderAccountDto[],
   providerKey: ProviderAccountDto['providerKey'],
 ): boolean {
-  return accounts.some((a) => a.providerKey === providerKey && a.status === 'ok' && !a.lastError);
+  return accounts.some((a) => a.providerKey === providerKey);
 }
 
 /**
@@ -224,9 +233,9 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
         onClose={() => setAddOpen(false)}
         onConnected={refreshAccounts}
       />
-      <GmailRow initialModalOpen={initialModalOpen} hideWhenHealthy={hasHealthyAccount(accounts, 'google')} />
-      <CalendarRow hideWhenHealthy={hasHealthyAccount(accounts, 'google')} />
-      <TodoistRow onProviderChanged={refreshAccounts} hideWhenHealthy={hasHealthyAccount(accounts, 'todoist')} />
+      <GmailRow initialModalOpen={initialModalOpen} hideWhenHealthy={hasAccount(accounts, 'google')} />
+      <CalendarRow hideWhenHealthy={hasAccount(accounts, 'google')} />
+      <TodoistRow onProviderChanged={refreshAccounts} hideWhenHealthy={hasAccount(accounts, 'todoist')} />
       <RagDisconnectedSection />
       <ResearchApiKeyRow provider="brave" label="Research — Brave Search" />
       <ResearchApiKeyRow provider="exa" label="Research — Exa" />
