@@ -1,33 +1,27 @@
 /**
- * Plan 02-02 Task 3 — Settings → Integrations.
+ * Settings → Integrations.
  *
- * Renders one row per third-party integration. Plan 02-01 shipped Gmail; this
- * plan adds Calendar as a sibling row. Each row owns INDEPENDENT React state
- * (no shared store) so disconnecting one does NOT visually reset the other —
- * the SC3 mechanic.
+ * Connect entry point lives in AddAccountModal (Google, Microsoft, Todoist).
+ * Connected accounts render through AccountRow (one row per provider_account),
+ * which surfaces provider, email, status chip, lastError banner, and
+ * Disconnect via the generic providerAccountDisconnect IPC + a confirmation
+ * dialog gated at the section level.
  *
- * Row states (Gmail + Calendar share the vocabulary):
- *   - disconnected:        "Connect <Kind>" button
- *   - connected (ok):      email + "Sync now" + "Disconnect"
- *   - connected (expired): EMAIL-07 banner (locked copy) + "Reconnect"
- *   - connected (revoked): EMAIL-07 banner (revoked variant) + "Reconnect"
+ * Calendar still owns a legacy per-provider row for the EMAIL-07
+ * expired/revoked banner copy + inline Reconnect path + writeScopeMissing
+ * re-consent flow. Hides itself when an AccountRow already covers the
+ * account AND no actionable banner is firing.
  *
- * Locked banner copy is exported for spec assertions and contains the
- * "other integrations are unaffected" phrasing that proves SC3 at the
- * renderer level (Plan 02-01 Gmail half + Plan 02-02 Calendar half).
- *
- * Pre-OAuth disclosure modal is per-kind:
- *   - Gmail:    CASA unverified-app copy.
- *   - Calendar: read-only scope disclosure ("Aria will read your calendar
- *               only — never create, modify, or send events. Calendar write
- *               capability arrives in a later release.")
+ * Gmail and Todoist legacy rows were removed in quick task 260523-a5w when
+ * their connect entry points moved into AddAccountModal — AccountRow + the
+ * generic disconnect dialog cover the connected-state UX without
+ * duplicating the unified account list.
  */
 import { useCallback, useEffect, useState } from 'react';
 // Phase 9 editorial token reference: var(--ink), var(--gold), var(--rule), var(--paper).
 // Import kept for ratchet — used inline below.
 import type {
   CalendarIntegrationStatus,
-  GmailIntegrationStatus,
   IpcError,
   ProviderAccountDto,
 } from '../../../shared/ipc-contract';
@@ -37,20 +31,6 @@ import { DisconnectConfirmDialog } from '../../components/DisconnectConfirmDialo
 import { RagDisconnectedSection } from './RagDisconnectedSection';
 
 const POLL_MS = 10_000;
-
-// Gmail banner copy (Plan 02-01). The "Calendar and other integrations are
-// unaffected" phrasing was locked in 02-01 and MUST remain stable.
-export const EMAIL_07_EXPIRED_COPY =
-  "Aria's access to Gmail has expired. Re-connect to resume syncing. Calendar and other integrations are unaffected.";
-export const EMAIL_07_REVOKED_COPY =
-  "Aria's access to Gmail was revoked. Re-connect to resume syncing. Calendar and other integrations are unaffected.";
-export const PRE_OAUTH_DISCLOSURE =
-  "Google will show a warning that Aria hasn't been verified. This is expected while Aria is in private testing — your data stays on your machine. Continue?";
-
-// Plan 03-04 — surfaced when a recent send hit an unverified-app error
-// (RESEARCH §Pitfall 9). Persistent until the next successful send clears it.
-export const GMAIL_VERIFICATION_PENDING_COPY =
-  "Aria is awaiting Google verification (CASA Tier 2 in progress). Sending may fail until verification clears.";
 
 // Calendar banner copy (Plan 02-02). Symmetric phrasing — "Gmail and other
 // integrations are unaffected" proves SC3 mechanic across both halves.
@@ -72,20 +52,12 @@ function isErr(v: unknown): v is IpcError {
 }
 
 /**
- * Quick task 260523-a5w — switched from health-based to PRESENCE-based gating.
- *
- * Before: the legacy Gmail/Calendar/Todoist rows hid only when an account was
- * `status === 'ok' && !lastError`. Any time the account had `lastError` set or
- * `status === 'degraded' | 'needs-auth'`, the legacy card reappeared as a
- * second box even though `AccountRow` already renders the provider, email,
- * status chip, and lastError banner — producing the "duplicate empty box"
- * UX bug.
- *
- * After: hide whenever ANY AccountRow of the provider is mounted, regardless
- * of status. The legacy row's internal `hasBanner` check still surfaces the
- * connect-error / pre-OAuth disclosure / verification-pending banners during
- * the disconnected-but-attempting-to-connect flow, so the user still sees
- * actionable inline state when no provider_account row exists yet.
+ * Quick task 260523-a5w — PRESENCE-based gating for the last remaining
+ * legacy row (Calendar). Hides the row whenever ANY AccountRow of the
+ * provider is mounted, regardless of status — the row's internal
+ * `hasBanner` check still lets the EMAIL-07 expired/revoked +
+ * writeScopeMissing banners surface inline since those flows own a
+ * Reconnect button AccountRow does not replicate.
  */
 function hasAccount(
   accounts: ProviderAccountDto[],
@@ -114,12 +86,7 @@ function hasErrorCode(v: unknown): v is { error: string } {
   return !!v && typeof v === 'object' && 'error' in (v as object) && typeof (v as { error: unknown }).error === 'string';
 }
 
-interface IntegrationsSectionProps {
-  /** Hook for tests to start with the pre-OAuth modal already open. */
-  initialModalOpen?: boolean;
-}
-
-export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionProps = {}): JSX.Element {
+export function IntegrationsSection(): JSX.Element {
   const [accounts, setAccounts] = useState<ProviderAccountDto[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [pendingDisconnect, setPendingDisconnect] = useState<ProviderAccountDto | null>(null);
@@ -232,7 +199,6 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
         onClose={() => setAddOpen(false)}
         onConnected={refreshAccounts}
       />
-      <GmailRow initialModalOpen={initialModalOpen} hideWhenHealthy={hasAccount(accounts, 'google')} />
       <CalendarRow hideWhenHealthy={hasAccount(accounts, 'google')} />
       <RagDisconnectedSection />
       <ResearchApiKeyRow provider="brave" label="Research — Brave Search" />
@@ -262,174 +228,10 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
 }
 
 // ============================================================================
-// Gmail row — owns its own state. Behaviorally identical to the Plan 02-01
-// version; only refactored out of the section root.
-// ============================================================================
-
-function GmailRow({ initialModalOpen, hideWhenHealthy }: { initialModalOpen?: boolean; hideWhenHealthy?: boolean }): JSX.Element | null {
-  const [status, setStatus] = useState<GmailIntegrationStatus | null>(null);
-  const [modalOpen, setModalOpen] = useState<boolean>(initialModalOpen ?? false);
-  const [busy, setBusy] = useState<boolean>(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
-
-  const refresh = useCallback(async () => {
-    const next = await window.aria.gmailStatus();
-    if (!isErr(next)) setStatus(next);
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
-
-  const onConnectClick = useCallback(() => {
-    setConnectError(null);
-    setModalOpen(true);
-  }, []);
-  const onModalContinue = useCallback(async () => {
-    setModalOpen(false);
-    setBusy(true);
-    setConnectError(null);
-    try {
-      const result = await window.aria.gmailConnect();
-      if (hasErrorCode(result)) {
-        setConnectError(connectErrorCopy(result.error));
-      }
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }, [refresh]);
-  const onModalCancel = useCallback(() => setModalOpen(false), []);
-  // Phase 7 Gap 10 — gate disconnect behind explicit confirmation.
-  const onDisconnectClick = useCallback(() => setConfirmOpen(true), []);
-  const onConfirmDisconnect = useCallback(async () => {
-    setBusy(true);
-    try {
-      await window.aria.gmailDisconnect();
-      await refresh();
-    } finally {
-      setBusy(false);
-      setConfirmOpen(false);
-    }
-  }, [refresh]);
-  const onForceSync = useCallback(async () => {
-    setBusy(true);
-    try {
-      await window.aria.gmailForceSync();
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }, [refresh]);
-
-  const hasBanner =
-    (status?.connected && status.tokenStatus !== 'ok') ||
-    !!connectError ||
-    !!status?.verificationPending ||
-    (status?.connected && status.tokenStatus === 'ok' && !!status.lastError);
-  if (hideWhenHealthy && !hasBanner) {
-    return null;
-  }
-
-  return (
-    <>
-      <article data-testid="integration-row-gmail" style={rowStyle()}>
-        <header style={headerStyle()}>
-          <h3 style={titleStyle()}>Gmail</h3>
-          {status?.connected && status.email && (
-            <span data-testid="gmail-email" style={{ color: 'var(--aria-fg-muted)' }}>
-              {status.email}
-            </span>
-          )}
-        </header>
-
-        {status?.connected && status.tokenStatus === 'expired' && (
-          <div role="alert" data-testid="email07-banner-expired" style={bannerStyle()}>
-            <p style={{ margin: 0 }}>{EMAIL_07_EXPIRED_COPY}</p>
-            <button type="button" onClick={onConnectClick} disabled={busy}>Reconnect</button>
-          </div>
-        )}
-
-        {status?.connected && status.tokenStatus === 'revoked' && (
-          <div role="alert" data-testid="email07-banner-revoked" style={bannerStyle()}>
-            <p style={{ margin: 0 }}>{EMAIL_07_REVOKED_COPY}</p>
-            <button type="button" onClick={onConnectClick} disabled={busy}>Reconnect</button>
-          </div>
-        )}
-
-        {connectError && (
-          <div role="alert" data-testid="gmail-connect-error" style={bannerStyle()}>
-            <p style={{ margin: 0 }}>{connectError}</p>
-          </div>
-        )}
-
-        {status?.connected && status.tokenStatus === 'ok' && status.lastError && (
-          <p data-testid="gmail-sync-error" style={{ color: 'red', fontSize: 12, margin: '4px 0 0 0' }}>
-            Last sync: {status.lastError}. See Status panel for history.
-          </p>
-        )}
-
-        {status?.verificationPending && (
-          <div role="alert" data-testid="gmail-verification-pending-banner" style={bannerStyle()}>
-            <p style={{ margin: 0 }}>{GMAIL_VERIFICATION_PENDING_COPY}</p>
-          </div>
-        )}
-
-        <div style={actionsStyle()}>
-          {!status?.connected && (
-            <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-connect-btn">
-              Connect Gmail
-            </button>
-          )}
-          {status?.connected && status.tokenStatus === 'ok' && (
-            <>
-              <button type="button" onClick={onForceSync} disabled={busy} data-testid="gmail-sync-now-btn">
-                Sync now
-              </button>
-              <button type="button" onClick={onDisconnectClick} disabled={busy} data-testid="gmail-disconnect-btn">
-                Disconnect
-              </button>
-              <button type="button" onClick={onConnectClick} disabled={busy} data-testid="gmail-reconnect-btn">
-                Re-connect Gmail
-              </button>
-            </>
-          )}
-        </div>
-      </article>
-
-      {modalOpen && (
-        <div role="dialog" aria-modal="true" data-testid="pre-oauth-modal" style={modalBackdropStyle()}>
-          <div style={modalStyle()}>
-            <h3 style={{ marginTop: 0 }}>Connect Gmail</h3>
-            <p>{PRE_OAUTH_DISCLOSURE}</p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={onModalCancel} data-testid="pre-oauth-cancel">Cancel</button>
-              <button type="button" onClick={onModalContinue} data-testid="pre-oauth-continue">Continue</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmOpen && (
-        <DisconnectConfirmDialog
-          provider="Gmail"
-          account={status?.email ?? null}
-          wipesRagData={true}
-          testIdSuffix="gmail"
-          busy={busy}
-          onCancel={() => setConfirmOpen(false)}
-          onConfirm={onConfirmDisconnect}
-        />
-      )}
-    </>
-  );
-}
-
-// ============================================================================
-// Calendar row — its own state, mirroring the Gmail row's IPC vocabulary.
+// Calendar row — owns the EMAIL-07 expired/revoked banner + Reconnect path
+// + writeScopeMissing re-consent flow that AccountRow doesn't replicate.
+// Hides itself when an AccountRow already covers the account AND no
+// actionable banner is firing.
 // ============================================================================
 
 function CalendarRow({ hideWhenHealthy }: { hideWhenHealthy?: boolean } = {}): JSX.Element | null {
