@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { defineConfig, externalizeDepsPlugin, type UserConfig } from 'electron-vite';
+import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -14,9 +15,37 @@ import react from '@vitejs/plugin-react';
  * electron-vite v5 narrowed Main/Preload BuildOptions (Vite's `lib` field is
  * excluded). Entry points are declared via `build.rollupOptions.input`;
  * library bundling for main/preload is handled internally.
+ *
+ * Quick 260523-f73 — OAuth credentials baked into the main bundle.
+ * `loadEnv` reads `.env`, `.env.local`, `.env.<mode>` from the project root
+ * at BUILD time. The values are inlined as string literals into out/main via
+ * Vite's `define`, so packaged binaries (which lose the build machine's
+ * shell env) still have the credentials. Desktop OAuth client secrets are
+ * "not secrets in the cryptographic sense" per Google's published policy —
+ * they're public-by-design for desktop apps. Empty string fallback so the
+ * existing `if (!clientId || !clientSecret)` check still trips
+ * `OAuthConfigMissingError` cleanly when nothing is set.
  */
+// Build-time env (loadEnv reads .env, .env.local, .env.<mode> from cwd).
+const buildEnv = loadEnv(process.env.NODE_ENV ?? 'production', process.cwd(), '');
+const oauthDefine = {
+  'process.env.GOOGLE_OAUTH_CLIENT_ID': JSON.stringify(
+    buildEnv.GOOGLE_OAUTH_CLIENT_ID ?? '',
+  ),
+  'process.env.GOOGLE_OAUTH_CLIENT_SECRET': JSON.stringify(
+    buildEnv.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+  ),
+  'process.env.MS_OAUTH_CLIENT_ID': JSON.stringify(
+    buildEnv.MS_OAUTH_CLIENT_ID ?? '',
+  ),
+  'process.env.MS_OAUTH_TENANT_ID': JSON.stringify(
+    buildEnv.MS_OAUTH_TENANT_ID ?? '',
+  ),
+} as const;
+
 const config: UserConfig = {
   main: {
+    define: oauthDefine,
     build: {
       outDir: 'out/main',
       rollupOptions: {
