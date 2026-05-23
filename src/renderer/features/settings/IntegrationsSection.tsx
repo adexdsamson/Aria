@@ -132,6 +132,24 @@ export function IntegrationsSection(): JSX.Element {
     }
   }, [pendingDisconnect, refreshAccounts]);
 
+  // Quick task 260523-a5w — manual force-sync per account. Force-sync IPCs
+  // are singleton (no accountId arg) so for Google we run both gmail +
+  // calendar in parallel; Microsoft + Todoist each have a single combined
+  // sync IPC.
+  const syncAccount = useCallback(async (account: ProviderAccountDto): Promise<void> => {
+    if (account.providerKey === 'google') {
+      await Promise.allSettled([
+        window.aria.gmailForceSync(),
+        window.aria.calendarForceSync(),
+      ]);
+    } else if (account.providerKey === 'microsoft') {
+      await window.aria.microsoftForceSync();
+    } else if (account.providerKey === 'todoist') {
+      await window.aria.todoistForceSync();
+    }
+    await refreshAccounts();
+  }, [refreshAccounts]);
+
   return (
     <section
       data-testid="settings-integrations"
@@ -190,6 +208,7 @@ export function IntegrationsSection(): JSX.Element {
               key={`${account.providerKey}:${account.accountId}`}
               account={account}
               onDisconnect={requestDisconnectAccount}
+              onSync={syncAccount}
             />
           ))}
         </div>

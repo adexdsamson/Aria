@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import type { ProviderAccountDto } from '../../shared/ipc-contract';
 
 export interface AccountRowProps {
   account: ProviderAccountDto;
   onDisconnect(account: ProviderAccountDto): void | Promise<void>;
+  onSync?(account: ProviderAccountDto): void | Promise<void>;
   onSaveLabel?(account: ProviderAccountDto, label: string): void | Promise<void>;
 }
 
-export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowProps): JSX.Element {
+export function AccountRow({ account, onDisconnect, onSync, onSaveLabel }: AccountRowProps): JSX.Element {
+  const [syncing, setSyncing] = useState(false);
   const label = account.displayLabel || account.displayEmail;
   const needsAuth = account.status === 'needs-auth';
   const degraded = account.status === 'degraded';
@@ -15,6 +18,16 @@ export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowPro
     : degraded
       ? '#b34'
       : '#1f7a4d';
+
+  async function handleSync(): Promise<void> {
+    if (!onSync || syncing) return;
+    setSyncing(true);
+    try {
+      await onSync(account);
+    } finally {
+      setSyncing(false);
+    }
+  }
   return (
     <article data-testid={`account-row-${account.providerKey}-${account.accountId}`} style={rowStyle()}>
       <span aria-hidden style={{ ...dotStyle(), background: dotColor }} />
@@ -81,6 +94,17 @@ export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowPro
             style={linkBtnStyle()}
           >
             Reconnect
+          </button>
+        )}
+        {onSync && !needsAuth && (
+          <button
+            type="button"
+            data-testid={`account-sync-${account.accountId}`}
+            onClick={() => void handleSync()}
+            disabled={syncing}
+            style={linkBtnStyle()}
+          >
+            {syncing ? 'Syncing…' : 'Sync now'}
           </button>
         )}
         <button
