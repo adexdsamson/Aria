@@ -60,6 +60,22 @@ function isMailCalendarAccount(
   return account.providerKey === 'google' || account.providerKey === 'microsoft';
 }
 
+/**
+ * An account is eligible for scheduled syncing if it's healthy OR carrying a
+ * transient error we should attempt to recover from. `needs-auth` and
+ * `disconnected` are skipped — those require user action (re-OAuth, reconnect)
+ * before any sync attempt can succeed.
+ *
+ * Without `'degraded'` in this set, a single failed tick (e.g. Gmail
+ * history-window rotation) flips status to degraded, and any subsequent app
+ * restart refuses to schedule the account — leaving the recovery path
+ * permanently dark. The cron itself is what's supposed to recover transient
+ * errors; degraded accounts MUST stay scheduled.
+ */
+function isSchedulable(status: string): boolean {
+  return status === 'ok' || status === 'degraded';
+}
+
 function runLater(fn: () => void, jitterMs: number): void {
   const delay = jitterMs > 0 ? Math.floor(Math.random() * jitterMs) : 0;
   setTimeout(fn, delay);
@@ -116,10 +132,26 @@ export function createSyncOrchestrator(deps: SyncOrchestratorDeps): SyncOrchestr
     });
   }
 
+  function fireTick(account: ProviderAccountRow & { providerKey: 'google' | 'microsoft' }): void {
+    void api.tickAccount(account).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      setProviderAccountStatus(deps.db, {
+        providerKey: account.providerKey,
+        accountId: account.accountId,
+        status: 'degraded',
+        lastError: message,
+      });
+      deps.logger?.warn?.(
+        { scope: 'sync-orchestrator', providerKey: account.providerKey, accountId: account.accountId, error: message },
+        'provider sync tick failed',
+      );
+    });
+  }
+
   const api: SyncOrchestrator = {
     start() {
       for (const account of listProviderAccounts(deps.db)) {
-        if (account.status === 'ok' && isMailCalendarAccount(account)) {
+        if (isMailCalendarAccount(account) && isSchedulable(account.status)) {
           api.scheduleAccount(account);
         }
       }
@@ -135,31 +167,28 @@ export function createSyncOrchestrator(deps: SyncOrchestratorDeps): SyncOrchestr
 
     scheduleAccount(account) {
       if (!isMailCalendarAccount(account)) return;
-      if (account.status !== 'ok') return;
+      if (!isSchedulable(account.status)) return;
       const key = accountCronKey(account);
       if (cronRegistry.has(key)) return;
       const task = schedule(cronSchedule, () => {
         runLater(() => {
-          void api.tickAccount(account).catch((err) => {
-            const message = err instanceof Error ? err.message : String(err);
-            setProviderAccountStatus(deps.db, {
-              providerKey: account.providerKey,
-              accountId: account.accountId,
-              status: 'degraded',
-              lastError: message,
-            });
-            deps.logger?.warn?.(
-              { scope: 'sync-orchestrator', providerKey: account.providerKey, accountId: account.accountId, error: message },
-              'provider sync tick failed',
-            );
-          });
+          fireTick(account);
         }, jitterMs);
       });
       cronRegistry.set(key, task);
       deps.logger?.info?.(
-        { scope: 'sync-orchestrator', providerKey: account.providerKey, accountId: account.accountId, schedule: cronSchedule },
+        { scope: 'sync-orchestrator', providerKey: account.providerKey, accountId: account.accountId, schedule: cronSchedule, status: account.status },
         'provider sync scheduled',
       );
+      // For degraded accounts we kick a tick immediately (not after a 5-min
+      // cron interval) so the user sees recovery as soon as the app starts
+      // instead of staring at a sticky error chip. Healthy accounts wait for
+      // the regular cron cadence to avoid burning a sync on every launch.
+      if (account.status === 'degraded') {
+        runLater(() => {
+          fireTick(account);
+        }, jitterMs);
+      }
     },
 
     async tickAccount(account) {
