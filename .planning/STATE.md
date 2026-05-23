@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-23T05:37:16.250Z"
+last_updated: "2026-05-23T08:30:00.000Z"
 progress:
   total_phases: 13
   completed_phases: 11
@@ -80,6 +80,14 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 ### Phase 7 Followups
 
 - 2026-05-20 — Gap 10 closed (bdb8693): destructive integration disconnect now gated by `DisconnectConfirmDialog` with explicit RAG-wipe copy; symmetric across Gmail, Calendar, Todoist, and generic provider-account rows. Matches CLAUDE.md approval-gating principle and plan 07-03 task 8 "confirm before wipe" contract.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260523-a5w | Settings integrations cleanup + calendar fetch fix (3 surgical fixes — closes migration_014_lift_incomplete calendar half) | 2026-05-23 | a70936f / 968821c / 32e90b2 | [260523-a5w-settings-integrations-cleanup-and-calend](./quick/260523-a5w-settings-integrations-cleanup-and-calend/) |
+
+Last activity: 2026-05-23 - Completed quick task 260523-a5w: Settings integrations cleanup and calendar fetch fix
 
 ## Workflow Config
 
