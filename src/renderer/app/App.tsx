@@ -1,6 +1,6 @@
 import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { SideNav } from '../components/SideNav';
 import { Topbar } from '../components/Topbar';
 import { CommandPalette } from '../components/CommandPalette';
@@ -28,6 +28,8 @@ type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 export function App(): JSX.Element {
   return (
     <MemoryRouter initialEntries={['/briefing']}>
+      {/* Phase 12 / Plan 12-03 — aria:navigate push channel listener */}
+      <AppShellNavigateListener />
       <AppShell />
     </MemoryRouter>
   );
@@ -169,6 +171,46 @@ function GateLoadingScreen(): JSX.Element {
       </div>
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 12 / Plan 12-03 — aria:navigate listener (BG-03, T-12-10)
+//
+// Subscribes to the main-process push channel at mount. Allowlist enforced:
+// only /briefing and /approvals are routed programmatically. Any other path
+// is logged and ignored — prevents an open-redirect via IPC.
+//
+// Exported for unit-testing (navigate-listener.spec.tsx).
+// ---------------------------------------------------------------------------
+
+const NAVIGATE_ALLOWLIST = ['/briefing', '/approvals'] as const;
+type AllowedPath = (typeof NAVIGATE_ALLOWLIST)[number];
+
+function isAllowedPath(path: string): path is AllowedPath {
+  return (NAVIGATE_ALLOWLIST as readonly string[]).includes(path);
+}
+
+/**
+ * Thin component that mounts inside the MemoryRouter and registers the
+ * aria:navigate subscription. Renders nothing — pure side-effect.
+ */
+export function AppShellNavigateListener(): null {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.aria?.onNavigate) return;
+    const unsubscribe = window.aria.onNavigate((path: string) => {
+      if (isAllowedPath(path)) {
+        navigate(path);
+      }
+      // Non-allowlisted paths are silently ignored (T-12-10 defence).
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [navigate]);
+
+  return null;
 }
 
 function shellStyle(): React.CSSProperties {
