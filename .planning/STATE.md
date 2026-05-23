@@ -86,8 +86,9 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260523-a5w | Settings integrations cleanup + calendar fetch fix (3 surgical fixes — closes migration_014_lift_incomplete calendar half) | 2026-05-23 | a70936f / 968821c / 32e90b2 | [260523-a5w-settings-integrations-cleanup-and-calend](./quick/260523-a5w-settings-integrations-cleanup-and-calend/) |
+| 260523-eaf | Onboarding name personalization — new 5-step wizard with name as Step 1, plaintext profile.json sibling to vault.json, UnlockScreen renders `Good morning, <name>.` with fallback (24 new + 6 updated tests, 30/30 pass) | 2026-05-23 | 74af0e8 | [260523-eaf-onboarding-name-personalization](./quick/260523-eaf-onboarding-name-personalization/) |
 
-Last activity: 2026-05-23 - Completed quick task 260523-a5w: Settings integrations cleanup and calendar fetch fix
+Last activity: 2026-05-23 - Completed quick task 260523-eaf: Onboarding name personalization
 
 ## Workflow Config
 
