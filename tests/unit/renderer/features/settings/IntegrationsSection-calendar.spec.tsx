@@ -7,9 +7,9 @@
  *   3. Calendar expired: EMAIL-07-style banner with the EXACT locked copy
  *      ("Aria's access to Google Calendar has expired. Re-connect to resume
  *       syncing. Gmail and other integrations are unaffected.").
- *   4. Cross-row isolation (SC3 mechanic): Gmail ok + Calendar expired —
- *      Calendar banner shows, Gmail row stays clean, Gmail Sync-now still
- *      enabled. Then a Calendar disconnect does NOT reset Gmail row state.
+ *   4. (Removed in quick task 260523-a5w when GmailRow was deleted —
+ *       SC3 cross-row isolation now expressed at the provider_account /
+ *       AccountRow layer.)
  *   5. Pre-OAuth modal: Connect Calendar click renders modal with the
  *      Calendar-specific disclosure copy; Continue calls calendarConnect once.
  */
@@ -131,46 +131,12 @@ describe('IntegrationsSection (Calendar row)', () => {
     expect(reconnect?.textContent).toBe('Reconnect');
   });
 
-  it('Case 4 — cross-row isolation (SC3): Gmail ok + Calendar expired; Gmail untouched after Calendar disconnect', async () => {
-    const stub = installAria({
-      gmail: {
-        connected: true,
-        email: 'gm@bar.com',
-        tokenStatus: 'ok',
-        queueDepth: 0,
-        lastSyncedAt: new Date().toISOString(),
-      },
-      calendar: {
-        connected: true,
-        email: 'cal@bar.com',
-        tokenStatus: 'expired',
-        queueDepth: 0,
-        lastError: 'token-expired',
-      },
-    });
-    const user = userEvent.setup();
-    render(<IntegrationsSection />);
-
-    // Calendar banner visible
-    const calBanner = await screen.findByTestId('calendar-email07-banner-expired');
-    expect(calBanner).toBeTruthy();
-    // Gmail row has NO banner and Sync now is enabled
-    expect(screen.queryByTestId('email07-banner-expired')).toBeNull();
-    expect(screen.queryByTestId('email07-banner-revoked')).toBeNull();
-    const gmailSync = await screen.findByTestId('gmail-sync-now-btn');
-    expect((gmailSync as HTMLButtonElement).disabled).toBe(false);
-
-    // Click Calendar Reconnect → triggers Calendar's pre-OAuth modal; doesn't
-    // touch Gmail. After the click, Gmail row remains intact.
-    await user.click(calBanner.querySelector('button')!);
-    // Gmail row state unchanged: Sync-now still visible + email still visible
-    expect((await screen.findByTestId('gmail-email')).textContent).toBe('gm@bar.com');
-    expect(screen.getByTestId('gmail-sync-now-btn')).toBeTruthy();
-    // calendarDisconnect was not called by clicking Reconnect (it only opens
-    // the modal); gmailDisconnect was never called either.
-    expect(stub.gmailDisconnect).not.toHaveBeenCalled();
-    expect(stub.calendarDisconnect).not.toHaveBeenCalled();
-  });
+  // Case 4 (cross-row isolation: Gmail ok + Calendar expired) was removed in
+  // quick task 260523-a5w when GmailRow itself was deleted — the legacy
+  // per-provider Gmail row no longer exists. The SC3 cross-provider
+  // isolation property is now expressed at the IPC layer (separate
+  // provider_account rows per provider_key, independent sync engines) and
+  // at the AccountRow component layer.
 
   it('Case 5 — pre-OAuth modal: Cancel does NOT call calendarConnect; Continue calls it exactly once', async () => {
     const stub = installAria({ calendar: { connected: false, tokenStatus: 'missing', queueDepth: 0 } });
