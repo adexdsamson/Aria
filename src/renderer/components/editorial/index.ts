@@ -16,6 +16,7 @@ export { Button } from './Button';
 export { Input } from './Input';
 export { Modal } from './Modal';
 export { AppLogo } from './Logo';
+export { Checkbox } from './Checkbox';
 
 export type { MonogramSquareProps } from './MonogramSquare';
 export type { AvatarProps } from './Avatar';
@@ -28,3 +29,4 @@ export type { ButtonVariant, ButtonProps } from './Button';
 export type { InputProps } from './Input';
 export type { ModalSize, ModalProps } from './Modal';
 export type { LogoVariant, AppLogoProps } from './Logo';
+export type { CheckboxProps } from './Checkbox';

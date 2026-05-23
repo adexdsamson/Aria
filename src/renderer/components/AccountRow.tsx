@@ -8,42 +8,90 @@ export interface AccountRowProps {
 
 export function AccountRow({ account, onDisconnect, onSaveLabel }: AccountRowProps): JSX.Element {
   const label = account.displayLabel || account.displayEmail;
-  const color = account.displayColor || colorFromAccount(account.accountId);
   const needsAuth = account.status === 'needs-auth';
+  const degraded = account.status === 'degraded';
+  const dotColor = needsAuth
+    ? '#c98a3a'
+    : degraded
+      ? '#b34'
+      : '#1f7a4d';
   return (
     <article data-testid={`account-row-${account.providerKey}-${account.accountId}`} style={rowStyle()}>
-      <span aria-hidden style={{ ...dotStyle(), background: color }} />
-      <div style={{ flex: '1 1 auto' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <strong data-testid={`account-label-${account.accountId}`}>{label}</strong>
-          <span data-testid={`account-status-${account.accountId}`} style={chipStyle(needsAuth)}>
+      <span aria-hidden style={{ ...dotStyle(), background: dotColor }} />
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <strong
+            data-testid={`account-label-${account.accountId}`}
+            style={{
+              fontFamily: 'var(--f-display)',
+              fontWeight: 500,
+              fontSize: 17,
+              letterSpacing: '-0.005em',
+              color: 'var(--ink)',
+            }}
+          >
+            {label}
+          </strong>
+          <span data-testid={`account-status-${account.accountId}`} style={chipStyle(needsAuth, degraded)}>
             {account.status}
           </span>
         </div>
-        <div data-testid={`account-email-${account.accountId}`} style={{ color: '#64748b', fontSize: 13 }}>
+        <div
+          data-testid={`account-email-${account.accountId}`}
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--gray-soft)',
+            marginTop: 4,
+          }}
+        >
           {providerDisplayName(account.providerKey)} · {account.displayEmail}
         </div>
         {account.lastError && (
-          <div role="alert" style={{ color: '#b91c1c', fontSize: 12 }}>{account.lastError}</div>
+          <div
+            role="alert"
+            style={{
+              color: '#b34',
+              fontFamily: 'var(--f-mono)',
+              fontSize: 12,
+              marginTop: 6,
+            }}
+          >
+            {account.lastError}
+          </div>
         )}
       </div>
-      {onSaveLabel && (
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flex: '0 0 auto' }}>
+        {onSaveLabel && (
+          <button
+            type="button"
+            data-testid={`account-save-label-${account.accountId}`}
+            onClick={() => void onSaveLabel(account, label)}
+            style={linkBtnStyle()}
+          >
+            Save label
+          </button>
+        )}
+        {needsAuth && (
+          <button
+            type="button"
+            data-testid={`account-reconnect-${account.accountId}`}
+            style={linkBtnStyle()}
+          >
+            Reconnect
+          </button>
+        )}
         <button
           type="button"
-          data-testid={`account-save-label-${account.accountId}`}
-          onClick={() => void onSaveLabel(account, label)}
+          data-testid={`account-disconnect-${account.accountId}`}
+          onClick={() => void onDisconnect(account)}
+          style={linkBtnStyle()}
         >
-          Save label
+          Disconnect
         </button>
-      )}
-      {needsAuth && <button type="button" data-testid={`account-reconnect-${account.accountId}`}>Reconnect</button>}
-      <button
-        type="button"
-        data-testid={`account-disconnect-${account.accountId}`}
-        onClick={() => void onDisconnect(account)}
-      >
-        Disconnect
-      </button>
+      </div>
     </article>
   );
 }
@@ -54,34 +102,52 @@ function providerDisplayName(providerKey: ProviderAccountDto['providerKey']): st
   return 'Google';
 }
 
-function colorFromAccount(accountId: string): string {
-  let hash = 0;
-  for (const ch of accountId) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
-  return `hsl(${hash} 70% 46%)`;
-}
-
 function rowStyle(): React.CSSProperties {
   return {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    border: '1px solid #e2e8f0',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    gap: 16,
+    borderTop: '1px solid var(--rule)',
+    padding: '18px 4px',
   };
 }
 
 function dotStyle(): React.CSSProperties {
-  return { width: 14, height: 14, borderRadius: 999, flex: '0 0 auto' };
+  return {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    flex: '0 0 auto',
+    marginTop: 2,
+    boxShadow: '0 0 0 3px rgba(0,0,0,0.03)',
+  };
 }
 
-function chipStyle(warn: boolean): React.CSSProperties {
+function chipStyle(needsAuth: boolean, degraded: boolean): React.CSSProperties {
+  const color = needsAuth ? '#c98a3a' : degraded ? '#b34' : 'var(--gold, #8a6d3b)';
   return {
-    borderRadius: 999,
-    padding: '2px 8px',
-    fontSize: 11,
-    background: warn ? '#fef3c7' : '#dcfce7',
-    color: warn ? '#92400e' : '#166534',
+    fontFamily: 'var(--f-mono)',
+    fontSize: 10,
+    letterSpacing: '0.18em',
+    textTransform: 'uppercase',
+    color,
+    border: `1px solid ${color}`,
+    borderRadius: 2,
+    padding: '1px 6px',
+    lineHeight: 1.4,
+  };
+}
+
+function linkBtnStyle(): React.CSSProperties {
+  return {
+    background: 'transparent',
+    border: 'none',
+    padding: '4px 0',
+    fontFamily: 'var(--f-display)',
+    fontSize: 15,
+    color: 'var(--ink)',
+    cursor: 'pointer',
+    borderBottom: '1px solid transparent',
+    transition: 'border-color 160ms ease, color 160ms ease',
   };
 }

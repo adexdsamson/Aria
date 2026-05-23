@@ -64,7 +64,7 @@ function AppShell(): JSX.Element {
 
   if (gate === 'onboarding') {
     return (
-      <div data-testid="gate-onboarding" style={shellStyle()}>
+      <div data-testid="gate-onboarding" style={{ ...shellStyle(), background: 'var(--paper)', minHeight: '100vh' }}>
         <OnboardingWizard onComplete={() => void refresh()} />
       </div>
     );

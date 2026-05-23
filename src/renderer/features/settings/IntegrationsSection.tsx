@@ -73,6 +73,20 @@ function isErr(v: unknown): v is IpcError {
 }
 
 /**
+ * The legacy Gmail/Calendar/Todoist rows duplicate the unified AccountRow list
+ * when a provider already has an entry. We keep them mounted so they can still
+ * surface disconnected-state Connect buttons and expired/revoked banners, but
+ * collapse the visible card when AccountRow already represents the provider
+ * cleanly. The legacy rows opt in via `hideWhenHealthy`.
+ */
+function hasHealthyAccount(
+  accounts: ProviderAccountDto[],
+  providerKey: ProviderAccountDto['providerKey'],
+): boolean {
+  return accounts.some((a) => a.providerKey === providerKey && a.status === 'ok' && !a.lastError);
+}
+
+/**
  * Map known connect-error codes (UAT Gap 3) to user-facing copy. Unknown
  * codes fall through to a generic message that points at the dev terminal —
  * cheap escape hatch while we're still adding handler-side error vocab.
@@ -160,25 +174,42 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
       >
         Settings · Connections
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--rule)', paddingBottom: 12, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingBottom: 12, marginBottom: 4 }}>
         <h2
           style={{
             fontFamily: 'var(--f-display)',
-            fontSize: 28,
+            fontSize: 32,
             fontWeight: 500,
-            letterSpacing: '-0.01em',
+            letterSpacing: '-0.015em',
             color: 'var(--ink)',
             margin: 0,
           }}
         >
           Integrations
         </h2>
-        <button type="button" data-testid="add-account-open" onClick={() => setAddOpen(true)}>
+        <button
+          type="button"
+          data-testid="add-account-open"
+          onClick={() => setAddOpen(true)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '6px 0',
+            fontFamily: 'var(--f-display)',
+            fontSize: 16,
+            color: 'var(--ink)',
+            cursor: 'pointer',
+            borderBottom: '1px solid var(--gold, #8a6d3b)',
+          }}
+        >
           Add account
         </button>
       </div>
       {accounts.length > 0 && (
-        <div data-testid="provider-account-list" style={{ marginBottom: 'var(--aria-space-md)' }}>
+        <div
+          data-testid="provider-account-list"
+          style={{ marginBottom: 28, borderBottom: '1px solid var(--rule)' }}
+        >
           {accounts.map((account) => (
             <AccountRow
               key={`${account.providerKey}:${account.accountId}`}
@@ -193,9 +224,9 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
         onClose={() => setAddOpen(false)}
         onConnected={refreshAccounts}
       />
-      <GmailRow initialModalOpen={initialModalOpen} />
-      <CalendarRow />
-      <TodoistRow onProviderChanged={refreshAccounts} />
+      <GmailRow initialModalOpen={initialModalOpen} hideWhenHealthy={hasHealthyAccount(accounts, 'google')} />
+      <CalendarRow hideWhenHealthy={hasHealthyAccount(accounts, 'google')} />
+      <TodoistRow onProviderChanged={refreshAccounts} hideWhenHealthy={hasHealthyAccount(accounts, 'todoist')} />
       <RagDisconnectedSection />
       <ResearchApiKeyRow provider="brave" label="Research — Brave Search" />
       <ResearchApiKeyRow provider="exa" label="Research — Exa" />
@@ -228,7 +259,7 @@ export function IntegrationsSection({ initialModalOpen }: IntegrationsSectionPro
 // version; only refactored out of the section root.
 // ============================================================================
 
-function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Element {
+function GmailRow({ initialModalOpen, hideWhenHealthy }: { initialModalOpen?: boolean; hideWhenHealthy?: boolean }): JSX.Element | null {
   const [status, setStatus] = useState<GmailIntegrationStatus | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(initialModalOpen ?? false);
   const [busy, setBusy] = useState<boolean>(false);
@@ -286,6 +317,15 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
       setBusy(false);
     }
   }, [refresh]);
+
+  const hasBanner =
+    (status?.connected && status.tokenStatus !== 'ok') ||
+    !!connectError ||
+    !!status?.verificationPending ||
+    (status?.connected && status.tokenStatus === 'ok' && !!status.lastError);
+  if (hideWhenHealthy && !hasBanner) {
+    return null;
+  }
 
   return (
     <>
@@ -385,7 +425,7 @@ function GmailRow({ initialModalOpen }: { initialModalOpen?: boolean }): JSX.Ele
 // Calendar row — its own state, mirroring the Gmail row's IPC vocabulary.
 // ============================================================================
 
-function CalendarRow(): JSX.Element {
+function CalendarRow({ hideWhenHealthy }: { hideWhenHealthy?: boolean } = {}): JSX.Element | null {
   const [status, setStatus] = useState<CalendarIntegrationStatus | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
@@ -443,6 +483,14 @@ function CalendarRow(): JSX.Element {
       setBusy(false);
     }
   }, [refresh]);
+
+  const hasBanner =
+    (status?.connected && status.tokenStatus !== 'ok') ||
+    !!connectError ||
+    (status?.connected && status.tokenStatus === 'ok' && (!!status.lastError || !!status.writeScopeMissing));
+  if (hideWhenHealthy && !hasBanner) {
+    return null;
+  }
 
   return (
     <>
@@ -538,7 +586,7 @@ function CalendarRow(): JSX.Element {
   );
 }
 
-function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<void> }): JSX.Element {
+function TodoistRow({ onProviderChanged, hideWhenHealthy }: { onProviderChanged?: () => Promise<void>; hideWhenHealthy?: boolean }): JSX.Element | null {
   const [status, setStatus] = useState<TodoistIntegrationStatus | null>(null);
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -602,6 +650,11 @@ function TodoistRow({ onProviderChanged }: { onProviderChanged?: () => Promise<v
       setBusy(false);
     }
   }, [onProviderChanged, refresh]);
+
+  const hasBanner = !!connectError || !!status?.lastError;
+  if (hideWhenHealthy && !hasBanner) {
+    return null;
+  }
 
   return (
     <article data-testid="integration-row-todoist" style={rowStyle()}>

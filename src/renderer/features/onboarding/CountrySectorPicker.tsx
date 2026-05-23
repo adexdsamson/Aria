@@ -13,7 +13,7 @@
  * persisting via `newsSetBundle` AFTER the seal succeeds.
  */
 import { useState } from 'react';
-import { AppLogo, Button } from '../../components/editorial';
+import { AppLogo, Button, Checkbox } from '../../components/editorial';
 
 export const COUNTRIES: ReadonlyArray<{ code: string; label: string; hasBundle: boolean }> = [
   { code: 'NG', label: 'Nigeria', hasBundle: true },
@@ -154,20 +154,18 @@ export function CountrySectorPicker({ onSelected }: CountrySectorPickerProps): J
         >
           Sectors of interest
         </legend>
-        {SECTORS.map((s) => (
-          <label
-            key={s.id}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
-          >
-            <input
-              type="checkbox"
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {SECTORS.map((s) => (
+            <Checkbox
+              key={s.id}
               data-testid={`news-sector-${s.id}`}
               checked={sectors.includes(s.id)}
               onChange={() => toggleSector(s.id)}
+              label={s.label}
+              withDivider
             />
-            {s.label}
-          </label>
-        ))}
+          ))}
+        </div>
       </fieldset>
 
       <div style={{ marginTop: 16 }}>
