@@ -108,6 +108,7 @@ import {
   reconcileAutoLaunchOnBoot,
 } from './background/prefs';
 import { registerBackgroundHandlers } from './ipc/background';
+import { maybeShowFirstCloseToast } from './tray/notify';
 
 import {
   decideCloseAction,
@@ -310,7 +311,12 @@ function createMainWindow(
     if (action === 'hide') {
       e.preventDefault();
       win.hide();
-      // 12-03: maybeShowFirstCloseToast(win, dbHolder.db, logger)
+      // Phase 12 / Plan 12-03 — first-X discoverability toast (BG-07).
+      // Only fires on non-darwin (Windows-centric per plan). macOS red-X
+      // hide is not the "first close-to-tray" UX trigger.
+      if (process.platform !== 'darwin') {
+        void maybeShowFirstCloseToast(win, dbHolder.db, getLogger());
+      }
     }
   });
 
