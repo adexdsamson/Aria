@@ -619,6 +619,13 @@ async function bootstrap(): Promise<void> {
   });
 }
 
+// Windows requires an explicit AppUserModelId for native Toast notifications
+// to appear as banner popups. Without this, Notification.show() silently
+// drops or routes to an unattributed Action Center entry.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.aria.app');
+}
+
 acquireSingleInstanceLock({
   app,
   onAriaUrl: (url) =>
