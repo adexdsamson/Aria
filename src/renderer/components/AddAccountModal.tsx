@@ -76,12 +76,39 @@ export function AddAccountModal({ open, onClose, onConnected }: AddAccountModalP
         onClose();
         return;
       }
-      const result = selected === 'microsoft'
-        ? await window.aria.microsoftConnect()
-        : await window.aria.gmailConnect();
-      const failed = isErr(result) || Boolean((result as { ok?: boolean }).ok === false);
-      if (failed) {
-        setError('error' in result ? result.error : 'connect-failed');
+      if (selected === 'microsoft') {
+        const result = await window.aria.microsoftConnect();
+        const failed = isErr(result) || Boolean((result as { ok?: boolean }).ok === false);
+        if (failed) {
+          setError('error' in result ? result.error : 'connect-failed');
+          return;
+        }
+        await onConnected?.();
+        onClose();
+        return;
+      }
+      // Google · Gmail + Calendar — the modal advertises both scopes, so we
+      // run the two OAuth flows back-to-back. Gmail first; Calendar only if
+      // Gmail succeeded. Each one opens its own OAuth window because they
+      // use different token kinds (auth.ts SCOPES.gmail vs SCOPES.calendar)
+      // and persist into separate token records keyed by kind. The
+      // capability-merging UPSERT in the provider_account write path
+      // collapses both into a single AccountRow for the same Google email.
+      const gmailResult = await window.aria.gmailConnect();
+      const gmailFailed = isErr(gmailResult) || Boolean((gmailResult as { ok?: boolean }).ok === false);
+      if (gmailFailed) {
+        setError('error' in gmailResult ? gmailResult.error : 'connect-failed');
+        return;
+      }
+      const calendarResult = await window.aria.calendarConnect();
+      const calendarFailed = isErr(calendarResult) || Boolean((calendarResult as { ok?: boolean }).ok === false);
+      if (calendarFailed) {
+        setError(
+          'error' in calendarResult
+            ? `Gmail connected, but Calendar failed: ${calendarResult.error}. You can retry from Add account.`
+            : 'Gmail connected, but Calendar failed. You can retry from Add account.',
+        );
+        await onConnected?.();
         return;
       }
       await onConnected?.();
