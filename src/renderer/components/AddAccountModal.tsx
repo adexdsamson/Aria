@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type ProviderChoice = 'google' | 'microsoft';
+type ProviderChoice = 'google' | 'microsoft' | 'todoist';
 
 export interface AddAccountModalProps {
   open: boolean;
@@ -29,12 +29,27 @@ const PROVIDERS: Array<{ id: ProviderChoice; letter: string; letterColor: string
     name: 'Google · Gmail + Calendar',
     scopes: 'gmail.readonly + calendar.events (loopback OAuth)',
   },
+  {
+    id: 'todoist',
+    letter: 'T',
+    letterColor: '#e44332',
+    letterBg: 'rgba(228,67,50,0.10)',
+    name: 'Todoist',
+    scopes: 'Personal API token (read + write tasks)',
+  },
 ];
+
+// Quick task 260523-a5w — Todoist uses a personal API token instead of OAuth.
+// The modal swaps its action area to an inline password input + Connect button
+// that calls the existing aria:todoist:connect-token IPC (no new channels).
+const TODOIST_PRIVACY_COPY =
+  "Your Todoist API token is encrypted with the OS keychain via safeStorage; Aria's servers never see it. Create or rotate the token at todoist.com/prefs/integrations.";
 
 export function AddAccountModal({ open, onClose, onConnected }: AddAccountModalProps): JSX.Element | null {
   const [selected, setSelected] = useState<ProviderChoice>('microsoft');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState('');
 
   if (!open) return null;
 
@@ -44,6 +59,23 @@ export function AddAccountModal({ open, onClose, onConnected }: AddAccountModalP
     setBusy(true);
     setError(null);
     try {
+      if (selected === 'todoist') {
+        const trimmed = token.trim();
+        if (!trimmed) {
+          setError('Paste a Todoist API token to continue.');
+          return;
+        }
+        const result = await window.aria.todoistConnectToken({ token: trimmed });
+        const failed = isErr(result) || Boolean((result as { ok?: boolean }).ok === false);
+        if (failed) {
+          setError('error' in result ? result.error : 'connect-failed');
+          return;
+        }
+        setToken('');
+        await onConnected?.();
+        onClose();
+        return;
+      }
       const result = selected === 'microsoft'
         ? await window.aria.microsoftConnect()
         : await window.aria.gmailConnect();
@@ -141,10 +173,40 @@ export function AddAccountModal({ open, onClose, onConnected }: AddAccountModalP
           fontSize: 12, color: 'var(--ink-soft, #6b6455)', lineHeight: 1.55,
           marginBottom: 20,
         }}>
-          OAuth opens in a separate window. Tokens go to your OS keychain via{' '}
-          <code style={{ fontFamily: 'var(--f-mono)', fontSize: 11 }}>safeStorage</code>;
-          Aria's servers never see them.
+          {selected === 'todoist' ? (
+            <>{TODOIST_PRIVACY_COPY}</>
+          ) : (
+            <>
+              OAuth opens in a separate window. Tokens go to your OS keychain via{' '}
+              <code style={{ fontFamily: 'var(--f-mono)', fontSize: 11 }}>safeStorage</code>;
+              Aria's servers never see them.
+            </>
+          )}
         </div>
+
+        {/* Todoist API-token input — visible only when Todoist is selected. */}
+        {selected === 'todoist' && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <input
+              type="password"
+              data-testid="add-account-todoist-token"
+              aria-label="Todoist API token"
+              placeholder="Paste Todoist API token"
+              value={token}
+              onChange={(event) => setToken(event.currentTarget.value)}
+              style={{
+                flex: 1,
+                fontFamily: 'var(--f-mono)',
+                fontSize: 13,
+                border: '1px solid var(--rule)',
+                borderRadius: 'var(--radius)',
+                padding: '9px 12px',
+                background: 'var(--paper)',
+                color: 'var(--ink)',
+              }}
+            />
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -164,15 +226,27 @@ export function AddAccountModal({ open, onClose, onConnected }: AddAccountModalP
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={busy}
-            data-testid="add-account-connect"
-            style={{ padding: '9px 20px', border: 'none', borderRadius: 'var(--radius)', background: 'var(--gold)', color: '#fff', fontFamily: 'var(--f-body)', fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s' }}
-          >
-            {busy ? 'Connecting…' : `Continue with ${selectedProvider.id === 'microsoft' ? 'Microsoft' : 'Google'} →`}
-          </button>
+          {selected === 'todoist' ? (
+            <button
+              type="button"
+              onClick={() => void connect()}
+              disabled={busy}
+              data-testid="add-account-todoist-connect"
+              style={{ padding: '9px 20px', border: 'none', borderRadius: 'var(--radius)', background: 'var(--gold)', color: '#fff', fontFamily: 'var(--f-body)', fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s' }}
+            >
+              {busy ? 'Connecting…' : 'Connect Todoist'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void connect()}
+              disabled={busy}
+              data-testid="add-account-connect"
+              style={{ padding: '9px 20px', border: 'none', borderRadius: 'var(--radius)', background: 'var(--gold)', color: '#fff', fontFamily: 'var(--f-body)', fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s' }}
+            >
+              {busy ? 'Connecting…' : `Continue with ${selectedProvider.id === 'microsoft' ? 'Microsoft' : 'Google'} →`}
+            </button>
+          )}
         </div>
       </div>
     </div>
