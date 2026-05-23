@@ -52,6 +52,7 @@ const ICONS: Record<string, JSX.Element> = {
   scheduling: Ic('M21 11.5a8.4 8.4 0 0 1-15-5A8.4 8.4 0 0 1 21 11.5z M3 21l3-3'),
   ask: Ic('M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'),
   recap: Ic('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6'),
+  research: Ic('M21 21l-4.35-4.35 M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z M11 8v3 M9.5 9.5l3 3'),
   settings: Ic('M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'),
   'routing-log': Ic('M9 2v6 M15 2v6 M5 8h14v12H5z M9 12h6 M9 16h6'),
   search: Ic('M21 21l-4.35-4.35 M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z'),
@@ -257,6 +258,7 @@ export function SideNav(): JSX.Element {
     { to: '/scheduling', label: 'Scheduling', testid: 'sidenav-scheduling', icon: ICONS.scheduling },
     { to: '/ask', label: 'Ask Aria', testid: 'sidenav-ask', icon: ICONS.ask },
     { to: '/recap', label: 'Weekly Recap', testid: 'sidenav-recap', icon: ICONS.recap },
+    { to: '/research', label: 'Research', testid: 'nav-research', icon: ICONS.research },
   ];
   const system: ItemDef[] = [
     { to: '/settings', label: 'Settings', testid: 'sidenav-settings', icon: ICONS.settings },

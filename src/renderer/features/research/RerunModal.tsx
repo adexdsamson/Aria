@@ -47,22 +47,27 @@ export function RerunModal({ feedbackItems, onClose, onRerun }: RerunModalProps)
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'rgba(0,0,0,0.4)',
-          zIndex: 200,
+          background: 'rgba(20,18,14,0.55)',
+          zIndex: 1100,
+          backdropFilter: 'blur(2px)',
         }}
         onClick={onClose}
       >
         <div
           style={{
-            background: 'var(--bg)',
+            background: 'var(--paper, #faf8f4)',
             borderRadius: 8,
             padding: 32,
             width: 480,
             maxWidth: '90vw',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.1)',
             animation: `dialogEntry 200ms ${EASE_OUT}`,
+            overflow: 'hidden',
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Gold top accent — matches design system */}
+          <div style={{ height: 3, background: 'var(--gold)', margin: '-32px -32px 28px', borderRadius: '8px 8px 0 0' }} />
           <div
             style={{
               fontFamily: 'var(--f-mono)',

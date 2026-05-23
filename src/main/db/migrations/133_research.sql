@@ -1,4 +1,4 @@
--- 132_research.sql — Phase 11 Research
+-- 133_research.sql — Phase 11 Research
 -- Tables: research_job, research_report, research_report_section, research_feedback
 
 CREATE TABLE research_job (
@@ -56,4 +56,4 @@ CREATE TABLE research_feedback (
 
 CREATE INDEX idx_research_feedback_report ON research_feedback(report_id);
 
-PRAGMA user_version = 132;
+PRAGMA user_version = 133;
