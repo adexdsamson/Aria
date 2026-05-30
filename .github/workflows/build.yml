@@ -107,9 +107,20 @@ jobs:
         id: sha
         run: echo "short=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Create or update pre-release
+      # Publishes to the PUBLIC mirror repo adexdsamson/aria-releases so
+      # anonymous users (clicking the landing page Download buttons) can
+      # actually fetch the binaries. The main adexdsamson/Aria repo is
+      # private — its release-asset URLs return 404 without auth, so a
+      # public mirror is the simplest way to expose downloads without
+      # making the source repo public.
+      #
+      # Requires a fine-grained PAT in secret RELEASES_TOKEN with
+      # Contents: Read & write on adexdsamson/aria-releases only.
+      - name: Create or update pre-release on public mirror
         uses: softprops/action-gh-release@v2
         with:
+          repository: adexdsamson/aria-releases
+          token: ${{ secrets.RELEASES_TOKEN }}
           tag_name: dev-${{ steps.sha.outputs.short }}
           name: "Dev build ${{ steps.sha.outputs.short }}"
           body: |
@@ -120,6 +131,6 @@ jobs:
             | Windows | May show SmartScreen warning — click "More info → Run anyway" |
             | macOS | Right-click the app → Open to bypass Gatekeeper on first launch |
 
-            Commit: ${{ github.sha }}
+            Source commit: adexdsamson/Aria@${{ github.sha }}
           prerelease: true
           files: dist/*
