@@ -281,6 +281,7 @@ function resolveBrandIcon(): string | undefined {
 
 function createMainWindow(
   closeToTrayReader: () => boolean = () => true,
+  dbReader: () => import('./db/connect').Db | null = () => null,
 ): BrowserWindow {
   const brandIcon = resolveBrandIcon();
   const win = new BrowserWindow({
@@ -315,7 +316,7 @@ function createMainWindow(
       // Only fires on non-darwin (Windows-centric per plan). macOS red-X
       // hide is not the "first close-to-tray" UX trigger.
       if (process.platform !== 'darwin') {
-        void maybeShowFirstCloseToast(win, dbHolder.db, getLogger());
+        void maybeShowFirstCloseToast(win, dbReader(), getLogger());
       }
     }
   });
@@ -508,7 +509,7 @@ async function bootstrap(): Promise<void> {
   // conservative default (true → hide).
   const closeToTrayReader = (): boolean =>
     readBgPref(dbHolder.db, 'closeToTray', true);
-  const mainWindow = createMainWindow(closeToTrayReader);
+  const mainWindow = createMainWindow(closeToTrayReader, () => dbHolder.db);
   // Store the reader so the window-all-closed handler can reuse it.
   (globalThis as { __ariaCloseToTrayReader?: () => boolean }).__ariaCloseToTrayReader =
     closeToTrayReader;
@@ -615,7 +616,8 @@ async function bootstrap(): Promise<void> {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow(closeToTrayReader);
+    if (BrowserWindow.getAllWindows().length === 0)
+      createMainWindow(closeToTrayReader, () => dbHolder.db);
   });
 }
 
