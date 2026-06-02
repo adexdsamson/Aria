@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: roadmapped
-last_updated: "2026-06-02T16:24:39.479Z"
-last_activity: 2026-06-02
+status: planning
+last_updated: "2026-06-02T17:57:53.753Z"
+last_activity: 2026-06-02 — v2.0 roadmap created (6 phases, 14–19)
 progress:
   total_phases: 6
   completed_phases: 0
