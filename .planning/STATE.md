@@ -3,15 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: milestone_complete
-last_updated: 2026-06-02T12:58:17.651Z
+last_updated: "2026-06-02T13:09:50.261Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 14
-  completed_phases: 3
-  total_plans: 17
+  completed_phases: 12
+  total_plans: 52
   completed_plans: 49
-  percent: 21
-stopped_at: Milestone complete (Phase 13 was final phase)
+  percent: 86
 ---
 
 # State
@@ -93,8 +92,9 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 | 260523-f73 | Bake OAuth credentials into production build — `loadEnv` + `define` in `electron.vite.config.ts` inlines `GOOGLE_OAUTH_*` / `MS_OAUTH_*` from `.env.local` into the main bundle; fixes the "Aria can't find Google OAuth credentials" error on packaged builds | 2026-05-23 | 0181d18 | [260523-f73-bake-oauth-creds-into-build](./quick/260523-f73-bake-oauth-creds-into-build/) |
 | 260601-nxh | Fix production `ReferenceError: dbHolder is not defined` crash — `createMainWindow` close handler referenced `dbHolder` (local to `bootstrap()`, out of scope); injected `dbReader` closure mirroring `closeToTrayReader`; esbuild skips typecheck so it shipped. Added static ratchet. | 2026-06-01 | da2d936 | [260601-nxh-fix-dbholder-scope-crash](./quick/260601-nxh-fix-dbholder-scope-crash/) |
 | 260602-e4h | Fix production branding — packaged app showed Electron logo + "electron" taskbar name. Generated `build/icon.{png,ico}` (new `icons:app` script), wired electron-builder per-platform `icon` + extraResources, repointed `resolveBrandIcon` at packaged raster, aligned AUMID `com.aria.app`→`com.aria.desktop`. Visual confirm needs packaged build. | 2026-06-02 | 76fae51 | [260602-e4h-fix-app-branding-icon-and-name](./quick/260602-e4h-fix-app-branding-icon-and-name/) |
+| 260602-l4c | Fix dark-mode white backgrounds in Phase 11 Research UI — undefined `var(--bg,#fff)` always rendered white; added theme-aware `--bg:var(--paper)` + fixed `--on-gold:#FFFFFF` in globals.css, swapped 9 on-gold text sites across 5 files. User-confirmed live in dark mode. | 2026-06-02 | 2a11048 | [260602-l4c-fix-dark-mode-white-backgrounds-in-phase](./quick/260602-l4c-fix-dark-mode-white-backgrounds-in-phase/) |
 
-Last activity: 2026-06-02
+Last activity: 2026-06-02 - Completed quick task 260602-l4c: dark-mode white-background fix in Research UI
 
 ## Workflow Config
 
