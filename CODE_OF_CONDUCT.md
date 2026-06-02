@@ -19,7 +19,7 @@ Harassment, personal attacks, demeaning or discriminatory remarks, publishing ot
 
 ## Enforcement
 
-This is a solo-maintainer project. Concerns about conduct can be reported privately to the maintainer at [ai@mainlandtech.com](mailto:ai@mainlandtech.com). Reports will be reviewed and handled discreetly. The maintainer may take any action deemed appropriate, including warnings or removal from project spaces, up to and including a permanent ban for serious or repeated violations.
+This is a solo-maintainer project. Concerns about conduct can be reported privately to the maintainer at [adexdsamson@gmail.com](mailto:adexdsamson@gmail.com). Reports will be reviewed and handled discreetly. The maintainer may take any action deemed appropriate, including warnings or removal from project spaces, up to and including a permanent ban for serious or repeated violations.
 
 For the full enforcement guidelines and the community-impact ladder, see the [Contributor Covenant v2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
 

@@ -18,7 +18,7 @@ Please do **not** open a public GitHub Issue for security vulnerabilities. Discl
 Instead, use one of these private channels:
 
 - **GitHub private vulnerability reporting:** Go to the Security tab of this repository → "Report a vulnerability". GitHub will create a private advisory and notify the maintainer.
-- **Email:** Send details to [ai@mainlandtech.com](mailto:ai@mainlandtech.com). Include a description of the vulnerability, reproduction steps, and any relevant log output.
+- **Email:** Send details to [adexdsamson@gmail.com](mailto:adexdsamson@gmail.com). Include a description of the vulnerability, reproduction steps, and any relevant log output.
 
 We will respond within 72 hours and coordinate a fix before any public disclosure.
 
