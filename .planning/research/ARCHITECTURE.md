@@ -119,7 +119,7 @@ src/
 
 - **`src/main/voice/` mirrors the existing feature-folder convention** (`briefing/`, `triage/`, `rag/`). The orchestrator is the brain; `stt/`, `intent/`, `tts/`, `confirm/` are its limbs. Keeps the worker-thread native-module blast radius inside one folder.
 - **`intent/surfaces.ts` is the single integration seam.** It imports the SAME service functions the existing IPC handlers call (e.g. `generateBriefing`, `proposeSchedule`, `draftReply`, `AnswerService`) — it does NOT re-invoke IPC. One file to audit for "does every voice action route through the same gates as the UI."
-- **`confirm.ts` is deliberately NOT a gate.** It is a thin helper that turns a spoken "yes, send it" into the exact same `approval` row transition (`state→approved`, `approval_path='explicit'`) the Approvals UI performs. The real enforcement stays in `assertApproved`. This is the load-bearing trust decision.
+- **`confirm.ts` is deliberately NOT a gate.** It is a thin helper that turns a spoken "yes, send it" into the `approval` row transition (`state→approved`, `approval_path='voice-explicit'`). The `'voice-explicit'` value is distinguishable from `'explicit'` so `assertApproved` can reject it for forced/high-severity (financial/legal/HR) actions. The real enforcement stays in `assertApproved`. This is the load-bearing trust decision.
 - **Renderer `features/voice/` owns all audio I/O.** Capture worklet + VAD + Kokoro playback live together because they share the Web Audio `AudioContext` and the barge-in `.stop()` path.
 
 ## Architectural Patterns
@@ -302,8 +302,8 @@ CONFIRMING state: Aria speaks the action + shows VoiceConfirmDialog (reads exist
    ▼
 User confirms — by voice ("yes, send it") OR by click
    ▼
-SAME transition the Approvals UI performs:  approve(approvalId)
-   → state='approved', approval_path='explicit'
+voice confirm helper writes:  approve(approvalId)
+   → state='approved', approval_path='voice-explicit'
    ▼
 SAME unified send adapter runs:  assertApproved(db, approvalId)  ← unchanged enforcement
    → forced-explicit / high-severity / financial-legal-hr rules still apply verbatim
@@ -312,8 +312,8 @@ provider send (Gmail/Graph/calendar/Todoist)
 ```
 
 **Non-negotiables for the roadmapper:**
-- **Voice-confirm produces `approval_path='explicit'`** — it is an explicit human confirmation, so it clears the `assertApproved` forced-explicit branch the same way a UI click does. A voice "yes" is a first-class explicit approval, NOT a silent path.
-- **High-severity / financial-legal-hr categories** may warrant requiring the *visual* confirm (or a re-prompt) even when voice is active, because mishearing "yes" on an irreversible action is the worst failure mode. Recommend: voice-confirm allowed for low/med; high-severity forces the dialog tap. (Locks the trust posture without weakening the gate.)
+- **Voice-confirm produces `approval_path='voice-explicit'`** — NOT `'explicit'`. The `'voice-explicit'` value clears the `assertApproved` gate for low/medium severity actions (same flow as a UI click for those tiers), but is **REJECTED** by the dedicated `voice-forbidden-forced` branch for forced/high-severity (financial/legal/HR) actions. A voice "yes" is NOT a first-class explicit approval for high-stakes actions — it forces the on-screen click. This is the hard gate (VOICE-10).
+- **High-severity / financial-legal-hr categories require the visual confirm.** When `assertApproved` sees `approval_path='voice-explicit'` for a `forced`/high-severity row, it throws `ApprovalGateError` — the user must tap the UI. This prevents mishearing "yes" on an irreversible action from executing without explicit on-screen confirmation.
 - **The static-grep ratchet** (`single-mail-send-site.test.ts` and siblings) must be extended to assert the new voice write-paths ALSO route through the unified adapter — same shape as the Phase 4/6 silent-write-failure guards in memory. Add a voice send-path test in the same family.
 
 ## Wake-Word: Process Model & Privacy Isolation
