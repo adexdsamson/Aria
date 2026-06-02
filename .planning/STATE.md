@@ -73,6 +73,7 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 
 ### Roadmap Evolution
 
+- Phase 13 added: Open-Source Release Prep — publish Aria as a documented, source-available MIT project. Pre-publish git-history secret scan + .planning sensitivity review (hard gate), then README/LICENSE(MIT)/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT, docs/DEVELOPMENT.md + docs/ARCHITECTURE.md, light GitHub issue/PR templates, and package.json metadata. Source spec: docs/superpowers/specs/2026-06-02-open-source-prep-design.md
 - Phase 10 added: Knowledge Folders — local-folder RAG corpus (docx/xlsx/pdf/txt/md/csv) with chokidar watch + per-folder sensitivity flag (general/sensitive) writing into the existing Phase 7 chunks table as corpus='folder'. Google Drive connector deferred to a follow-up phase. Spec: docs/superpowers/specs/2026-05-21-knowledge-folders-design.md
 - Phase 9 added: Implement product UI from Anthropic design system (design ref VGTQmBNc8uXN62kH9DBTXA) — fetch design + README, apply to product UI, integrate logo; landing page out of scope
 - Phase 08.1 inserted after Phase 8: Subscription + 60-day trial (Stripe, license-key + periodic online check, no-card trial on first launch) — inserted before Phase 9 UI so paywall ships on new design system (URGENT)
