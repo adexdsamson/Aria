@@ -266,14 +266,21 @@ function applyCsp(): void {
 
 function resolveBrandIcon(): string | undefined {
   // Brand icon — mirrors src/renderer/components/editorial/MonogramSquare.tsx
-  // (ivory squircle + serif "A" + gold rule). Source-of-truth SVG lives at
-  // build/icon.svg; Electron accepts SVG natively on Linux. On Windows/macOS
-  // the file is still passed but Electron silently falls back to the default
-  // when it cannot rasterise — distributable builds should ship a generated
-  // .ico / .icns under build/ via electron-builder (TODO).
+  // (ivory squircle + serif "A" + gold rule). Electron cannot rasterise an SVG
+  // for a Windows/macOS window icon, so we ship a raster generated from
+  // build/icon.svg via `npm run icons:app` (build/icon.ico + build/icon.png).
+  //   - Packaged: assets are copied into resources/ via extraResources, so read
+  //     from process.resourcesPath. (build/ is not in the asar files[] list.)
+  //   - Dev (electron-vite): read from build/ at the repo root (__dirname is
+  //     out/main, so ../../build is the project's build dir).
+  // Windows prefers the multi-size .ico; other platforms use the 1024 .png.
   try {
-    const candidate = path.join(__dirname, '../../build/icon.svg');
-    return require('node:fs').existsSync(candidate) ? candidate : undefined;
+    const fs = require('node:fs') as typeof import('node:fs');
+    const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+    const candidate = app.isPackaged
+      ? path.join(process.resourcesPath, file)
+      : path.join(__dirname, '../../build', file);
+    return fs.existsSync(candidate) ? candidate : undefined;
   } catch {
     return undefined;
   }
@@ -624,8 +631,15 @@ async function bootstrap(): Promise<void> {
 // Windows requires an explicit AppUserModelId for native Toast notifications
 // to appear as banner popups. Without this, Notification.show() silently
 // drops or routes to an unattributed Action Center entry.
+//
+// The AUMID MUST match electron-builder's `appId` (com.aria.desktop) — that is
+// the AUMID the NSIS installer stamps on the Start Menu shortcut. When the
+// running app's AUMID matches the shortcut, Windows binds the taskbar identity
+// (name + icon) to the installed app; a mismatch makes the taskbar fall back to
+// the generic "Electron" identity and the default icon. (Builds are already
+// published under com.aria.desktop, so we match code → appId, not the reverse.)
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.aria.app');
+  app.setAppUserModelId('com.aria.desktop');
 }
 
 acquireSingleInstanceLock({

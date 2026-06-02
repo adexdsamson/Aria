@@ -25,7 +25,8 @@
     "release": "electron-builder --publish github",
     "release:mac": "electron-builder --mac --publish github",
     "release:win": "electron-builder --win --publish github",
-    "icons:tray": "node scripts/build-tray-icons.mjs"
+    "icons:tray": "node scripts/build-tray-icons.mjs",
+    "icons:app": "node scripts/build-app-icons.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
@@ -115,6 +116,7 @@
       "provider": "github"
     },
     "mac": {
+      "icon": "build/icon.png",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
@@ -129,6 +131,7 @@
       ]
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis"
       ]
@@ -139,6 +142,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
+      "icon": "build/icon.png",
       "target": [
         "AppImage",
         "deb"
@@ -161,6 +165,8 @@
         "from": "build/",
         "to": ".",
         "filter": [
+          "icon.ico",
+          "icon.png",
           "tray-icon*.ico",
           "tray-iconTemplate*.png",
           "tray-iconBadgedTemplate*.png"
