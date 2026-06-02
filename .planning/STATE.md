@@ -3,13 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-last_updated: "2026-05-23T08:30:00.000Z"
+last_updated: "2026-06-02T10:36:18.193Z"
+last_activity: 2026-06-02
 progress:
-  total_phases: 13
+  total_phases: 14
   completed_phases: 11
-  total_plans: 48
+  total_plans: 52
   completed_plans: 45
-  percent: 85
+  percent: 79
 ---
 
 # State
@@ -92,7 +93,7 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 | 260601-nxh | Fix production `ReferenceError: dbHolder is not defined` crash — `createMainWindow` close handler referenced `dbHolder` (local to `bootstrap()`, out of scope); injected `dbReader` closure mirroring `closeToTrayReader`; esbuild skips typecheck so it shipped. Added static ratchet. | 2026-06-01 | da2d936 | [260601-nxh-fix-dbholder-scope-crash](./quick/260601-nxh-fix-dbholder-scope-crash/) |
 | 260602-e4h | Fix production branding — packaged app showed Electron logo + "electron" taskbar name. Generated `build/icon.{png,ico}` (new `icons:app` script), wired electron-builder per-platform `icon` + extraResources, repointed `resolveBrandIcon` at packaged raster, aligned AUMID `com.aria.app`→`com.aria.desktop`. Visual confirm needs packaged build. | 2026-06-02 | 76fae51 | [260602-e4h-fix-app-branding-icon-and-name](./quick/260602-e4h-fix-app-branding-icon-and-name/) |
 
-Last activity: 2026-06-02 - Completed quick task 260602-e4h: Fix production app branding (icon + Windows identity)
+Last activity: 2026-06-02
 
 ## Workflow Config
 
