@@ -42,7 +42,7 @@
   3. The static-grep ratchet fails the build if the voice handler is a direct caller of `send.ts` / `write-event.ts` / `push-actions.ts`, proving voice routes through the same staging the UI uses.
   4. A voice confirm of a low/medium-severity action performs the SAME `approve()` transition the Approvals UI performs, then runs the unchanged unified send adapter (`assertApproved`).
 **Plans**: 3 plans (2 waves)
-  - [ ] 14-01-PLAN.md — Schema + type foundation: ApprovalPath union extension + v134 CHECK-widening migration (.sql + embedded.ts)
+  - [x] 14-01-PLAN.md — Schema + type foundation: ApprovalPath union extension + v134 CHECK-widening migration (.sql + embedded.ts)
   - [ ] 14-02-PLAN.md — Named voice-forbidden-forced gate branch + dormant voiceConfirm seam + SC2/SC4 tests
   - [ ] 14-03-PLAN.md — Two static ratchets (chokepoint caller allow-list + named voice ratchet) + ARCHITECTURE.md reconciliation
 
@@ -113,7 +113,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 14. Voice Safety / Confirm Contract | 0/0 | Not started | - |
+| 14. Voice Safety / Confirm Contract | 1/3 | In Progress|  |
 | 15. Audio I/O + Model Runtime | 0/0 | Not started | - |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
