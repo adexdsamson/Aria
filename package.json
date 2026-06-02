@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "description": "Aria — local-first desktop AI personal assistant for executives.",
+  "license": "MIT",
+  "author": "Mainland Tech <ai@mainlandtech.com>",
+  "homepage": "https://github.com/adexdsamson/Aria#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adexdsamson/Aria.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adexdsamson/Aria/issues"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
