@@ -21,7 +21,8 @@ type Db = Database.Database;
 export type ApprovalGateErrorCode =
   | 'not-found'
   | 'not-approved'
-  | 'forced-explicit-missing';
+  | 'forced-explicit-missing'
+  | 'voice-forbidden-forced';
 
 export class ApprovalGateError extends Error {
   readonly code: ApprovalGateErrorCode;
@@ -86,6 +87,17 @@ export function assertApproved(db: Db, approvalId: string): void {
     row.severity === null ||
     row.severity === 'high' ||
     cats.some((c) => FORCED_CATEGORIES.has(c));
+  // D-02: Named rejection branch — MUST be ordered BEFORE the generic forced
+  // check so a future refactor of the generic branch cannot silently reopen
+  // the voice path. This is intentional defense-in-depth: 'voice-explicit'
+  // is also !== 'explicit' and would be caught generically below, but the
+  // named branch makes the rejection auditable and refactor-proof.
+  if (isForced && row.approval_path === 'voice-explicit') {
+    throw new ApprovalGateError(
+      'voice-forbidden-forced',
+      `forced/high-severity action cannot be authorized by voice; got path=voice-explicit`,
+    );
+  }
   if (isForced && row.approval_path !== 'explicit') {
     const reason = parseFailed
       ? '; reason=malformed-categories_json'
