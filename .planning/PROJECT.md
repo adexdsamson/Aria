@@ -8,11 +8,17 @@ Aria is a local-first desktop AI personal assistant for executives and busy prof
 
 A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actions (email, calendar, meeting follow-through) are the value compound. If Aria tells the user what matters every morning and has handled the rest by Friday, it has earned its place.
 
+## Current State
+
+**v1.0 — ✅ SHIPPED 2026-06-02** (Phases 1–13, incl. 08.1; ~416 commits over ~19 days). The full v1 vision landed: encrypted local-first foundation + hybrid LLM router, daily briefing, approval-gated email/calendar/meeting/task actions, Outlook parity, RAG + Knowledge Folders, insights + weekly recap, subscription/trial, editorial UI, web research, background tray, and open-source release prep. Milestone audit = `tech_debt` (integration INTACT, no blockers). See [MILESTONES.md](./MILESTONES.md) and [milestones/v1.0-ROADMAP.md](./milestones/v1.0-ROADMAP.md).
+
+**Carried tech debt:** Phase 9 design walkthrough, Phase 2/8 live/release verification, macOS tray UAT, dark-mode `--aria-gray-*` gap, typecheck-on-WIP. **Next milestone:** TBD via `/gsd-new-milestone` (fresh requirements; phase numbering continues from 14).
+
 ## Requirements
 
 ### Validated
 
-(None yet - ship to validate)
+✓ **All v1.0 capability clusters shipped (2026-06-02)** — daily briefing & insights, email triage/drafting/send, calendar smart-scheduling (Google + Outlook), meeting capture → Todoist, RAG Q&A + Knowledge Folders, weekly recap (DOCX/PDF), preference learning, hybrid LLM routing, and the approval chokepoint. Full per-requirement outcomes archived in [milestones/v1.0-REQUIREMENTS.md](./milestones/v1.0-REQUIREMENTS.md). Live-usage validation (dogfood, design-partner) carries forward.
 
 ### Active
 
@@ -121,4 +127,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-05-14 after initialization*
+*Last updated: 2026-06-02 after v1.0 milestone completion*
