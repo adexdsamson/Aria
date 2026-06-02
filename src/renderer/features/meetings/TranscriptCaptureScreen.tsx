@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { TranscriptNoteDto, TranscriptSourceKind } from '../../../shared/ipc-contract';
-import { Button, Card, LabelRule } from '../../components/editorial';
+import { Button, LabelRule } from '../../components/editorial';
 import { NoteView } from './NoteView';
 
 /**
@@ -108,8 +108,7 @@ export function TranscriptCaptureScreen({
         </p>
       </header>
 
-      <Card>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label
             style={{
               display: 'flex',
@@ -213,8 +212,7 @@ export function TranscriptCaptureScreen({
               {busy ? 'Extracting…' : 'Extract action items'}
             </Button>
           </div>
-        </div>
-      </Card>
+      </div>
 
       {error && (
         <p

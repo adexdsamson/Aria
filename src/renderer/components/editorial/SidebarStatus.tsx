@@ -13,7 +13,9 @@
  * reserved for pure leaf primitives that never import from features/* / IPC).
  */
 import { useEffect, useState } from 'react';
-import type { ProviderAccountDto } from '../../../shared/ipc-contract';
+import type { ProviderId, ProviderAccountDto } from '../../../shared/ipc-contract';
+import { FRONTIER_LABELS, DEFAULT_FRONTIER_PROVIDER } from '../../../shared/frontier-labels';
+import { useFrontierProvider } from '../../lib/useFrontierProvider';
 import { StatusDot } from './StatusDot';
 import type { StatusDotKind } from './StatusDot';
 
@@ -23,13 +25,14 @@ interface Row {
   kind: StatusDotKind;
 }
 
-function rowsFor(rows: ProviderAccountDto[], loading: boolean): Row[] {
-  const ollama: Row = (() => {
-    return { label: 'Ollama', value: loading ? 'checking…' : 'localhost · ready', kind: 'ok' };
-  })();
-  const frontier: Row = (() => {
-    return { label: 'Frontier', value: 'Anthropic · configured', kind: 'ok' };
-  })();
+function rowsFor(rows: ProviderAccountDto[], loading: boolean, provider: ProviderId | null): Row[] {
+  const ollama: Row = { label: 'Ollama', value: loading ? 'checking…' : 'localhost · ready', kind: 'ok' };
+  const lbl = FRONTIER_LABELS[provider ?? DEFAULT_FRONTIER_PROVIDER];
+  const frontier: Row = {
+    label: 'Frontier',
+    value: provider ? `${lbl.vendor} · configured` : 'not configured',
+    kind: provider ? 'ok' : 'idle',
+  };
 
   const gmailAccounts = rows.filter((r) => r.providerKey === 'google');
   const calAccounts = rows.filter(
@@ -69,6 +72,7 @@ function rowsFor(rows: ProviderAccountDto[], loading: boolean): Row[] {
 export function SidebarStatus(): JSX.Element {
   const [rows, setRows] = useState<ProviderAccountDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const provider = useFrontierProvider();
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +91,7 @@ export function SidebarStatus(): JSX.Element {
     };
   }, []);
 
-  const summary = rowsFor(rows, loading);
+  const summary = rowsFor(rows, loading, provider);
 
   return (
     <div

@@ -9,7 +9,6 @@
  * unchanged; behaviour is identical.
  */
 import type { BriefingItem } from '../../../shared/ipc-contract';
-import { Card } from '../../components/editorial';
 import { BriefingItem as BriefingItemRow } from './BriefingItem';
 
 export function SectionCalendar({
@@ -75,26 +74,24 @@ export function SectionCalendar({
         <p style={{ fontStyle: 'italic', color: 'var(--gray)', margin: 0 }}>No items today.</p>
       )}
       {top3.length > 0 && (
-        <Card>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {top3.map((it) => {
-              const allDay = it.title.startsWith('[All day]') || /\ball day\b/i.test(it.why);
-              return (
-                <BriefingItemRow key={it.id} item={it} testId={`calendar-item-${it.id}`}>
-                  {allDay && (
-                    <span
-                      data-testid={`calendar-item-${it.id}-allday`}
-                      className="smallcaps"
-                      style={{ marginLeft: 6, color: 'var(--gray-soft)' }}
-                    >
-                      All day
-                    </span>
-                  )}
-                </BriefingItemRow>
-              );
-            })}
-          </ul>
-        </Card>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {top3.map((it) => {
+            const allDay = it.title.startsWith('[All day]') || /\ball day\b/i.test(it.why);
+            return (
+              <BriefingItemRow key={it.id} item={it} testId={`calendar-item-${it.id}`}>
+                {allDay && (
+                  <span
+                    data-testid={`calendar-item-${it.id}-allday`}
+                    className="smallcaps"
+                    style={{ marginLeft: 6, color: 'var(--gray-soft)' }}
+                  >
+                    All day
+                  </span>
+                )}
+              </BriefingItemRow>
+            );
+          })}
+        </ul>
       )}
     </section>
   );
