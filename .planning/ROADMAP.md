@@ -268,13 +268,16 @@ Plans:
 
 ### Phase 13: Open-Source Release Prep: publish Aria as a documented, source-available MIT project
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Publish Aria as a documented, source-available MIT project — pre-publish safety pass (secret scan + .planning sensitivity review), root docs (README/LICENSE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT), docs/DEVELOPMENT.md + docs/ARCHITECTURE.md, GitHub issue/PR templates, and package.json metadata cleanup.
+**Requirements**: none (documentation + release-prep phase)
 **Depends on:** Phase 12
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 13 to break down)
+- [ ] 13-01-PLAN.md — Pre-publish safety pass: full git-history secret scan + .planning sensitivity review + stray-file disposition (wave 1, autonomous: false — user sign-off checkpoint)
+- [ ] 13-02-PLAN.md — Root community docs: README.md, LICENSE (MIT), CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md (wave 2)
+- [ ] 13-03-PLAN.md — Developer + architecture docs: docs/DEVELOPMENT.md (grounded in package.json) + docs/ARCHITECTURE.md (grounded in src/) (wave 2)
+- [ ] 13-04-PLAN.md — GitHub scaffolding + metadata: .github issue/PR templates + package.json OSS fields + AGENTS.md Codex cleanup (wave 2)
 
 ---
 
