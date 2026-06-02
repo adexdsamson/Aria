@@ -248,12 +248,12 @@ Plans:
 **Goal:** Aria lets users commission web-backed research jobs (manual + transcript auto-detected), renders versioned reports in Document and Dashboard views, and refines results through a structured per-section feedback loop
 **Requirements:** RES-01, RES-02, RES-03, RES-04, RES-05, RES-06, RES-07, RES-08
 **Depends on:** Phase 6, Phase 9
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 11-01-PLAN.md — Migration 132 + ipc-contract DTOs + EntitlementAction extension + ResearchService + SearchProviderService + static ratchets (wave 1)
 - [x] 11-02-PLAN.md — research.ts IPC handlers + index.ts registration + transcripts.ts hook + renderer UI components + route + Integrations key rows (wave 2)
-- [ ] 11-03-PLAN.md — SideNav Research link + unit/integration/UI tests + human-verify UAT (wave 3)
+- [x] 11-03-PLAN.md — SideNav Research link + unit/integration/UI tests + human-verify UAT (wave 3)
 
 ### Phase 12: Background Activity (Tray + Auto-launch)
 

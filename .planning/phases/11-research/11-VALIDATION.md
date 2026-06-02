@@ -1,9 +1,9 @@
 ---
 phase: 11
 slug: research
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-21
 ---
 
