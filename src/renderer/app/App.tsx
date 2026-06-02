@@ -1,5 +1,6 @@
 import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { applyTheme, getThemeMode } from '../hooks/useTheme';
 import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { SideNav } from '../components/SideNav';
 import { Topbar } from '../components/Topbar';
@@ -25,6 +26,9 @@ type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
  * /restore is reachable from the UnlockScreen "forgot password" link and is
  * mounted inside the same MemoryRouter so navigation works.
  */
+// Apply saved theme preference immediately before first render.
+applyTheme(getThemeMode());
+
 export function App(): JSX.Element {
   return (
     <MemoryRouter initialEntries={['/briefing']}>

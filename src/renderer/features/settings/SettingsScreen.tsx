@@ -10,6 +10,7 @@
 import type * as React from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { BackupRestoreSection } from '../onboarding/BackupRestoreSection';
+import { AppearanceSection } from './AppearanceSection';
 import { BehaviourSection } from './BehaviourSection';
 import { BriefingSettingsSection } from './BriefingSettingsSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
@@ -62,6 +63,7 @@ const SECTIONS: ReadonlyArray<NavSection> = [
   {
     title: 'Behaviour',
     tabs: [
+      { to: 'appearance', label: 'Appearance' },
       { to: 'background-activity', label: 'Background activity' },
       { to: 'briefing', label: 'Briefing' },
       { to: 'scheduling-rules', label: 'Scheduling rules' },
@@ -158,6 +160,7 @@ export function SettingsScreen(): JSX.Element {
               </div>
             }
           />
+          <Route path="appearance" element={<AppearanceSection />} />
           <Route path="background-activity" element={<BehaviourSection />} />
           <Route path="insights" element={<InsightsSection />} />
           <Route path="learned-preferences" element={<LearnedPreferencesSection />} />
