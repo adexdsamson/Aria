@@ -19,3 +19,8 @@ build_catalog.js
 # Local/ephemeral Claude Code state (.claude/launch.json stays tracked)
 .claude/settings.local.json
 .claude/worktrees/
+
+# Generated build artifacts + throwaway spikes + local tooling state
+build/config.gypi
+build/spike/
+.planning/memory/
