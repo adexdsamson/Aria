@@ -11,3 +11,11 @@ userData/
 .env
 .env.*
 !.env.example
+
+# Scratch / build catalog files (Phase 13 stray-file disposition)
+catalog_*.json
+build_catalog.js
+
+# Local/ephemeral Claude Code state (.claude/launch.json stays tracked)
+.claude/settings.local.json
+.claude/worktrees/

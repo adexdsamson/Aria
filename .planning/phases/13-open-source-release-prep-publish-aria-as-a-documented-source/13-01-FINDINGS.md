@@ -217,3 +217,25 @@ This is a VS Code / Claude Code debug launch config for serving the landing page
 - `.env.local` never tracked
 - Ed25519 public key is intentionally public (by design)
 - All "high-entropy" strings are either the intended public key or SHA-256 test vectors
+
+---
+
+## Remediation Taken
+
+**Signed off:** 2026-06-02 by repo owner.
+
+**Decisions applied:**
+
+1. **Flag 2 (third-party tester email) — Option B: scrubbed from history.** The owner chose to remove the email rather than keep it. Because the offending commit (`e1c592c`) was already present on the private `origin/master`, a full history rewrite + force-push was required (not just a local scrub).
+   - Tooling: `git filter-repo --replace-text` (installed via `python -m pip install --user git-filter-repo`, v2.47.0).
+   - Replacement rule: `adediran.dbs@gmail.com==>redacted-tester@example.invalid`.
+   - Safety: full `git bundle --all` backup taken first (`../Aria-backup-20260602-presrub.bundle`); uncommitted WIP captured to a patch and re-applied after the rewrite (working tree preserved).
+   - Result: rewrote 393 commits; `git log --all -S "adediran.dbs@gmail.com"` and `git grep` over HEAD both return **zero** matches. HEAD moved `80ea8f0` → `203e489`.
+   - Remote: `git push origin master --force-with-lease=master:7ec391e…` succeeded (`7ec391e...203e489 forced update`). Email is gone from the private GitHub remote.
+   - Residual-risk note: GitHub may keep the old commit reachable by raw SHA in cache until it garbage-collects; negligible for a private, zero-fork repo. Contact GitHub Support to expedite GC if desired.
+
+2. **Stray files — added to `.gitignore`:** `catalog_*.json` and `build_catalog.js` (kept locally, not deleted).
+
+3. **`.claude/` — `launch.json` kept tracked**; `.claude/settings.local.json` and `.claude/worktrees/` added to `.gitignore`.
+
+**Verdict after remediation: SAFE TO PUBLISH.** No secrets in history; the one flagged third-party email has been scrubbed from local and remote history.
