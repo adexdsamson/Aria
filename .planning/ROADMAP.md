@@ -41,7 +41,10 @@
   2. The approval gate rejects a voice-confirm (`approval_path='voice-explicit'`) for forced categories (financial/legal/HR) and `severity==='high'`, forcing the on-screen typed/clicked confirm — verifiable by a failing-then-passing gate test.
   3. The static-grep ratchet fails the build if the voice handler is a direct caller of `send.ts` / `write-event.ts` / `push-actions.ts`, proving voice routes through the same staging the UI uses.
   4. A voice confirm of a low/medium-severity action performs the SAME `approve()` transition the Approvals UI performs, then runs the unchanged unified send adapter (`assertApproved`).
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+  - [ ] 14-01-PLAN.md — Schema + type foundation: ApprovalPath union extension + v134 CHECK-widening migration (.sql + embedded.ts)
+  - [ ] 14-02-PLAN.md — Named voice-forbidden-forced gate branch + dormant voiceConfirm seam + SC2/SC4 tests
+  - [ ] 14-03-PLAN.md — Two static ratchets (chokepoint caller allow-list + named voice ratchet) + ARCHITECTURE.md reconciliation
 
 ### Phase 15: Audio I/O + Model Runtime
 **Goal**: Aria can capture the user's voice, detect speech endpoints, run local transcription that survives packaging, and play synthesized speech — proven on the packaged app on Windows + macOS, without echoing itself or breaking the native-addon ABI.
