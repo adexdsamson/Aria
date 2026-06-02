@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Aria (activity)">
+  <!-- Badged tray glyph (Windows .ico) — gold tile + ivory "A" + an ivory
+       activity dot (ringed) bottom-right. Signals background activity while
+       the vault is sealed. Visibly distinct from tray-glyph.svg. -->
+  <rect x="12" y="12" width="232" height="232" rx="52" ry="52"
+        fill="#B8860B" stroke="#8E6708" stroke-width="2" />
+  <text x="118" y="186"
+        text-anchor="middle"
+        font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+        font-weight="700"
+        font-size="190"
+        fill="#FAFAF8">A</text>
+  <circle cx="198" cy="198" r="44" fill="#FAFAF8" stroke="#8E6708" stroke-width="6" />
+</svg>

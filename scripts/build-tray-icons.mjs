@@ -48,18 +48,24 @@ async function makePng(svgPath, size, outPath) {
 }
 
 async function main() {
-  const iconSvg = path.join(BUILD_DIR, 'icon.svg');
-  const badgedSvg = path.join(BUILD_DIR, 'icon-badged.svg');
+  // Tray-specific glyphs (NOT the app-launcher tile icon.svg, which is a
+  // low-contrast light tile that renders blank at 16px on a dark tray).
+  // Windows: colour gold tile + ivory "A". macOS: monochrome black "A"
+  // Template (AppKit auto-inverts on the menu bar).
+  const winGlyph = path.join(BUILD_DIR, 'tray-glyph.svg');
+  const winGlyphBadged = path.join(BUILD_DIR, 'tray-glyph-badged.svg');
+  const macGlyph = path.join(BUILD_DIR, 'tray-glyph-template.svg');
+  const macGlyphBadged = path.join(BUILD_DIR, 'tray-glyph-badged-template.svg');
 
-  // Windows .ico — plain + badged
-  await makeIco(iconSvg, path.join(BUILD_DIR, 'tray-icon.ico'));
-  await makeIco(badgedSvg, path.join(BUILD_DIR, 'tray-icon-badged.ico'));
+  // Windows .ico — plain + badged (colour gold tile)
+  await makeIco(winGlyph, path.join(BUILD_DIR, 'tray-icon.ico'));
+  await makeIco(winGlyphBadged, path.join(BUILD_DIR, 'tray-icon-badged.ico'));
 
-  // macOS Template PNGs — filename MUST end in `Template` so AppKit auto-inverts
-  await makePng(iconSvg, 22, path.join(BUILD_DIR, 'tray-iconTemplate.png'));
-  await makePng(iconSvg, 44, path.join(BUILD_DIR, 'tray-iconTemplate@2x.png'));
-  await makePng(badgedSvg, 22, path.join(BUILD_DIR, 'tray-iconBadgedTemplate.png'));
-  await makePng(badgedSvg, 44, path.join(BUILD_DIR, 'tray-iconBadgedTemplate@2x.png'));
+  // macOS Template PNGs — monochrome; filename MUST end in `Template` so AppKit auto-inverts
+  await makePng(macGlyph, 22, path.join(BUILD_DIR, 'tray-iconTemplate.png'));
+  await makePng(macGlyph, 44, path.join(BUILD_DIR, 'tray-iconTemplate@2x.png'));
+  await makePng(macGlyphBadged, 22, path.join(BUILD_DIR, 'tray-iconBadgedTemplate.png'));
+  await makePng(macGlyphBadged, 44, path.join(BUILD_DIR, 'tray-iconBadgedTemplate@2x.png'));
 }
 
 main().catch((err) => {

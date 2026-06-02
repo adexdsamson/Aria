@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Aria (activity)">
+  <!-- Badged macOS Template glyph: black "A" + black activity dot, transparent.
+       Black + alpha only (AppKit auto-inverts). -->
+  <text x="118" y="192"
+        text-anchor="middle"
+        font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+        font-weight="700"
+        font-size="200"
+        fill="#000000">A</text>
+  <circle cx="198" cy="198" r="44" fill="#000000" />
+</svg>
