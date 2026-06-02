@@ -47,4 +47,19 @@ Voice is a **modality layered over Aria's existing shipped surfaces** (briefing,
 
 ## Traceability
 
-_(empty — filled by the roadmapper: REQ-ID → phase mapping)_
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VOICE-01 | Phase 15 | Pending |
+| VOICE-02 | Phase 16 | Pending |
+| VOICE-03 | Phase 16 | Pending |
+| VOICE-04 | Phase 15 | Pending |
+| VOICE-05 | Phase 17 | Pending |
+| VOICE-06 | Phase 16 | Pending |
+| VOICE-07 | Phase 15 | Pending |
+| VOICE-08 | Phase 17 | Pending |
+| VOICE-09 | Phase 17 | Pending |
+| VOICE-10 | Phase 14 | Pending |
+| VOICE-11 | Phase 17 | Pending |
+| VOICE-12 | Phase 18 | Pending |
+
+**Coverage:** 12/12 VOICE-* requirements mapped ✓ (no orphans, no duplicates). Phase 19 is a pure performance/quality-polish phase tuning capabilities delivered in 14–18; it carries no net-new requirement.
