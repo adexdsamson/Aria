@@ -89,8 +89,9 @@ Phase 8 is now code-complete (4/4 plans). Next: `/gsd-verify-work 8` once `pnpm 
 | 260523-eaf | Onboarding name personalization — new 5-step wizard with name as Step 1, plaintext profile.json sibling to vault.json, UnlockScreen renders `Good morning, <name>.` with fallback (24 new + 6 updated tests, 30/30 pass) | 2026-05-23 | 74af0e8 | [260523-eaf-onboarding-name-personalization](./quick/260523-eaf-onboarding-name-personalization/) |
 | 260523-f73 | Bake OAuth credentials into production build — `loadEnv` + `define` in `electron.vite.config.ts` inlines `GOOGLE_OAUTH_*` / `MS_OAUTH_*` from `.env.local` into the main bundle; fixes the "Aria can't find Google OAuth credentials" error on packaged builds | 2026-05-23 | 0181d18 | [260523-f73-bake-oauth-creds-into-build](./quick/260523-f73-bake-oauth-creds-into-build/) |
 | 260601-nxh | Fix production `ReferenceError: dbHolder is not defined` crash — `createMainWindow` close handler referenced `dbHolder` (local to `bootstrap()`, out of scope); injected `dbReader` closure mirroring `closeToTrayReader`; esbuild skips typecheck so it shipped. Added static ratchet. | 2026-06-01 | da2d936 | [260601-nxh-fix-dbholder-scope-crash](./quick/260601-nxh-fix-dbholder-scope-crash/) |
+| 260602-e4h | Fix production branding — packaged app showed Electron logo + "electron" taskbar name. Generated `build/icon.{png,ico}` (new `icons:app` script), wired electron-builder per-platform `icon` + extraResources, repointed `resolveBrandIcon` at packaged raster, aligned AUMID `com.aria.app`→`com.aria.desktop`. Visual confirm needs packaged build. | 2026-06-02 | 76fae51 | [260602-e4h-fix-app-branding-icon-and-name](./quick/260602-e4h-fix-app-branding-icon-and-name/) |
 
-Last activity: 2026-06-01 - Completed quick task 260601-nxh: Fix dbHolder scope crash in createMainWindow close handler
+Last activity: 2026-06-02 - Completed quick task 260602-e4h: Fix production app branding (icon + Windows identity)
 
 ## Workflow Config
 
