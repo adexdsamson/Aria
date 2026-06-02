@@ -12,7 +12,22 @@ A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actio
 
 **v1.0 — ✅ SHIPPED 2026-06-02** (Phases 1–13, incl. 08.1; ~416 commits over ~19 days). The full v1 vision landed: encrypted local-first foundation + hybrid LLM router, daily briefing, approval-gated email/calendar/meeting/task actions, Outlook parity, RAG + Knowledge Folders, insights + weekly recap, subscription/trial, editorial UI, web research, background tray, and open-source release prep. Milestone audit = `tech_debt` (integration INTACT, no blockers). See [MILESTONES.md](./MILESTONES.md) and [milestones/v1.0-ROADMAP.md](./milestones/v1.0-ROADMAP.md).
 
-**Carried tech debt:** Phase 9 design walkthrough, Phase 2/8 live/release verification, macOS tray UAT, dark-mode `--aria-gray-*` gap, typecheck-on-WIP. **Next milestone:** TBD via `/gsd-new-milestone` (fresh requirements; phase numbering continues from 14).
+**Carried tech debt:** Phase 9 design walkthrough, Phase 2/8 live/release verification, macOS tray UAT, dark-mode `--aria-gray-*` gap, typecheck-on-WIP.
+
+## Current Milestone: v2.0 — Voice Interface
+
+**Goal:** Aria becomes voice-driven — a full conversational, talk-to-Aria assistant over the existing briefing / triage / scheduling / ask / drafting surfaces.
+
+**Target features:**
+- **Hybrid audio (local-first default, cloud opt-in):** on-device STT (Whisper large-v3-turbo, MIT) + on-device TTS (Kokoro-82M / Chatterbox-Turbo) by default; consent-gated cloud opt-in for max quality. Mirrors the existing hybrid-LLM-routing pattern.
+- **Full conversational duplex** via a local cascading pipeline (STT → LLM → TTS) with turn-taking + barge-in.
+- **Both activations:** push-to-talk + opt-in always-listening wake-word.
+- **Voice drives real work:** spoken briefing/answer playback + voice-driven triage/scheduling/ask/drafting; approval-gated actions get a voice-confirm flow (the `assertApproved` chokepoint still holds).
+- **Consent & disclosure UX** before any audio leaves the machine on the cloud opt-in path.
+
+**Deferred to v2.1+:** multi-party meeting coordination · advanced reports + predictive analytics · extensibility/plugins. (Phase numbering continues from 14.)
+
+**Model research (2026):** STT — Whisper large-v3-turbo (MIT, on-device via whisper.cpp) is the local default; NVIDIA Canary/Parakeet are faster/heavier (GPU). TTS — Kokoro-82M (#1 TTS Arena, permissive, tiny) + Chatterbox-Turbo (beat ElevenLabs 65% in blind tests, sub-200ms); avoid XTTS-v2 (CPML non-commercial). True single-model duplex (Moshi) needs A100-class GPU → use a local cascading pipeline instead.
 
 ## Requirements
 
@@ -108,6 +123,7 @@ A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actio
 | Defer voice, health, call/VoIP, CRM, BI, IoT to v2 or cut | Solo dev cannot ship all 6 ABD pillars in v1 without compromising any | Pending |
 | User-in-the-loop for every send and material calendar change | Trust beats automation. One surprising send destroys the product reputation | Pending |
 | No named design partner at start | Acceptable risk; user will dogfood and recruit during development | Revisit - recruit a real SMB-exec user before Phase 3 |
+| v2.0 voice audio = hybrid (local-first default + consent-gated cloud opt-in) | 2026 research: local models (Whisper large-v3-turbo MIT; Kokoro-82M / Chatterbox-Turbo) now match cloud quality, so local-first is preserved as default rather than pivoting to cloud. Cloud opt-in mirrors existing hybrid-LLM routing. | v2.0 |
 
 ## Evolution
 
@@ -127,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-06-02 after v1.0 milestone completion*
+*Last updated: 2026-06-02 — started milestone v2.0 (Voice Interface)*

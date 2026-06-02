@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: milestone_complete
-last_updated: 2026-06-02T14:44:08.398Z
+milestone: v2.0
+milestone_name: Voice Interface
+status: planning
+last_updated: "2026-06-02T16:24:39.479Z"
 last_activity: 2026-06-02
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 52
-  completed_plans: 52
-  percent: 100
-stopped_at: v1.0 SHIPPED + archived (tag v1.0). Next: /gsd-new-milestone to start the next milestone.
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -108,3 +107,10 @@ Last activity: 2026-06-02 - Completed quick task 260602-m2g: visible system-tray
 - Plan check: Yes
 - Verifier: Yes
 - Model profile: Balanced (Sonnet)
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-02 — Milestone v2.0 started
