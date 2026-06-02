@@ -71,6 +71,10 @@
   --ivory: #FAFAF8;
   --ivory-deep: #F5F3F0;
   --paper: #FFFFFF;
+  /* Theme-aware surface (tracks --paper across light/dark) + fixed on-gold text.
+     Replaces the undefined `var(--bg, #fff)` that rendered white in dark mode. */
+  --bg: var(--paper);
+  --on-gold: #FFFFFF;
   --ink: #1A1A1A;
   --ink-soft: #2A2826;
   --gray: #6B6B6B;
@@ -121,6 +125,18 @@
     --aria-gray-800: #e4e4e7;
     --aria-gray-900: #f4f4f5;
     --aria-gray-950: #fafafa;
+
+    /* Editorial palette — warm dark mode */
+    --ivory:      #131210;
+    --ivory-deep: #0D0C0A;
+    --paper:      #1C1A17;
+    --ink:        #EDE8E0;
+    --ink-soft:   #C8C3BA;
+    --gray:       #7A7670;
+    --gray-soft:  #5A5652;
+    --gray-faint: #34312D;
+    --rule:       #2A2724;
+    --rule-strong:#3A3733;
   }
 }
 
@@ -131,6 +147,39 @@
   --aria-border: #27272a;
   --aria-accent: #7aa2f7;
   --aria-accent-fg: #0b1220;
+
+  /* Editorial palette — warm dark mode */
+  --ivory:      #131210;
+  --ivory-deep: #0D0C0A;
+  --paper:      #1C1A17;
+  --ink:        #EDE8E0;
+  --ink-soft:   #C8C3BA;
+  --gray:       #7A7670;
+  --gray-soft:  #5A5652;
+  --gray-faint: #34312D;
+  --rule:       #2A2724;
+  --rule-strong:#3A3733;
+}
+
+:root[data-theme='light'] {
+  --aria-bg: #ffffff;
+  --aria-fg: #18181b;
+  --aria-muted-fg: #52525b;
+  --aria-border: #e4e4e7;
+  --aria-accent: #5b8def;
+  --aria-accent-fg: #ffffff;
+
+  /* Editorial palette — light (explicit override) */
+  --ivory:      #FAFAF8;
+  --ivory-deep: #F5F3F0;
+  --paper:      #FFFFFF;
+  --ink:        #1A1A1A;
+  --ink-soft:   #2A2826;
+  --gray:       #6B6B6B;
+  --gray-soft:  #8A8784;
+  --gray-faint: #C7C2BB;
+  --rule:       #E8E4DF;
+  --rule-strong:#D6D1C8;
 }
 
 html,

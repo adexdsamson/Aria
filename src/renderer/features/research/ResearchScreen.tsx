@@ -146,7 +146,7 @@ export function ResearchScreen(): JSX.Element {
                 fontSize: 11,
                 letterSpacing: '0.06em',
                 background: 'var(--gold)',
-                color: 'var(--bg, #fff)',
+                color: 'var(--on-gold, #fff)',
                 border: 'none',
                 borderRadius: 5,
                 padding: '9px 0',
@@ -194,7 +194,7 @@ export function ResearchScreen(): JSX.Element {
                       onClick={() => void approveSuggestion(j.id)}
                       style={{
                         fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: '0.05em',
-                        background: 'var(--gold)', color: 'var(--bg)',
+                        background: 'var(--gold)', color: 'var(--on-gold, #fff)',
                         border: 'none', borderRadius: 3, padding: '3px 9px', cursor: 'pointer',
                       }}
                     >Approve</button>
@@ -394,7 +394,7 @@ export function ResearchScreen(): JSX.Element {
                         fontSize: 11,
                         letterSpacing: '0.04em',
                         background: view === v ? 'var(--gold)' : 'transparent',
-                        color: view === v ? 'var(--bg)' : 'var(--ink-soft, #6b6455)',
+                        color: view === v ? 'var(--on-gold, #fff)' : 'var(--ink-soft, #6b6455)',
                         border: 'none',
                         borderRadius: 4,
                         padding: '5px 14px',
@@ -493,7 +493,7 @@ export function ResearchScreen(): JSX.Element {
                   fontSize: 11,
                   letterSpacing: '0.06em',
                   background: 'var(--gold)',
-                  color: 'var(--bg)',
+                  color: 'var(--on-gold, #fff)',
                   border: 'none',
                   borderRadius: 5,
                   padding: '9px 22px',

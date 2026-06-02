@@ -262,7 +262,7 @@ function ResearchApiKeyRow({
             fontFamily: 'var(--f-mono)',
             fontSize: 12,
             background: keyValue.trim() ? 'var(--gold)' : 'var(--rule)',
-            color: keyValue.trim() ? 'var(--bg)' : 'var(--gray-soft)',
+            color: keyValue.trim() ? 'var(--on-gold, #fff)' : 'var(--gray-soft)',
             border: 'none',
             borderRadius: 4,
             padding: '7px 16px',

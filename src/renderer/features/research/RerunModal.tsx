@@ -163,7 +163,7 @@ export function RerunModal({ feedbackItems, onClose, onRerun }: RerunModalProps)
                 fontFamily: 'var(--f-mono)',
                 fontSize: 12,
                 background: 'var(--gold)',
-                color: 'var(--bg)',
+                color: 'var(--on-gold, #fff)',
                 border: 'none',
                 borderRadius: 4,
                 padding: '8px 20px',

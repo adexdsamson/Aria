@@ -119,7 +119,7 @@ export function FeedbackBar({ reportId, sectionId }: FeedbackBarProps): JSX.Elem
               fontFamily: 'var(--f-mono)',
               fontSize: 11,
               background: 'var(--gold)',
-              color: 'var(--bg)',
+              color: 'var(--on-gold, #fff)',
               border: 'none',
               borderRadius: 4,
               padding: '3px 10px',
