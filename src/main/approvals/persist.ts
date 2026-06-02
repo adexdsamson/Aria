@@ -22,7 +22,7 @@ type Db = Database.Database;
 export type ApprovalKind = 'email_send' | 'calendar_change' | 'task_batch';
 export type CalendarAction = 'move' | 'create' | 'find-time';
 export type RecurringScope = 'this' | 'future' | 'all';
-export type ApprovalPath = 'explicit' | 'silent';
+export type ApprovalPath = 'explicit' | 'silent' | 'voice-explicit';
 export type Severity = 'low' | 'med' | 'high';
 export type Routed = 'local' | 'frontier' | 'hybrid';
 
