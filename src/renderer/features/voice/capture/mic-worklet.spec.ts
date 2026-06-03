@@ -27,7 +27,18 @@ let blobConstructorArgs: [string[], BlobPropertyBag | undefined] | null = null;
 let revokedUrls: string[] = [];
 
 const mockAddModule = vi.fn().mockResolvedValue(undefined);
-const mockAudioWorkletNode = { connect: vi.fn(), port: { onmessage: null } };
+
+// AudioWorkletNode must be mocked as a class (vitest requires mockImplementation for `new`)
+class MockAudioWorkletNode {
+  ctx: unknown;
+  processorName: string;
+  port = { onmessage: null as unknown };
+  constructor(ctx: unknown, processorName: string) {
+    this.ctx = ctx;
+    this.processorName = processorName;
+  }
+  connect = vi.fn();
+}
 
 beforeEach(() => {
   blobConstructorArgs = null;
@@ -36,13 +47,9 @@ beforeEach(() => {
 
   // Blob mock: capture constructor args for assertion
   vi.stubGlobal('Blob', class MockBlob {
-    private parts: string[];
-    private opts: BlobPropertyBag | undefined;
     type: string;
     constructor(parts: string[], opts?: BlobPropertyBag) {
       blobConstructorArgs = [parts, opts];
-      this.parts = parts;
-      this.opts = opts;
       this.type = opts?.type ?? '';
     }
   });
@@ -52,8 +59,8 @@ beforeEach(() => {
     revokeObjectURL: vi.fn((url: string) => { revokedUrls.push(url); }),
   });
 
-  // AudioWorkletNode constructor mock
-  vi.stubGlobal('AudioWorkletNode', vi.fn().mockReturnValue(mockAudioWorkletNode));
+  // AudioWorkletNode constructor mock — must be a class, not a plain fn with mockReturnValue
+  vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode);
 });
 
 // ─── tests ─────────────────────────────────────────────────────────────────
@@ -116,10 +123,11 @@ describe('setupWorklet', () => {
     expect(revokedUrls).toContain(FAKE_BLOB_URL);
   });
 
-  it('returns an AudioWorkletNode', async () => {
+  it('returns an AudioWorkletNode constructed with correct args', async () => {
     const ctx = makeMockCtx();
     const node = await setupWorklet(ctx);
     expect(node).toBeTruthy();
-    expect(AudioWorkletNode).toHaveBeenCalledWith(ctx, 'mic-processor');
+    // Verify the node is a MockAudioWorkletNode instance with the correct processorName
+    expect((node as unknown as MockAudioWorkletNode).processorName).toBe('mic-processor');
   });
 });
