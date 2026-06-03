@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-03T21:20:00.000Z"
+last_updated: "2026-06-03T22:25:00.000Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 19
 ---
 
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 6 of 9
+Plan: 6 of 9 (15-05 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 6 complete (renderer TTS useKokoroPlayer + voice session store + half-duplex gate — VOICE-07/SC3 automated proxy green)
+**Plan:** 6 complete (voice IPC wiring: registerVoiceHandlers + bootstrap sidecar/download/powerMonitor lifecycle — VOICE-01/04)
 **Status:** Executing Phase 15
 **Last activity:** 2026-06-03
 
@@ -52,6 +52,9 @@ Plan: 6 of 9
 - Store pattern (15-06): createVoiceSessionStore() observable factory (Zustand not installed) — pub/sub achieves same contract
 - half-duplex.spec placement (15-06): tests/unit/renderer/voice/ (not tests/unit/voice/) — matches vitest renderer project include glob
 - startTurn() returns boolean (15-06): false when blocked (speaking state), true when started — callers can check
+- Pre-unlock voice stubs (15-05): VOICE_FEED_AUDIO/DOWNLOAD/GET_STATUS/CANCEL stubs in ipc/index.ts replaced at bootstrap by real registerVoiceHandlers; voiceEmitter forward-ref bound post-mainWindow
+- IPC db-null skip trap (15-05): knowledge channels stubs always register + add to skip pre-unlock; entitlement else-branch covers all 5 channels
+- Handler-count invariant (15-05): 149/149 CHANNELS registered in registerHandlers — push-event no-op stubs + pre-unlock stubs close the gap
 
 ## Next Action
 
