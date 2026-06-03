@@ -75,8 +75,27 @@ const deviceChangeListeners = new Map<string, EventListenerOrEventListenerObject
 let mockGetUserMedia: ReturnType<typeof vi.fn>;
 let mockAddEventListener: ReturnType<typeof vi.fn>;
 let mockRemoveEventListener: ReturnType<typeof vi.fn>;
-let MockAudioContext: ReturnType<typeof vi.fn>;
 let currentFakeCtx: ReturnType<typeof fakeAudioContext>;
+
+// AudioContext must be a real class for `new AudioContext(...)` to work
+class FakeAudioContext {
+  sampleRate: number;
+  state: AudioContextState = 'running';
+  destination = {};
+  close: ReturnType<typeof vi.fn>;
+  createMediaStreamSource: ReturnType<typeof vi.fn>;
+  audioWorklet: { addModule: ReturnType<typeof vi.fn> };
+
+  constructor(opts?: { sampleRate?: number }) {
+    this.sampleRate = opts?.sampleRate ?? 44100;
+    this.close = vi.fn().mockResolvedValue(undefined);
+    const source = { connect: vi.fn() };
+    this.createMediaStreamSource = vi.fn().mockReturnValue(source);
+    this.audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+    // Track this instance as currentFakeCtx for assertion
+    currentFakeCtx = this as unknown as ReturnType<typeof fakeAudioContext>;
+  }
+}
 
 beforeEach(() => {
   deviceChangeListeners.clear();
@@ -97,9 +116,9 @@ beforeEach(() => {
     },
   });
 
-  currentFakeCtx = fakeAudioContext();
-  MockAudioContext = vi.fn().mockImplementation(() => currentFakeCtx);
-  vi.stubGlobal('AudioContext', MockAudioContext);
+  // Reset currentFakeCtx (will be set by FakeAudioContext constructor)
+  currentFakeCtx = null as unknown as ReturnType<typeof fakeAudioContext>;
+  vi.stubGlobal('AudioContext', FakeAudioContext);
 });
 
 afterEach(() => {
@@ -139,7 +158,9 @@ describe('createMicCapture', () => {
       const capture = createMicCapture({ onPcmFrame: vi.fn(), onError: vi.fn() });
       await capture.start();
 
-      expect(MockAudioContext).toHaveBeenCalledWith({ sampleRate: 16000 });
+      // FakeAudioContext class records the sampleRate from opts
+      expect(currentFakeCtx).toBeTruthy();
+      expect(currentFakeCtx.sampleRate).toBe(16000);
       await capture.stop();
     });
 
