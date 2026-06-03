@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: ready_to_plan
-last_updated: 2026-06-03T01:57:04.703Z
-last_activity: 2026-06-02
+status: planning
+last_updated: "2026-06-03T02:50:05.666Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 55
-  percent: 0
-stopped_at: Phase 14 complete (3/3) — ready to discuss Phase 15
+  completed_plans: 3
+  percent: 17
 ---
 
 # State
