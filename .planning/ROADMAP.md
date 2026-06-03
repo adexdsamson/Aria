@@ -62,7 +62,7 @@
   - [x] 15-03-PLAN.md — Resumable Whisper model download manager (NDH + powerMonitor + readiness flip)
   - [x] 15-04-PLAN.md — Renderer mic capture: getUserMedia + inline-Blob AudioWorklet + 16kHz + device hot-swap
   - [ ] 15-05-PLAN.md — Voice IPC handlers (feedAudio→sidecar→transcript push) + bootstrap powerMonitor wiring
-  - [ ] 15-06-PLAN.md — Real Kokoro TTS playback + Zustand session store + half-duplex micGated gate (SC3)
+  - [x] 15-06-PLAN.md — Real Kokoro TTS playback + Zustand session store + half-duplex micGated gate (SC3)
   - [ ] 15-07-PLAN.md — Mic-state surface: VoiceStatusDot + VoiceHUDBand + PTT + App/Topbar wiring
   - [ ] 15-08-PLAN.md — Model-download UX: onboarding step + lazy modal + disabled-PTT affordance (SC4)
   - [ ] 15-09-PLAN.md — Packaging: extraResources binary + mac.binaries signing + packaged-launch E2E (SC2) + RAM ceiling
@@ -123,7 +123,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
-| 15. Audio I/O + Model Runtime | 4/9 | In Progress|  |
+| 15. Audio I/O + Model Runtime | 5/9 | In Progress|  |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
