@@ -13,6 +13,8 @@ import { RestoreScreen } from '../features/onboarding/RestoreScreen';
 import { EntitlementProvider } from '../features/entitlement/EntitlementProvider';
 import { TrialBanner } from '../features/entitlement/TrialBanner';
 import { AppLogo } from '../components/editorial/Logo';
+import { VoiceHUDBand } from '../features/voice/VoiceHUDBand';
+import { useVoiceSession } from '../features/voice/useVoiceSession';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -103,6 +105,8 @@ function AppShell(): JSX.Element {
             color: 'var(--ink)',
           }}
         >
+          {/* Phase 15 — VoiceHUDBand: in-flow, collapses to 0 when idle (D-15) */}
+          <VoiceHUDBandConnected />
           <TrialBanner />
           <Topbar onLocked={() => void refresh()} />
           <div style={{ flex: '1 1 auto', overflowY: 'auto', minWidth: 0 }}>
@@ -225,5 +229,17 @@ function shellStyle(): React.CSSProperties {
     backgroundColor: 'var(--aria-bg)',
     color: 'var(--aria-fg)',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15 / Plan 15-07 — VoiceHUDBand connector
+//
+// Reads voiceState + liveTranscript from the session store and passes them
+// to VoiceHUDBand. Mounted unconditionally in the App shell's main column,
+// immediately before TrialBanner (D-15). Collapses to 0-height when idle.
+// ---------------------------------------------------------------------------
+function VoiceHUDBandConnected(): JSX.Element {
+  const { voiceState, liveTranscript } = useVoiceSession();
+  return <VoiceHUDBand state={voiceState} transcript={liveTranscript} />;
 }
 

@@ -7,10 +7,16 @@
  * The right cluster is: ⌘K trigger button → bell (decorative, D-06) → Avatar.
  * The ⌘K trigger dispatches a global `aria:cmdk-toggle` CustomEvent that
  * CommandPalette listens for in addition to its native keydown handler.
+ *
+ * Phase 15 / Plan 15-07 — Right cluster updated (D-14/D-15):
+ *   ⌘K → bell → VoicePTTButton (compact 28px) → VoiceStatusDot (6px) → AvatarMenu
  */
 import { useLocation } from 'react-router-dom';
 import { KbdHint } from './editorial';
 import { AvatarMenu } from './AvatarMenu';
+import { VoicePTTButton } from '../features/voice/VoicePTTButton';
+import { VoiceStatusDot } from '../features/voice/VoiceStatusDot';
+import { useVoiceSession } from '../features/voice/useVoiceSession';
 
 export interface TopbarProps {
   /** Fired after the user logs out via the avatar menu. */
@@ -76,6 +82,7 @@ export function emitCmdKToggle(): void {
 export function Topbar({ onLocked }: TopbarProps = {}): JSX.Element {
   const location = useLocation();
   const { eyebrow, title } = titleForPath(location.pathname);
+  const { voiceState } = useVoiceSession();
 
   return (
     <div
@@ -172,6 +179,20 @@ export function Topbar({ onLocked }: TopbarProps = {}): JSX.Element {
             background: 'var(--gold)',
           }}
         />
+      </span>
+
+      {/* Phase 15 — Voice cluster: PTT compact + StatusDot (D-14/D-15)
+          Order: ⌘K → bell → PTT(28px) → VoiceStatusDot(6px) → AvatarMenu
+          Wrapped in a flex span with 8px gap (sm token, UI-SPEC §Topbar) */}
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        <VoicePTTButton compact testId="aria-topbar-ptt" />
+        <VoiceStatusDot state={voiceState} />
       </span>
 
       <AvatarMenu initials="EV" onLocked={onLocked} />

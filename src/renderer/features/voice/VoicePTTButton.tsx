@@ -91,6 +91,8 @@ export interface VoicePTTButtonProps {
   _testSession?: SessionState;
   /** Compact 28×28px icon-only variant for the Topbar slot. */
   compact?: boolean;
+  /** Custom data-testid (defaults to "voice-ptt-button"). */
+  testId?: string;
 }
 
 // ─── Inner component (always gets a session — no conditional hook) ────────────
@@ -98,9 +100,11 @@ export interface VoicePTTButtonProps {
 function VoicePTTButtonCore({
   session,
   compact = false,
+  testId = 'voice-ptt-button',
 }: {
   session: SessionState;
   compact?: boolean;
+  testId?: string;
 }): JSX.Element {
   const holdActiveRef = useRef(false);
   const gated = isGated(session);
@@ -188,7 +192,7 @@ function VoicePTTButtonCore({
       >
         <button
           type="button"
-          data-testid="voice-ptt-button"
+          data-testid={testId}
           aria-label="Push to talk — hold Space or click to toggle"
           aria-disabled={gated ? 'true' : undefined}
           title={gated ? 'Aria is speaking' : undefined}
@@ -241,8 +245,8 @@ function VoicePTTButtonCore({
  * In production, calls useVoiceSession() to get the live session store.
  * In tests, accepts _testSession to inject a mock session without vi.mock.
  */
-export function VoicePTTButton({ _testSession, compact }: VoicePTTButtonProps): JSX.Element {
+export function VoicePTTButton({ _testSession, compact, testId }: VoicePTTButtonProps): JSX.Element {
   const liveSession = useVoiceSession();
   const session = _testSession ?? liveSession;
-  return <VoicePTTButtonCore session={session} compact={compact} />;
+  return <VoicePTTButtonCore session={session} compact={compact} testId={testId} />;
 }
