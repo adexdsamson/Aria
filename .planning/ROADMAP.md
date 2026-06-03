@@ -60,7 +60,7 @@
   - [x] 15-01-PLAN.md — Wave 0 foundation: CSP blob: fix + voice-types/IPC contract + settings-KV model-readiness prefs + no-cloud ratchet
   - [x] 15-02-PLAN.md — STT whisper.cpp CLI sidecar manager + WAV writer + no-native-addon ratchet (SC2 by construction)
   - [x] 15-03-PLAN.md — Resumable Whisper model download manager (NDH + powerMonitor + readiness flip)
-  - [ ] 15-04-PLAN.md — Renderer mic capture: getUserMedia + inline-Blob AudioWorklet + 16kHz + device hot-swap
+  - [x] 15-04-PLAN.md — Renderer mic capture: getUserMedia + inline-Blob AudioWorklet + 16kHz + device hot-swap
   - [ ] 15-05-PLAN.md — Voice IPC handlers (feedAudio→sidecar→transcript push) + bootstrap powerMonitor wiring
   - [ ] 15-06-PLAN.md — Real Kokoro TTS playback + Zustand session store + half-duplex micGated gate (SC3)
   - [ ] 15-07-PLAN.md — Mic-state surface: VoiceStatusDot + VoiceHUDBand + PTT + App/Topbar wiring
@@ -123,7 +123,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
-| 15. Audio I/O + Model Runtime | 3/9 | In Progress|  |
+| 15. Audio I/O + Model Runtime | 4/9 | In Progress|  |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
