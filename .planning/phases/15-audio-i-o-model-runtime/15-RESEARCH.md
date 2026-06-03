@@ -88,7 +88,7 @@ The three most consequential research findings that the planner MUST account for
 | Mic-state indicator (StatusDot) | Renderer (Topbar right cluster) | — | D-14; uses existing StatusDot editorial component |
 | VoiceHUDBand (live transcript + state) | Renderer (App shell, TrialBanner slot) | — | D-15; in-flow, no z-index conflict |
 | Model download manager | Main process | — | Needs `userData` path, `powerMonitor`, `http` Range; D-09 |
-| Model-readiness pref | SQLite `user_prefs` (migration ≥ 136) | — | D-08; persisted across restarts |
+| Model-readiness pref | SQLite `settings(k,v)` KV via `src/main/voice/prefs.ts` (no migration) | — | D-08; persisted across restarts |
 | Onboarding voice step | Renderer (OnboardingWizard) | — | D-07; appended step after existing password step |
 
 ---
@@ -591,19 +591,22 @@ Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **macOS Binary CI Build Feasibility**
+   - RESOLVED: handled by the blocking human-action checkpoint in Plan 15-09 Task 2 (CI-build whisper-cli, verify `otool -L` self-containment, then electron-builder signing) before the packaged build runs.
    - What we know: No official macOS CLI binary in whisper.cpp releases. cmake builds work. bizenlabs provides third-party builds.
    - What's unclear: Does a cmake-built `whisper-cli` on macOS produce a self-contained binary (no external dylib deps) or does it require Metal.framework linkage? Does electron-builder's `binaries` array handle arbitrary executables or only those inside `Contents/MacOS`?
    - Recommendation: Wave 0 spike task — build whisper-cli on a macOS runner and verify `otool -L` shows only system frameworks, then test electron-builder signing on a test app before the full phase.
 
 2. **Electron 41 Chromium WebGPU availability**
+   - RESOLVED: made irrelevant by the webgpu→wasm device fallback in Plan 15-06 — Kokoro probes `navigator.gpu` at runtime and degrades to WASM, so default WebGPU availability is no longer a blocker.
    - What we know: Electron 41 uses Chromium ~130. WebGPU was in origin-trial then graduated to GA in Chrome 113+.
    - What's unclear: Does Electron 41's Chromium 130 expose WebGPU to renderer by default? Is `navigator.gpu` available in production build?
    - Recommendation: In Wave 0, render a quick feature-probe: `typeof navigator.gpu !== 'undefined'`. Use result to set Kokoro device.
 
 3. **CSP `blob:` for AudioWorklet**
+   - RESOLVED: addressed by Plan 15-01 Task 3, which reads the `src/main/index.ts` CSP and ensures `blob:` is present in `script-src` for the AudioWorklet Blob URL.
    - What we know: Electron sets a custom CSP via `onHeadersReceived`. The worklet Blob URL requires `blob:` in `script-src`.
    - What's unclear: Does Aria's current CSP allow `blob:` or does it use a restrictive default?
    - Recommendation: Wave 0 task — read `src/main/index.ts` CSP configuration and verify or add `blob:` to `script-src`.
@@ -773,7 +776,7 @@ Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
 | Architecture (sidecar, worklet, TTS) | HIGH | Design verified against constraints; edge cases ASSUMED |
 | RAM ceiling | LOW | Requires on-device measurement; dev machine is 8 GB |
 
-### Open Questions
-- Does Aria's CSP allow `blob:` in `script-src`? (read `src/main/index.ts` in Wave 0)
-- Is WebGPU available in Electron 41 renderer? (probe `navigator.gpu` in Wave 0)
-- Does cmake-built macOS whisper-cli binary have external dylib deps? (verify `otool -L` in CI spike)
+### Open Questions (RESOLVED)
+- Does Aria's CSP allow `blob:` in `script-src`? — RESOLVED by Plan 15-01 Task 3 (CSP `script-src` gets `blob:`).
+- Is WebGPU available in Electron 41 renderer? — RESOLVED: made irrelevant by the Plan 15-06 webgpu→wasm Kokoro fallback.
+- Does cmake-built macOS whisper-cli binary have external dylib deps? — RESOLVED by the blocking Plan 15-09 Task 2 human-action checkpoint (`otool -L` verification before signing).
