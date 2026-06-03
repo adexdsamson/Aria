@@ -1,4 +1,12 @@
 PRAGMA foreign_keys=OFF;
+-- legacy_alter_table=ON makes RENAME behave as in SQLite < 3.25: it does NOT
+-- rewrite references to `approval` inside OTHER objects (child-table foreign
+-- keys, views, triggers). Without this, RENAME approval -> approval_old silently
+-- repoints send_log / calendar_action_log / meeting_action FKs and the
+-- action_audit_log view at approval_old, which we then DROP — leaving dangling
+-- references that fail every child insert once foreign_keys=ON. (migration 135
+-- repairs the equivalent damage migration 124 inflicted before this guard existed.)
+PRAGMA legacy_alter_table=ON;
 BEGIN;
 
 ALTER TABLE approval RENAME TO approval_old;
@@ -76,4 +84,5 @@ CREATE INDEX IF NOT EXISTS idx_approval_provider_account ON approval(provider_ke
 CREATE INDEX IF NOT EXISTS idx_approval_meeting_note ON approval(meeting_note_id);
 
 COMMIT;
+PRAGMA legacy_alter_table=OFF;
 PRAGMA foreign_keys=ON;
