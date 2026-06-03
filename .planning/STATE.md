@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-03T19:31:35.717Z"
+last_updated: "2026-06-03T20:50:00.000Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 12
-  completed_plans: 5
+  completed_plans: 7
   percent: 17
 ---
 
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 2 complete (STT sidecar manager + WAV writer + no-native-addon ratchet)
+**Plan:** 3 complete (model download manager — NDH resumable + size disclosure + powerMonitor + readiness flip)
 **Status:** Executing Phase 15
 **Last activity:** 2026-06-03
 
