@@ -27,6 +27,8 @@ A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actio
 
 **Deferred to v2.1+:** multi-party meeting coordination · advanced reports + predictive analytics · extensibility/plugins. (Phase numbering continues from 14.)
 
+**Progress:** Phase 14 (Voice Safety / Confirm Contract — VOICE-10) ✅ complete 2026-06-03. The voice-to-approval safety contract is in place before any fluency work: `approval_path='voice-explicit'` value + the named `voice-forbidden-forced` hard gate (voice can never authorize forced/high-severity actions), a dormant headless `voiceConfirm()` seam routing through the same `assertApproved` chokepoint, and two static ratchets fencing the write-module chokepoints. (Post-merge integration also surfaced and fixed a latent Phase-6 DB bug — dangling `approval_old` FKs from migration 124 — via migration 135.) Next: Phase 15 (Audio I/O + Model Runtime).
+
 **Model research (2026):** STT — Whisper large-v3-turbo (MIT, on-device via whisper.cpp) is the local default; NVIDIA Canary/Parakeet are faster/heavier (GPU). TTS — Kokoro-82M (#1 TTS Arena, permissive, tiny) + Chatterbox-Turbo (beat ElevenLabs 65% in blind tests, sub-200ms); avoid XTTS-v2 (CPML non-commercial). True single-model duplex (Moshi) needs A100-class GPU → use a local cascading pipeline instead.
 
 ## Requirements
@@ -143,4 +145,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-06-02 — started milestone v2.0 (Voice Interface)*
+*Last updated: 2026-06-03 — Phase 14 (Voice Safety / Confirm Contract) complete*
