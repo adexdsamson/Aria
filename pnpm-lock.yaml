@@ -92,6 +92,9 @@ importers:
       node-cron:
         specifier: ^4.0.0
         version: 4.2.1
+      node-downloader-helper:
+        specifier: ^2.1.11
+        version: 2.1.11
       ollama-ai-provider-v2:
         specifier: ^3.0.0
         version: 3.5.1(ai@6.0.185(zod@4.4.3))(zod@4.4.3)
@@ -3566,6 +3569,11 @@ packages:
   node-cron@4.2.1:
     resolution: {integrity: sha512-lgimEHPE/QDgFlywTd8yTR61ptugX3Qer29efeyWw2rv259HtGBNn1vZVmp8lB9uo9wC0t/AT4iGqXxia+CJFg==}
     engines: {node: '>=6.0.0'}
+
+  node-downloader-helper@2.1.11:
+    resolution: {integrity: sha512-882fH2C9AWdiPCwz/2beq5t8FGMZK9Dx8TJUOIxzMCbvG7XUKM5BuJwN5f0NKo4SCQK6jR4p2TPm54mYGdGchQ==}
+    engines: {node: '>=14.18'}
+    hasBin: true
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
@@ -8600,6 +8608,8 @@ snapshots:
       semver: 7.8.0
 
   node-cron@4.2.1: {}
+
+  node-downloader-helper@2.1.11: {}
 
   node-fetch@2.7.0:
     dependencies:

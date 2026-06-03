@@ -67,6 +67,7 @@
     "jose": "^6.2.3",
     "mammoth": "^1.12.0",
     "node-cron": "^4.0.0",
+    "node-downloader-helper": "^2.1.11",
     "ollama-ai-provider-v2": "^3.0.0",
     "p-queue": "^9.0.0",
     "papaparse": "^5.5.3",
