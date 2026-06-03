@@ -22,6 +22,11 @@ import type { ChildProcess } from 'node:child_process';
 
 // Will fail until sidecar-manager.ts is created (TDD RED)
 import { SttSidecarManager, resolveBinaryPath } from './sidecar-manager';
+import type { SttSidecarManagerOptions } from './sidecar-manager';
+
+// Helper: cast a vi.fn to the injectable SpawnFn type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpawnFn = SttSidecarManagerOptions['spawnFn'] & ((...args: any[]) => ChildProcess);
 
 // ─── Fake ChildProcess factory ────────────────────────────────────────────────
 
@@ -116,10 +121,8 @@ describe('resolveBinaryPath', () => {
 
 describe('SttSidecarManager — success path', () => {
   let manager: SttSidecarManager;
-  const spawnCalls: { cmd: string; args: string[] }[] = [];
 
   afterEach(async () => {
-    spawnCalls.splice(0);
     await manager?.dispose();
   });
 
@@ -129,7 +132,7 @@ describe('SttSidecarManager — success path', () => {
 
     const spawnFn = vi.fn((_cmd: string, _args: string[]) => {
       return makeFakeChild({ stdout: jsonOutput, exitCode: 0 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -151,7 +154,7 @@ describe('SttSidecarManager — success path', () => {
     const spawnFn = vi.fn((cmd: string, args: string[]) => {
       spawnArgs.push({ cmd, args });
       return makeFakeChild({ stdout: jsonOutput, exitCode: 0 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -183,14 +186,14 @@ describe('SttSidecarManager — success path', () => {
     let capturedWavPath = '';
     let wavExistedDuringSpawn = false;
 
-    const spawnFn = vi.fn((cmd: string, args: string[]) => {
+    const spawnFn = vi.fn((_cmd: string, args: string[]) => {
       const fIdx = args.indexOf('-f');
       if (fIdx >= 0) {
         capturedWavPath = args[fIdx + 1];
         wavExistedDuringSpawn = fs.existsSync(capturedWavPath);
       }
       return makeFakeChild({ stdout: jsonOutput, exitCode: 0 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -218,7 +221,7 @@ describe('SttSidecarManager — error paths', () => {
   it('rejects with a structured error when exit code is non-zero', async () => {
     const spawnFn = vi.fn(() => {
       return makeFakeChild({ stdout: '', exitCode: 1 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -236,7 +239,7 @@ describe('SttSidecarManager — error paths', () => {
       const fIdx = args.indexOf('-f');
       if (fIdx >= 0) capturedWavPath = args[fIdx + 1];
       return makeFakeChild({ stdout: '', exitCode: 1 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -253,7 +256,7 @@ describe('SttSidecarManager — error paths', () => {
   it('rejects when stdout contains no valid JSON', async () => {
     const spawnFn = vi.fn(() => {
       return makeFakeChild({ stdout: 'not json at all', exitCode: 0 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -271,7 +274,7 @@ describe('SttSidecarManager — error paths', () => {
       const fIdx = args.indexOf('-f');
       if (fIdx >= 0) capturedWavPath = args[fIdx + 1];
       return makeFakeChild({ stdout: 'not json', exitCode: 0 });
-    }) as unknown as typeof import('node:child_process').spawn;
+    }) as unknown as SpawnFn;
 
     manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
@@ -292,7 +295,7 @@ describe('SttSidecarManager — lifecycle', () => {
     const manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
       modelPath: '/fake/model.bin',
-      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as typeof import('node:child_process').spawn,
+      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as SpawnFn,
     });
     expect(() => manager.pause()).not.toThrow();
     await manager.dispose();
@@ -303,7 +306,7 @@ describe('SttSidecarManager — lifecycle', () => {
     const manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
       modelPath: '/fake/model.bin',
-      spawnFn: spawnFn as unknown as typeof import('node:child_process').spawn,
+      spawnFn: spawnFn as unknown as SpawnFn,
     });
     manager.resume();
     // resume() does not eagerly spawn; spawn happens on next transcribe()
@@ -319,7 +322,7 @@ describe('SttSidecarManager — lifecycle', () => {
     const manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
       modelPath: '/fake/model.bin',
-      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as typeof import('node:child_process').spawn,
+      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as SpawnFn,
     });
 
     // Inject the fake path into the manager's tracking (via internal exposure for testing)
@@ -335,7 +338,7 @@ describe('SttSidecarManager — lifecycle', () => {
     const manager = new SttSidecarManager({
       binaryPath: '/fake/whisper-cli',
       modelPath: '/fake/model.bin',
-      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as typeof import('node:child_process').spawn,
+      spawnFn: vi.fn(() => makeFakeChild({})) as unknown as SpawnFn,
     });
     await expect(manager.dispose()).resolves.not.toThrow();
   });
