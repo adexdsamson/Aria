@@ -19,7 +19,7 @@ import { EventEmitter } from 'node:events';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { createTempUserDataDir } from '../../../../tests/setup';
-import { openDb, closeDb, type Db } from '../../db/connect';
+import { openDb, type Db } from '../../db/connect';
 import { runMigrations } from '../../db/migrations/runner';
 import { getVoiceModelStatus } from '../prefs';
 
@@ -29,7 +29,7 @@ import {
   DISCLOSED_MODEL_SIZE_BYTES,
   MODEL_FILENAME,
 } from './model-download';
-import type { ModelDownloadDeps } from './model-download';
+import type { ModelDownloadDeps as _ModelDownloadDeps } from './model-download';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../db/migrations');
 
@@ -90,7 +90,6 @@ function makeFakeNdh(opts: FakeNdhOpts = {}) {
   return dl;
 }
 
-type FakeNdh = ReturnType<typeof makeFakeNdh>;
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -112,9 +111,9 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: (url, destDir) => {
+      helperFactory: (_url, destDir) => {
         capturedDestDir = destDir;
-        return fakeNdh as unknown as import('node-downloader-helper').DownloadHelper;
+        return fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper;
       },
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
@@ -135,7 +134,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -160,7 +159,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -183,7 +182,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -211,7 +210,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -234,7 +233,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -263,7 +262,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
     });
@@ -286,7 +285,7 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloadHelper,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: ({ onSuspend, onResume }) => {
         registeredOnSuspend = onSuspend;
@@ -319,9 +318,9 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     const ctrl = createModelDownload({
       db,
       emitToRenderer,
-      helperFactory: (url, destDir) => {
+      helperFactory: (_url, destDir) => {
         capturedDestDir = destDir;
-        return fakeNdh as unknown as import('node-downloader-helper').DownloadHelper;
+        return fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper;
       },
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
