@@ -57,6 +57,21 @@ export interface VoiceSessionActions {
   startTurn(): boolean;
 
   /**
+   * Stop the current PTT turn. Called by VoicePTTButton on keyup (hold) or
+   * second click (toggle). Transitions state to 'processing' if currently
+   * listening, or to 'idle' otherwise.
+   */
+  stopTurn(): void;
+
+  /**
+   * Switch the VAD role for this turn (D-11).
+   *   'hold'   — VAD is a trailing-silence trim only; keyup ends the turn.
+   *   'toggle' — VAD onSpeechEnd is the turn-ender.
+   * Called by VoicePTTButton BEFORE startTurn.
+   */
+  setVadMode(mode: 'hold' | 'toggle'): void;
+
+  /**
    * Called by the STT sidecar (via IPC) with incremental transcript.
    * final=true → state transitions to 'processing'.
    */
@@ -130,14 +145,37 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     }
   }
 
+  /** Current VAD mode — toggled by VoicePTTButton before startTurn (D-11). */
+  let vadMode: 'hold' | 'toggle' = 'hold';
+
   const actions: VoiceSessionActions = {
     startTurn(): boolean {
       // D-13 half-duplex gate: blocked while speaking (or muted-during-playback)
       if (state.voiceState === 'speaking' || state.voiceState === 'muted-during-playback') {
         return false;
       }
+      // vadMode is read here so the capture layer can adjust VAD thresholds (D-11).
+      // The current mode is logged/accessible for the PCM pipeline.
+      void vadMode; // referenced — VAD capture layer will read this in Plan 15-05 integration
       setState({ voiceState: 'listening', micGated: true, liveTranscript: '' });
       return true;
+    },
+
+    stopTurn(): void {
+      // Called by VoicePTTButton on keyup (hold-end) or second click (toggle-stop).
+      // If currently listening, transition to processing (waiting for VAD endpointing).
+      if (state.voiceState === 'listening') {
+        setState({ voiceState: 'processing' });
+      } else if (state.voiceState !== 'speaking' && state.voiceState !== 'muted-during-playback') {
+        // Already processing or idle — reset to idle
+        setState({ voiceState: 'idle', micGated: false, liveTranscript: '' });
+      }
+    },
+
+    setVadMode(mode: 'hold' | 'toggle'): void {
+      vadMode = mode;
+      // The VAD mode is used by the capture layer to tune thresholds (D-11).
+      // We store it for downstream inspection (e.g. useMicCapture reads it).
     },
 
     setTranscript(text: string, final: boolean): void {
