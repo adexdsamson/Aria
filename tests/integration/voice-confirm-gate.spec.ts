@@ -30,6 +30,19 @@ import { assertApproved, ApprovalGateError } from '../../src/main/approvals/gate
 import { voiceConfirm } from '../../src/main/voice/confirm';
 import { sendApprovedEmail } from '../../src/main/integrations/send';
 
+// The entitlement gate (Phase 08.1 subscription/licensing) runs at send.ts:145
+// BEFORE the approval gate at send.ts:146. It is orthogonal to this suite —
+// which exercises the APPROVAL gate (voice-forbidden-forced), not entitlement —
+// and asserting a real entitlement row would require a validly-signed Ed25519
+// JWT. Mock assertEntitled to a no-op so execution reaches assertApproved, the
+// unit under test. Entitlement enforcement has its own dedicated coverage
+// (tests/unit/main/entitlement/enforcement.test.ts). Mirrors the precedent in
+// tests/integration/research-ipc.spec.ts. importActual preserves EntitlementError.
+vi.mock('../../src/main/entitlement/gate', async (importActual) => {
+  const actual = await importActual<typeof import('../../src/main/entitlement/gate')>();
+  return { ...actual, assertEntitled: vi.fn().mockResolvedValue(undefined) };
+});
+
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../src/main/db/migrations');
 
 // ─── Test DB factory ──────────────────────────────────────────────────────────
