@@ -57,7 +57,7 @@
   4. First-run model download is a designed flow (progress + resumable + size disclosure + graceful "voice unavailable until ready" state), not a bare spinner.
   5. Plugging/unplugging an audio device mid-session is handled gracefully (device hot-swap + 16 kHz resample + permission-denied surfaced as an actionable error).
 **Plans**: 9 plans (5 waves)
-  - [ ] 15-01-PLAN.md — Wave 0 foundation: CSP blob: fix + voice-types/IPC contract + settings-KV model-readiness prefs + no-cloud ratchet
+  - [x] 15-01-PLAN.md — Wave 0 foundation: CSP blob: fix + voice-types/IPC contract + settings-KV model-readiness prefs + no-cloud ratchet
   - [ ] 15-02-PLAN.md — STT whisper.cpp CLI sidecar manager + WAV writer + no-native-addon ratchet (SC2 by construction)
   - [ ] 15-03-PLAN.md — Resumable Whisper model download manager (NDH + powerMonitor + readiness flip)
   - [ ] 15-04-PLAN.md — Renderer mic capture: getUserMedia + inline-Blob AudioWorklet + 16kHz + device hot-swap
@@ -123,7 +123,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
-| 15. Audio I/O + Model Runtime | 0/9 | Planned     | - |
+| 15. Audio I/O + Model Runtime | 1/9 | In Progress|  |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
