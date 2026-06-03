@@ -39,7 +39,7 @@ Declared values (must be multiples of 4):
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon gaps, inline badge padding |
-| sm | 8px | HUD band internal gaps, button padding compact |
+| sm | 8px | HUD band internal gaps, button padding compact, voice-pair wrapper gap |
 | md | 16px | HUD band horizontal padding, card padding |
 | lg | 24px | Section spacing, HUD band expanded height |
 | xl | 32px | Onboarding step vertical rhythm |
@@ -62,14 +62,16 @@ All fonts are already bundled via `@fontsource/` in `globals.css`. No new fonts 
 | Role | Family | Size | Weight | Line Height | Usage |
 |------|--------|------|--------|-------------|-------|
 | Body | Source Sans 3 (`var(--f-body)`) | 14px | 400 | 1.5 | HUD transcript text, download flow body |
-| Label / eyebrow | IBM Plex Mono (`var(--f-mono)`) | 10px | 500 | 1.2 | State labels (LISTENING, PROCESSING, SPEAKING, MUTED, ERROR), Topbar eyebrows |
-| Subhead | Source Sans 3 (`var(--f-body)`) | 13px | 500 | 1.4 | HUD status phrase, download progress label |
+| Label / eyebrow | IBM Plex Mono (`var(--f-mono)`) | 10px | 500 | 1.2 | State labels (LISTENING, PROCESSING, SPEAKING, MUTED, ERROR), Topbar eyebrows, size-disclosure label prefix, download progress percentage |
+| Subhead | Source Sans 3 (`var(--f-body)`) | 13px | 500 | 1.4 | HUD status phrase, download progress label, size-disclosure sub-text |
 | Heading | Playfair Display (`var(--f-display)`) | 20–22px | 500 | 1.1 | Onboarding "Set up voice" step title, lazy first-PTT modal heading |
 
 Typography constraints:
 - State labels in VoiceHUDBand and StatusDot tooltip: IBM Plex Mono, 10px, weight 500, letter-spacing 0.2em, uppercase. This is the existing `.smallcaps` / Topbar eyebrow pattern.
 - Transcript text in VoiceHUDBand: Source Sans 3, 14px, weight 400, `var(--ink)`. No italics, no display font.
-- Download progress percentage: IBM Plex Mono, 12px, tabular-nums (`font-variant-numeric: tabular-nums`), `var(--gray)`.
+- Download progress percentage (`"NN% · X.X MB / 574 MB"`): IBM Plex Mono, 10px, `font-variant-numeric: tabular-nums`, `var(--gray)`.
+- Size-disclosure sub-text (`"Stored in your app data folder. One-time download."`): Source Sans 3, 13px, `var(--gray-soft)`.
+- Declared scale exactly: **10px mono label / 13px subhead / 14px body / 20–22px heading**. No other sizes appear anywhere in this spec.
 
 ---
 
@@ -193,7 +195,7 @@ interface VoiceStatusDotProps {
 | toggle-active (recording) | Same as hold-active. Click again to stop. |
 | muted (TTS playing) | `opacity: 0.5`, `cursor: not-allowed`. Mic icon has struck-line overlay. Tooltip: "Aria is speaking". |
 
-**Discoverability of both hold + toggle:** A `<kbd>` hint label is rendered below the button at 10px mono gray: `"Hold · Click to toggle"`. This surfaces both affordances at a glance without a tooltip dependency.
+**Discoverability of both hold + toggle:** A `<kbd>` hint label is rendered below the button at 10px IBM Plex Mono `var(--gray)`: `"Space · Click to toggle"`. This surfaces both affordances at a glance without a tooltip dependency.
 
 **Keyboard binding:** `Space` key hold-to-talk (consistent with broadcast/PTT conventions). Displayed in the hint label as `"Space · Click to toggle"`.
 
@@ -225,18 +227,18 @@ Rendered as a new step card inside the existing `OnboardingWizard` step flow. Fo
 **Step position:** Appended after the existing `password` step — the final step before `sealing`. The new step type is `'voice'`.
 
 **Content layout:**
-1. Gold mono eyebrow (10px): `"VOICE ASSISTANT"`
+1. Gold mono eyebrow (10px IBM Plex Mono): `"VOICE ASSISTANT"`
 2. Playfair Display heading (20px, weight 500): `"Set up voice for Aria"`
-3. Source Sans body (14px, `var(--gray)`): `"Aria can transcribe your voice locally — no audio leaves your machine. Download the speech model to get started."`
+3. Source Sans 3 body (14px, `var(--gray)`): `"Aria can transcribe your voice locally — no audio leaves your machine. Download the speech model to get started."`
 4. **Size disclosure block** (before any download starts — mandatory per D-07):
-   - IBM Plex Mono, 11px, `var(--gray)`: `"DOWNLOAD SIZE"`
+   - IBM Plex Mono, 10px, `var(--gray)`: `"DOWNLOAD SIZE"`
    - Source Sans 3, 14px, `var(--ink)`: `"Whisper large-v3-turbo — 574 MB"`
-   - Source Sans 3, 12px, `var(--gray-soft)`: `"Stored in your app data folder. One-time download."`
+   - Source Sans 3, 13px, `var(--gray-soft)`: `"Stored in your app data folder. One-time download."`
 5. Progress bar (appears after download starts):
    - Container: `height: 4px`, `background: var(--rule)`, `border-radius: 2px`
    - Fill: `background: var(--gold)`, animated width. Under `prefers-reduced-motion`: no animation, static fill based on current percent.
-   - Below bar: `"NN% · X.X MB / 574 MB"` — IBM Plex Mono 11px, `var(--gray)`, tabular-nums.
-   - Pause/resume link: `"Pause"` / `"Resume"` — ghost text link style, `var(--gold)`, 12px.
+   - Below bar: `"NN% · X.X MB / 574 MB"` — IBM Plex Mono, 10px, `var(--gray)`, `font-variant-numeric: tabular-nums`.
+   - Pause/resume link: `"Pause download"` / `"Resume download"` — ghost text link style, `var(--gold)`, 13px Source Sans 3.
 6. CTA button row:
    - Primary: `"Download now"` (`.btn .btn-primary`, gold)
    - Secondary: `"Set up later"` (`.btn .btn-ghost`, `var(--gray)`) — skips the step, sets model-readiness to pending. The user will see the lazy modal on first PTT.
@@ -244,7 +246,7 @@ Rendered as a new step card inside the existing `OnboardingWizard` step flow. Fo
 **During download:** "Download now" button changes to `"Downloading…"` with `disabled` state and spinner. Pause link appears. "Set up later" becomes "Skip" in ghost style.
 
 **Download complete state:**
-- Progress bar replaces with a checkmark row: moss-colored SVG check + `"Voice ready"` in `var(--moss)`, 14px.
+- Progress bar replaces with a checkmark row: moss-colored SVG check + `"Voice ready"` in `var(--moss)`, 14px Source Sans 3.
 - CTA changes to `"Continue →"` (primary) to advance to the next onboarding step (`sealing`).
 
 #### 5b. Lazy first-PTT modal variant
@@ -354,7 +356,7 @@ State information remains fully accessible via: color (`var(--gold)` / `var(--mo
 | ToastHost: device lost | `"Audio device disconnected. Plug in a microphone to continue."` |
 | ToastHost: download failed | `"Voice model download failed. Check your connection and try again."` |
 | Empty voice state (model not ready) | Not shown — voice surfaces are hidden until model is ready, not shown as empty |
-| Download pause link | `"Pause"` / `"Resume"` |
+| Download pause link | `"Pause download"` / `"Resume download"` |
 
 **Tone notes:** Aria's editorial voice is terse, declarative, executive-caliber. No exclamation points. No casual language ("Oops!"). No filler adjectives. Label verbs are past-tense declarative ("Transcribing…", not "We're working on it").
 
@@ -446,7 +448,7 @@ Current order: `⌘K button → bell → AvatarMenu`
 
 Updated order: `⌘K button → bell → VoicePTTCompact (28px icon) → VoiceStatusDot (6px) → AvatarMenu`
 
-Gap between new voice elements and `AvatarMenu`: 8px (existing `gap: 16` is applied to the flex row; the voice pair is wrapped in a `<span>` with `display: flex; align-items: center; gap: 6px`).
+Gap between new voice elements and `AvatarMenu`: 8px (`sm` token). The voice pair is wrapped in a `<span>` with `display: flex; align-items: center; gap: 8px` (`sm` token — matches the HUD band's internal gap rhythm).
 
 ### OnboardingWizard.tsx step extension
 
@@ -478,10 +480,10 @@ The `voice` step renders `VoiceModelDownload` (5a). It can be skipped via "Set u
 
 ### Contract Summary
 
-- Spacing: 8-point scale (4/8/16/24/32/48); exception 44px touch targets + 6px StatusDot
-- Typography: 4 sizes (10/13/14/20-22px), 2 weights (400 body + 500 label/heading)
+- Spacing: 8-point scale (4/8/16/24/32/48); exception 44px touch targets + 6px StatusDot; voice-pair gap = `sm` (8px)
+- Typography: 4 sizes exactly (10px mono label / 13px subhead / 14px body / 20–22px heading), 2 weights (400 body + 500 label/heading)
 - Color: ivory dominant / paper secondary / gold accent (6 specific elements) / moss (speaking) / rose (error)
-- Copywriting: 28 elements defined (HUD states, PTT affordances, download flow, error toasts)
+- Copywriting: 29 elements defined (HUD states, PTT affordances, download flow, error toasts; "Pause download"/"Resume download" per declarative voice)
 - Registry: shadcn official — none; third-party — none; existing editorial primitives only
 
 ### File Created
