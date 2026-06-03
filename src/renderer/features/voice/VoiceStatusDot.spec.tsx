@@ -4,7 +4,7 @@
  * Tests the VoiceState→StatusDotKind mapping, aria contract, and
  * prefers-reduced-motion handling (D-14/D-16).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { VoiceStatusDot } from './VoiceStatusDot';
 import type { VoiceState } from '../../../shared/voice-types';
