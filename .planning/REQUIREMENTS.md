@@ -22,7 +22,7 @@ Voice is a **modality layered over Aria's existing shipped surfaces** (briefing,
 ### Voice-Driven Work (over existing surfaces, gated)
 
 - [ ] **VOICE-09** — User can drive triage / scheduling / `/ask` / drafting by voice; voice intents call the same in-process services the existing IPC handlers use (never re-cross the preload bridge).
-- [ ] **VOICE-10** — Approval-gated actions (email send, calendar change, task push) require the voice-confirm contract: stage → read-back of resolved entities → explicit dual-channel confirm → existing `assertApproved`. Voice can never auto-execute, and is blocked from satisfying the forced-explicit / high-severity / financial-legal-hr override (those force the on-screen click). Extends the existing single-send-site static ratchet to voice write-paths.
+- [x] **VOICE-10** — Approval-gated actions (email send, calendar change, task push) require the voice-confirm contract: stage → read-back of resolved entities → explicit dual-channel confirm → existing `assertApproved`. Voice can never auto-execute, and is blocked from satisfying the forced-explicit / high-severity / financial-legal-hr override (those force the on-screen click). Extends the existing single-send-site static ratchet to voice write-paths.
 - [ ] **VOICE-11** — Mishear recovery: user can correct or cancel a mis-recognized command before it acts.
 
 ### Wake-Word (opt-in, licensing-gated)
@@ -58,7 +58,7 @@ Voice is a **modality layered over Aria's existing shipped surfaces** (briefing,
 | VOICE-07 | Phase 15 | Pending |
 | VOICE-08 | Phase 17 | Pending |
 | VOICE-09 | Phase 17 | Pending |
-| VOICE-10 | Phase 14 | Pending |
+| VOICE-10 | Phase 14 | Complete |
 | VOICE-11 | Phase 17 | Pending |
 | VOICE-12 | Phase 18 | Pending |
 

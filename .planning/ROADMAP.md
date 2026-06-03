@@ -113,7 +113,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 14. Voice Safety / Confirm Contract | 3/3 | Complete   | 2026-06-03 |
+| 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 0/0 | Not started | - |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |

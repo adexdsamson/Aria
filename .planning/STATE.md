@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: executing
-last_updated: "2026-06-02T18:42:46.614Z"
+status: ready_to_plan
+last_updated: 2026-06-03T01:57:04.703Z
 last_activity: 2026-06-02
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 55
   percent: 0
+stopped_at: Phase 14 complete (3/3) — ready to discuss Phase 15
 ---
 
 # State
@@ -26,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 Phase: 14 (voice-safety-confirm-contract) — EXECUTING
 Plan: 1 of 3
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
-**Phase:** Not started — Phase 14 (Voice Safety / Confirm Contract) is next
-**Plan:** —
-**Status:** Executing Phase 14
-**Last activity:** 2026-06-02
+**Phase:** 15
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-06-03
 
 **v2.0 phases (14–19), dependency-ordered:**
 
