@@ -31,9 +31,11 @@
 - **D-19** Capture = renderer `getUserMedia` → AudioWorklet → 16 kHz mono PCM. Bundle worklet as inline Blob URL to dodge CSP/file-protocol. PCM renderer→main over typed IPC preload using transferable `ArrayBuffer`/chunked messages. No native recorder. Not desktopCapturer.
 - **D-20** Device hot-swap + 16 kHz resample in AudioWorklet (renderer-side). Permission-denied = actionable error via ToastHost + HUD error state.
 
+> **D-08 storage reconciliation (Spec-vs-codebase correction, PATTERNS.md correction 1):** D-08's literal "persist model-readiness in `user_prefs` via migration ≥ 136" is reconciled to the `settings(k,v)` KV table via `src/main/voice/prefs.ts` — `user_prefs` does NOT exist in the schema. NO migration is created and NO `embedded.ts` snapshot change is needed. See the Plan 15-01 Task 2 implementation and the CONTEXT.md D-08 addendum.
+
 ### Claude's Discretion
 - Sidecar stdio framing protocol (length-prefixed PCM vs JSON lines) and exact whisper.cpp binary procurement (ship release binaries vs build in CI).
-- Exact resumable-download library and the precise migration number (≥ 136).
+- Exact resumable-download library.
 - AudioWorklet bundling specifics and VAD threshold values (within D-11 roles).
 - Whether `VoiceHUDBand` uses `grid-template-rows: 0fr/1fr` or `max-height` expansion.
 
@@ -181,6 +183,7 @@ src/
 │   └── voice/
 │       ├── confirm.ts            (EXISTING — dormant, do not modify)
 │       ├── confirm.spec.ts       (EXISTING — do not modify)
+│       ├── prefs.ts              # settings(k,v) KV model-readiness prefs (D-08; NO migration)
 │       ├── stt/
 │       │   ├── sidecar-manager.ts  # spawn/kill/restart whisper-cli; VAD-endpoint-gated WAV→CLI protocol
 │       │   └── sidecar-manager.spec.ts
@@ -316,6 +319,7 @@ export function createModelDownload(destDir: string): DownloadHelper {
 }
 // Emit progress via makeRendererEmitter on 'progress' event
 // Pause on powerMonitor 'suspend'; resume on 'resume'
+// On complete, flip model-readiness via the settings(k,v) KV prefs (src/main/voice/prefs.ts) — NO migration
 ```
 
 **HF CDN Range support:** Hugging Face uses AWS CloudFront as CDN for model files. CloudFront supports `Accept-Ranges: bytes` for files under 50 GB (confirmed). The ~574 MB q5_0 model is well under this limit.
@@ -519,10 +523,10 @@ async function initTts(): Promise<void> {
 **Prevention:** Run `npm run typecheck` after every main/preload edit. Per project memory: esbuild skips tsc; only vitest tests and typecheck catch these errors.
 [CITED: project MEMORY — esbuild_skips_typecheck]
 
-### Pitfall 7: migration chain + embedded.ts split-brain
-**What goes wrong:** New `user_prefs` column added for model-readiness in `136_voice_model_prefs.sql` but `embedded.ts` not updated. The runner loads `embedded.ts` at runtime (esbuild bundles main); the .sql file is not bundled. Migration never runs in packaged app.
-**Prevention:** Any migration MUST update BOTH the `.sql` file AND `embedded.ts`. Test with `npm run typecheck` and the migration runner test. This pattern is documented in project memory (Phase 14 D-03 split-brain lesson).
-[CITED: project MEMORY — Phase 14 split-brain lesson; src/main/db/migrations/embedded.ts verified]
+### Pitfall 7: model-readiness persists in the settings KV table — NO migration
+**What goes wrong:** An executor reads D-08's literal "persist in `user_prefs` via migration ≥ 136" and adds a `user_prefs` column / a `136_*.sql` migration + `embedded.ts` snapshot edit. But `user_prefs` does NOT exist in the schema, so the migration targets a non-existent table and the readiness pref never persists.
+**Prevention:** Persist model-readiness in the existing `settings(k,v)` KV table via `src/main/voice/prefs.ts` (Plan 15-01 Task 2). There is NO migration, NO `ALTER TABLE`, NO `user_prefs` column, and therefore NO `embedded.ts` snapshot change. This is the Spec-vs-codebase reconciliation recorded in CONTEXT.md (D-08 addendum) and PATTERNS.md correction 1.
+[CITED: PATTERNS.md correction 1; CONTEXT.md D-08 addendum; src/main/db/migrations/embedded.ts verified — latest migration = 135, no user_prefs table]
 
 ---
 
@@ -544,19 +548,17 @@ Phase 15 requires an explicit RAM measurement as a success check. The target: ST
 
 ---
 
-## Migration Plan (≥ 136)
+## Model-Readiness Persistence (settings KV — NO migration)
 
-Next migration must be `136_voice_model_prefs.sql` (since latest is `135_repair_approval_child_fks.sql`).
-[VERIFIED: ls migrations/ 2026-06-03]
+> **SUPERSEDED:** An earlier draft of this section proposed a `136_voice_model_prefs.sql` migration adding `voice_model_ready` / `voice_model_path` columns to `user_prefs`. That is struck — `user_prefs` does NOT exist in Aria's schema (latest migration is `135_repair_approval_child_fks.sql`; the KV store is `settings(k,v)`).
 
-```sql
--- 136_voice_model_prefs.sql
-ALTER TABLE user_prefs ADD COLUMN voice_model_ready INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE user_prefs ADD COLUMN voice_model_path TEXT;
--- Persist: 0=not downloaded, 1=ready, 2=downloading
-```
+Model-readiness state persists in the existing `settings(k,v)` KV table via `src/main/voice/prefs.ts` (Plan 15-01 Task 2). There is **NO migration**, **NO `ALTER TABLE`**, **NO `user_prefs` column**, and therefore **NO `embedded.ts` snapshot change**.
 
-Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
+- Backing store: `settings(k,v)` rows (e.g. key `voice.model.status` → `0` not-downloaded / `1` ready / `2` downloading; key `voice.model.path` → absolute path).
+- Accessors: `getVoiceModelStatus(db)`, `setVoiceModelReady(db, path)`, `setVoiceModelDownloading(db)` in `src/main/voice/prefs.ts`.
+- This reconciles D-08's literal "user_prefs via migration ≥ 136" wording — see the CONTEXT.md D-08 addendum and PATTERNS.md correction 1.
+
+[VERIFIED: ls migrations/ 2026-06-03 — latest is 135; no user_prefs table. CITED: PATTERNS.md correction 1]
 
 ---
 
@@ -666,7 +668,7 @@ Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
 | SC3 Laptop speakers | Manual UAT — Aria speaks, mic shows gated, no self-transcript | Manual | UAT checklist | N/A |
 | SC4 Download flow | Progress events emitted; pause/resume work; size shown before start | Unit | `npx vitest run tests/unit/voice/model-download.spec.ts -x` | ❌ Wave 0 |
 | SC5 Device hot-swap | `devicechange` event triggers stream re-acquisition; no crash | Unit | `npx vitest run tests/unit/voice/useMicCapture.spec.ts -x` | ❌ Wave 0 |
-| Migration 136 | user_prefs has voice_model_ready column after migration | Unit | existing migration runner test | ❌ Wave 0 migration file |
+| Model-readiness pref | `getVoiceModelStatus(db)` flips to ready after `setVoiceModelReady` (settings KV; NO migration) | Unit | `npx vitest run src/main/voice/prefs.spec.ts -x` | ❌ Wave 0 |
 
 ### Sampling Rate
 
@@ -683,8 +685,7 @@ Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
 - [ ] `tests/unit/voice/model-download.spec.ts` — covers SC4 download flow (NDH mock)
 - [ ] `tests/unit/voice/useMicCapture.spec.ts` — covers SC5 device hot-swap
 - [ ] `tests/e2e/packaged-launch.spec.ts` — covers SC2 no-crash on packaged launch
-- [ ] `src/main/db/migrations/136_voice_model_prefs.sql` — migration file
-- [ ] `src/main/db/migrations/embedded.ts` — update with migration 136 SQL
+- [ ] `src/main/voice/prefs.ts` + `src/main/voice/prefs.spec.ts` — model-readiness via `settings(k,v)` KV (NO migration, NO `user_prefs` column)
 
 ---
 
@@ -764,6 +765,7 @@ Both `136_voice_model_prefs.sql` AND `embedded.ts` MUST be updated together.
 - **kokoro-js (Kokoro-82M) targets the renderer** with device: 'webgpu'|'wasm', downloads ~160 MB on first use via HF/transformers.js cache — SEPARATE from the ~574 MB Whisper model designed download flow. Two distinct download concerns.
 - **VAD dual-role (D-11) is parameter-level config:** raise `positiveSpeechThreshold`/`redemptionMs` under hold to suppress false turn-ends; use defaults under toggle for natural endpointing.
 - **macOS sidecar binary signing** requires listing in `build.mac.binaries` in package.json — electron-builder does not auto-sign `extraResources` executables.
+- **Model-readiness persists in the `settings(k,v)` KV table via `src/main/voice/prefs.ts` — NO migration.** D-08's literal "user_prefs via migration ≥ 136" is reconciled (CONTEXT.md D-08 addendum, PATTERNS.md correction 1) because `user_prefs` does not exist in the schema.
 
 ### File Created
 `.planning/phases/15-audio-i-o-model-runtime/15-RESEARCH.md`
