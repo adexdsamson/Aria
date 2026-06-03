@@ -177,14 +177,21 @@ describe('createKokoroPlayer', () => {
 
     await player.init();
 
+    // Start speaking — don't await yet; let the microtasks (generate) run first
     const speakPromise = player.speak('Hello');
 
-    // onPlaybackStart must have fired synchronously before the source.start() call
+    // Flush the pending generate() microtask so createBufferSource is called
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Now the source node exists
+    const sourceNode = fakeCtx.lastSourceNode;
+    expect(sourceNode).not.toBeNull();
+
+    // onPlaybackStart must have fired (before source.start())
     expect(onPlaybackStart).toHaveBeenCalledTimes(1);
 
     // Simulate audio ending by triggering the source node's onended
-    const sourceNode = fakeCtx.lastSourceNode;
-    expect(sourceNode).not.toBeNull();
     sourceNode!.onended?.();
 
     await speakPromise;
@@ -208,6 +215,11 @@ describe('createKokoroPlayer', () => {
     await player.init();
 
     const speakPromise = player.speak('test utterance');
+
+    // Flush microtasks so generate() resolves and createBufferSource() is called
+    await Promise.resolve();
+    await Promise.resolve();
+
     const sourceNode = fakeCtx.lastSourceNode;
     sourceNode!.onended?.();
 
@@ -231,6 +243,11 @@ describe('createKokoroPlayer', () => {
     await player.init();
 
     const speakPromise = player.speak('test');
+
+    // Flush microtasks so generate() resolves and createBufferSource() is called
+    await Promise.resolve();
+    await Promise.resolve();
+
     const sourceNode = fakeCtx.lastSourceNode;
     sourceNode!.onended?.();
     await speakPromise;
