@@ -109,6 +109,10 @@ import {
 } from './background/prefs';
 import { registerBackgroundHandlers } from './ipc/background';
 import { maybeShowFirstCloseToast } from './tray/notify';
+import { registerVoiceHandlers } from './ipc/voice';
+import { SttSidecarManager } from './voice/stt/sidecar-manager';
+import { createModelDownload } from './voice/download/model-download';
+import { registerLifecycleCallbacks } from './lifecycle/powerMonitor';
 
 import {
   decideCloseAction,
@@ -373,6 +377,71 @@ async function bootstrap(): Promise<void> {
   // pattern; defaults-only path is safe under a sealed vault).
   registerBackgroundHandlers(ipcMain, dbHolder, logger);
 
+  // Phase 15 / Plan 15-05 — Voice IPC + powerMonitor lifecycle (D-03/D-09).
+  //
+  // Construct services at bootstrap time with empty/null defaults:
+  //   - SttSidecarManager: modelPath is '' until model is downloaded; transcribe()
+  //     will reject with a meaningful error if called before the model is ready.
+  //   - ModelDownloadController: db is accessed lazily via dbHolder; null pre-unlock.
+  //
+  // registerHandlers (above) wired lightweight stubs for the 4 VOICE invoke
+  // channels. We now replace those stubs with real handlers by removing them first
+  // and re-registering via registerVoiceHandlers (same pattern as entitlement).
+  //
+  // powerMonitor lifecycle (D-03/D-09): suspend parks both sidecar and download;
+  // resume restores them. unregisterVoiceLifecycle is retained for app quit cleanup.
+  // voiceEmitter forward-ref: set to mainWindow push-sink once the window is created.
+  // The lambdas below capture the `voiceEmitter` binding (not its current value),
+  // so they will use the live value when invoked post-window-creation.
+  let voiceEmitter: ((channel: string, payload?: unknown) => void) | undefined;
+
+  const sttSidecar = new SttSidecarManager({ modelPath: '' });
+  // downloadController uses forward-ref for emitToRenderer (bound to mainWindow below).
+  const downloadController = createModelDownload({
+    db: null, // plan 15-03: db is checked as `if (db)` inside event handlers
+    emitToRenderer: (channel, payload) => voiceEmitter?.(channel, payload),
+    // destDirResolver and registerLifecycle use Electron defaults (app.getPath + powerMonitor)
+  });
+
+  // Remove the lightweight stubs registered by registerHandlers, then wire real handlers.
+  const VOICE_INVOKE_CHANNELS = [
+    CHANNELS.VOICE_FEED_AUDIO,
+    CHANNELS.VOICE_GET_MODEL_STATUS,
+    CHANNELS.VOICE_DOWNLOAD_MODEL,
+    CHANNELS.VOICE_CANCEL_TTS,
+  ];
+  for (const ch of VOICE_INVOKE_CHANNELS) {
+    ipcMain.removeHandler(ch);
+  }
+  // Also remove the push-event stubs (no-ops registered by registerHandlers).
+  for (const ch of [
+    CHANNELS.VOICE_TRANSCRIPT_DELTA,
+    CHANNELS.VOICE_STATE_CHANGED,
+    CHANNELS.VOICE_MODEL_PROGRESS,
+  ]) {
+    ipcMain.removeHandler(ch);
+  }
+  registerVoiceHandlers(ipcMain, {
+    logger,
+    dbHolder,
+    sttSidecar,
+    downloadController,
+    emitToRenderer: (channel, payload) => voiceEmitter?.(channel, payload),
+  });
+
+  // Register powerMonitor lifecycle for sidecar + download (D-03/D-09).
+  const _unregisterVoiceLifecycle = registerLifecycleCallbacks({
+    onSuspend: () => {
+      try { sttSidecar.pause(); } catch { /* non-fatal */ }
+      try { downloadController.pause(); } catch { /* non-fatal */ }
+    },
+    onResume: () => {
+      try { sttSidecar.resume(); } catch { /* non-fatal */ }
+      try { downloadController.resume(); } catch { /* non-fatal */ }
+    },
+  });
+  void _unregisterVoiceLifecycle; // retained for future teardown
+
   // Lazily bootstrap entitlement once the DB is unlocked. The bootstrap
   // method is itself idempotent and concurrency-safe.
   const tryBootstrapEntitlement = async (): Promise<void> => {
@@ -525,6 +594,11 @@ async function bootstrap(): Promise<void> {
   // Store the reader so the window-all-closed handler can reuse it.
   (globalThis as { __ariaCloseToTrayReader?: () => boolean }).__ariaCloseToTrayReader =
     closeToTrayReader;
+
+  // Phase 15 / Plan 15-05 — bind the voice push emitter to the main window now
+  // that it exists. voiceEmitter was declared above (before mainWindow creation)
+  // as a late-bound forward-reference; assigning here wires it correctly.
+  voiceEmitter = makeRendererEmitter(mainWindow);
 
   // Phase 12 / Plan 12-02 Task 2 — construct the tray now that the main
   // window exists. Single-instance lock has already been acquired upstream

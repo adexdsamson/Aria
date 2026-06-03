@@ -37,7 +37,12 @@ function makeFakeLogger() {
 }
 
 function makeFakeDbHolder(db: unknown = null) {
-  return { db };
+  return {
+    db,
+    get isOpen() { return db !== null; },
+    set: () => {},
+    close: () => {},
+  } as import('./onboarding').DbHolder;
 }
 
 function makeFakeSttSidecar(): SttSidecarManager {
