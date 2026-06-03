@@ -5,6 +5,7 @@
  * anywhere else. Channel constants are mirrored 1:1 by the preload bridge into
  * `window.aria` (camelCase method names).
  */
+import type { VoiceState, TranscriptDelta, VoiceModelStatus } from './voice-types';
 
 export const CHANNELS = {
   ASK_ARIA: 'aria:ask',
@@ -178,6 +179,16 @@ export const CHANNELS = {
   // to an allowlisted path (/briefing, /approvals). T-12-10: path is hardcoded
   // at the call site (no user-controlled value in the payload).
   NAVIGATE: 'aria:navigate',
+  // Phase 15 — Voice I/O + Model Runtime (15-01)
+  // Invoke channels (renderer → main):
+  VOICE_FEED_AUDIO: 'aria:voice:feed-audio',        // PCM ArrayBuffer (D-19 transferable)
+  VOICE_GET_MODEL_STATUS: 'aria:voice:model-status', // returns VoiceModelStatus
+  VOICE_DOWNLOAD_MODEL: 'aria:voice:download-model', // trigger first-run download
+  VOICE_CANCEL_TTS: 'aria:voice:cancel-tts',         // half-duplex gate: cancel in-flight TTS
+  // Push channels (main → renderer via ipcRenderer.on):
+  VOICE_TRANSCRIPT_DELTA: 'aria:voice:transcript-delta', // TranscriptDelta payload
+  VOICE_STATE_CHANGED: 'aria:voice:state-changed',        // VoiceState payload
+  VOICE_MODEL_PROGRESS: 'aria:voice:model-progress',      // { receivedBytes, totalBytes }
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -1047,6 +1058,21 @@ export interface AriaApi {
    * Returns an unsubscribe function. Allowlist enforced in App.tsx.
    */
   onNavigate?: (cb: (path: string) => void) => () => void;
+
+  // Phase 15 / Plan 15-01 — Voice I/O + Model Runtime
+  // Invoke methods (auto-mapped by the buildApi() loop via CHANNEL_METHODS):
+  voiceFeedAudio(audioBuffer: ArrayBuffer): Promise<{ ok: true } | IpcError>;
+  voiceGetModelStatus(): Promise<VoiceModelStatus | IpcError>;
+  voiceDownloadModel(): Promise<{ ok: true } | { ok: false; error: string } | IpcError>;
+  voiceCancelTts(): Promise<{ ok: true } | IpcError>;
+
+  /**
+   * Subscription helpers for push channels (ipcRenderer.on, not invoke).
+   * Registered in preload as real listeners; each returns an unsubscribe fn.
+   */
+  onVoiceTranscript?: (cb: (delta: TranscriptDelta) => void) => () => void;
+  onVoiceState?: (cb: (state: VoiceState) => void) => () => void;
+  onVoiceModelProgress?: (cb: (progress: { receivedBytes: number; totalBytes: number }) => void) => () => void;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1436,6 +1462,15 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   // Phase 12 / Plan 12-03 — push-only navigate channel. Overridden in preload
   // with a real ipcRenderer.on subscription (like ENTITLEMENT_STATE_CHANGED).
   NAVIGATE: 'onNavigate',
+  // Phase 15 — Voice channels. Invoke methods auto-mapped by buildApi();
+  // push channels overridden in preload with real ipcRenderer.on listeners.
+  VOICE_FEED_AUDIO: 'voiceFeedAudio',
+  VOICE_GET_MODEL_STATUS: 'voiceGetModelStatus',
+  VOICE_DOWNLOAD_MODEL: 'voiceDownloadModel',
+  VOICE_CANCEL_TTS: 'voiceCancelTts',
+  VOICE_TRANSCRIPT_DELTA: 'onVoiceTranscript',
+  VOICE_STATE_CHANGED: 'onVoiceState',
+  VOICE_MODEL_PROGRESS: 'onVoiceModelProgress',
 } as const;
 
 // ---------------------------------------------------------------------------

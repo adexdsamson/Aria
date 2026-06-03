@@ -45,6 +45,33 @@ const api = buildApi();
   return () => ipcRenderer.removeListener(CHANNELS.NAVIGATE, handler);
 };
 
+// Phase 15 / Plan 15-01 — Voice push channels.
+// Overrides the auto-mapped invoke stubs with real ipcRenderer.on listeners.
+// Each returns an unsubscribe function for useEffect cleanup (same pattern as
+// onNavigate / entitlementOnStateChanged above). The invoke-direction channels
+// (voiceFeedAudio, voiceGetModelStatus, voiceDownloadModel, voiceCancelTts)
+// are auto-mapped by buildApi() and need no manual override.
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onVoiceTranscript = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.VOICE_TRANSCRIPT_DELTA, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.VOICE_TRANSCRIPT_DELTA, handler);
+};
+
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onVoiceState = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.VOICE_STATE_CHANGED, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.VOICE_STATE_CHANGED, handler);
+};
+
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onVoiceModelProgress = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.VOICE_MODEL_PROGRESS, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.VOICE_MODEL_PROGRESS, handler);
+};
+
 // E2E-only escape hatches; gated by ARIA_E2E env var so production builds
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.
