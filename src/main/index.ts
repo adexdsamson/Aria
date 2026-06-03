@@ -153,7 +153,10 @@ let _trayHandle: TrayHandle | null = null;
 function prodCspHeader(): string {
   return (
     "default-src 'self'; " +
-    "script-src 'self'; " +
+    // Phase 15 / Plan 15-01: blob: added to script-src so the inline-Blob-URL
+    // AudioWorklet (D-19) can register in the packaged build. connect-src is
+    // the hard egress gate — blob: MUST NOT appear there (T-15-01).
+    "script-src 'self' blob:; " +
     "style-src 'self' 'unsafe-inline'; " +
     "connect-src 'self' http://127.0.0.1:11434 https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
     "img-src 'self' data:"
@@ -163,7 +166,9 @@ function prodCspHeader(): string {
 function devCspHeader(): string {
   return (
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline'; " +
+    // Phase 15 / Plan 15-01: blob: added to script-src (same as prod) so dev
+    // AudioWorklet Blob URL registration is consistent with the packaged build.
+    "script-src 'self' 'unsafe-inline' blob:; " +
     "style-src 'self' 'unsafe-inline'; " +
     "connect-src 'self' ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
     "img-src 'self' data:"
