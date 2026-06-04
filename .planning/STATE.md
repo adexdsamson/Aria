@@ -29,6 +29,7 @@ Plan: 9 of 9 (15-09 complete; two open human-verify debts: macOS binary + packag
 **Phase:** 15
 **Plan:** 9 complete — packaging config + ship-blocker fix (whisper.dll) + Windows binary staged/verified; macOS DEFERRED to CI; SC2/SC3/SC5 + RAM ceiling = OPEN human-verify debt
 **Status:** Phase 15 code-complete; packaged-verification pending user's 16 GB machine
+**Verifier:** 9/10 must-haves (lazy first-PTT→download-modal gap closed in `1e848c6`); 5 packaged/hardware human-verify items open (see 15-VERIFICATION.md)
 **Last activity:** 2026-06-04
 
 **Open verification debts (Phase 15):**
