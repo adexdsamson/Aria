@@ -24,3 +24,8 @@ build_catalog.js
 build/config.gypi
 build/spike/
 .planning/memory/
+
+# whisper.cpp CI-procured binaries (staged here before packaging; not committed)
+# The README.md procurement contract IS committed.
+build/whisper/windows/
+build/whisper/macos/
