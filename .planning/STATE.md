@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-04T04:59:04.263Z"
-last_activity: 2026-06-03
+last_updated: "2026-06-04T05:20:26.130Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 17
 ---
 
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 7 of 9 (15-07 complete)
+Plan: 8 of 9 (15-08 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 7 complete (voice UI surface: VoiceStatusDot + VoiceHUDBand + VoicePTTButton + App.tsx/Topbar wiring — VOICE-01/VOICE-07)
+**Plan:** 8 complete (first-run model download UX: VoiceModelDownload step+modal + OnboardingWizard voice step — SC4/D-07/VOICE-04)
 **Status:** Executing Phase 15
 **Last activity:** 2026-06-04
 
@@ -59,6 +59,9 @@ Plan: 7 of 9 (15-07 complete)
 - VoiceHUDBand (15-07): grid-template-rows 0fr/1fr collapse/expand chosen over max-height; inner overflow:hidden; role=status aria-live=polite aria-atomic=false; transcript plain text node (D-15/T-15-21)
 - VoicePTTButton (15-07): Public/Core split avoids conditional useVoiceSession hook; _testSession prop avoids vi.mock vitest-pool timeout; testId prop for Topbar aria-topbar-ptt slot (D-10/D-12)
 - stopTurn/setVadMode (15-07): added to VoiceSessionActions — stopTurn transitions listening→processing; setVadMode stores 'hold'|'toggle' for capture layer (D-10/D-11)
+- VoiceModelDownload variants (15-08): step card vs Modal size="md"; _testIpc prop for test isolation; DISCLOSED_BYTES=601_882_624 matches model-download.ts
+- OnboardingWizard voice step (15-08): password → voice → sealing sequence; seal() called from voice step onSkip/onComplete; __forceStep__ test-only prop; sealing extracted to own render branch
+- Voice step isolation (15-08): Card.data-testid limitation worked around with wrapper div; voice step never blocks seal (T-15-24 mitigated)
 
 ## Next Action
 
