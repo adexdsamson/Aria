@@ -1,19 +1,31 @@
 /**
- * Onboarding wizard state machine — 5 steps:
+ * Onboarding wizard state machine — 6 steps (Phase 15 adds 'voice'):
  *   1. name        — display name for personalized UnlockScreen greeting
  *   2. show        — render mnemonic, gated by "I've written these down"
  *   3. confirm     — 3-word position challenge
  *   4. news-picker — country + sectors for the briefing
- *   5. password    — daily-unlock password (min 8 chars), then seal vault + open DB
+ *   5. password    — collect daily-unlock password (min 8 chars)
+ *   6. voice       — skippable "Set up voice" step (Plan 15-08, D-07)
+ *   7. sealing     — seal vault + open DB (triggered from voice step)
  *
  * The display name is buffered in state and persisted via `profileSet` inside
  * `seal()` right alongside the existing `newsSetBundle` write. Quick 260523-eaf.
+ *
+ * Voice step (Plan 15-08):
+ *   Inserted after 'password', before 'sealing'. Hosts VoiceModelDownload
+ *   variant='step'. "Set up later" (skip) and "Continue →" (after download)
+ *   both transition to 'sealing' → call seal(). The voice step is NEVER a gate —
+ *   seal is not blocked on voice readiness (D-07/T-15-24).
+ *
+ *   The password step's "Finish setup" button now transitions to 'voice'.
+ *   The seal() function is called from the 'voice' step onComplete/onSkip handlers.
  */
 import { useEffect, useState } from 'react';
 import { MnemonicShow } from './MnemonicShow';
 import { MnemonicConfirm } from './MnemonicConfirm';
 import { CountrySectorPicker } from './CountrySectorPicker';
 import { NameStep } from './NameStep';
+import { VoiceModelDownload } from '../voice/VoiceModelDownload';
 import { AppLogo, Button, Card } from '../../components/editorial';
 
 type Step =
@@ -23,15 +35,22 @@ type Step =
   | 'confirm'
   | 'news-picker'
   | 'password'
+  | 'voice'        // Plan 15-08: skippable voice setup (D-07)
   | 'sealing'
   | 'done';
 
 export interface OnboardingWizardProps {
   onComplete: () => void;
+  /**
+   * Test-only: force the wizard to render a specific step directly, bypassing
+   * the normal navigation flow. This avoids the need to simulate the full
+   * multi-step sequence in unit tests. NEVER used in production.
+   */
+  __forceStep__?: Step;
 }
 
-export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Element {
-  const [step, setStep] = useState<Step>('loading');
+export function OnboardingWizard({ onComplete, __forceStep__ }: OnboardingWizardProps): JSX.Element {
+  const [step, setStep] = useState<Step>(__forceStep__ ?? 'loading');
   const [displayName, setDisplayName] = useState('');
   const [words, setWords] = useState<string[]>([]);
   const [positions, setPositions] = useState<number[]>([]);
@@ -41,7 +60,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
     null,
   );
 
+  // Only run genMnemonic when using the normal flow (not test force-step)
   useEffect(() => {
+    // If __forceStep__ is set, skip the loading/genMnemonic flow entirely
+    if (__forceStep__) return;
+
     let cancelled = false;
     (async () => {
       const res = (await window.aria.onboardingGenMnemonic()) as {
@@ -56,6 +79,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function seal(): Promise<void> {
@@ -152,7 +176,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
       />
     );
   }
-  if (step === 'password' || step === 'sealing') {
+  if (step === 'password') {
     return (
       <section
         data-testid="onboarding-password"
@@ -178,7 +202,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
             marginBottom: 6,
           }}
         >
-          Step 5 of 5 · seal your vault
+          Step 5 of 6 · seal your vault
         </div>
         <h1
           style={{
@@ -202,7 +226,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
           data-testid="password-input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          disabled={step === 'sealing'}
           style={{
             width: '100%',
             minHeight: 44,
@@ -217,42 +240,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
             boxSizing: 'border-box',
           }}
         />
-        {step === 'sealing' && (
-          <div
-            data-testid="onboarding-sealing"
-            style={{
-              marginTop: 16,
-              padding: 14,
-              background: 'var(--ivory-deep)',
-              border: '1px solid var(--rule)',
-              borderTop: '2px solid var(--gold)',
-              borderRadius: 'var(--radius)',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--f-display)',
-                fontStyle: 'italic',
-                fontSize: 18,
-                color: 'var(--ink)',
-                marginBottom: 4,
-              }}
-            >
-              Sealing your vault…
-            </div>
-            <div
-              style={{
-                fontFamily: 'var(--f-mono)',
-                fontSize: 10,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--gray)',
-              }}
-            >
-              5–15 seconds on this machine
-            </div>
-          </div>
-        )}
         {error && (
           <Card style={{ marginTop: 16, padding: 14, borderTop: '2px solid var(--rose)' }}>
             <p data-testid="password-error" style={{ color: 'var(--rose)', margin: 0, fontFamily: 'var(--f-body)' }}>
@@ -264,12 +251,86 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): JSX.Ele
           <Button
             variant="primary"
             data-testid="password-submit"
-            disabled={password.length < 8 || step === 'sealing'}
-            onClick={seal}
+            disabled={password.length < 8}
+            onClick={() => setStep('voice')}
           >
-            {step === 'sealing' ? 'Sealing…' : 'Finish setup'}
+            Continue
           </Button>
         </div>
+      </section>
+    );
+  }
+  if (step === 'voice') {
+    // Plan 15-08: skippable voice setup step (D-07).
+    // Both skip ("Set up later") and complete ("Continue →") transition to sealing.
+    // The download manager (Plan 15-03) flips model-readiness via settings KV prefs;
+    // this step does NOT write any pref itself (D-07/D-08).
+    return (
+      <VoiceModelDownload
+        variant="step"
+        onSkip={seal}
+        onComplete={seal}
+      />
+    );
+  }
+  if (step === 'sealing') {
+    // Sealing in-progress UI — shown while onboardingSeal is running
+    return (
+      <section
+        data-testid="onboarding-password"
+        style={{
+          padding: 32,
+          maxWidth: 560,
+          margin: '0 auto',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-body)',
+          background: 'var(--paper)',
+        }}
+      >
+        <div style={{ marginBottom: 18 }}>
+          <AppLogo variant="header" />
+        </div>
+        <div
+          data-testid="onboarding-sealing"
+          style={{
+            marginTop: 16,
+            padding: 14,
+            background: 'var(--ivory-deep)',
+            border: '1px solid var(--rule)',
+            borderTop: '2px solid var(--gold)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--f-display)',
+              fontStyle: 'italic',
+              fontSize: 18,
+              color: 'var(--ink)',
+              marginBottom: 4,
+            }}
+          >
+            Sealing your vault…
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--gray)',
+            }}
+          >
+            5–15 seconds on this machine
+          </div>
+        </div>
+        {error && (
+          <Card style={{ marginTop: 16, padding: 14, borderTop: '2px solid var(--rose)' }}>
+            <p data-testid="password-error" style={{ color: 'var(--rose)', margin: 0, fontFamily: 'var(--f-body)' }}>
+              {error}
+            </p>
+          </Card>
+        )}
       </section>
     );
   }
