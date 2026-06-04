@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-04T05:20:26.130Z"
+last_updated: "2026-06-04T06:38:00.000Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 6
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 8 of 9 (15-08 complete)
+Plan: 9 of 9 (15-09 in-progress, paused at Task 2 human-action checkpoint)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 8 complete (first-run model download UX: VoiceModelDownload step+modal + OnboardingWizard voice step — SC4/D-07/VOICE-04)
+**Plan:** 9 in-progress (packaging config + static guard done; paused at Task 2 human-action checkpoint: macOS whisper-cli binary procurement)
 **Status:** Executing Phase 15
 **Last activity:** 2026-06-04
 
