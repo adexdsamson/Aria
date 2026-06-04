@@ -5,14 +5,19 @@
  * input/textarea focus guard (T-15-22), aria contract, and the no-globalShortcut
  * guarantee (D-10/D-12).
  *
+ * Also tests the lazy first-PTT model-readiness gate (D-08/SC4):
+ * when model is NOT ready, PTT press opens the VoiceModelDownload modal
+ * instead of entering listening state.
+ *
  * Uses the _testSession prop (test-only override) to inject mock session state
  * without vi.mock module-level hoisting (which triggers vitest-pool timeout on
  * some machines).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { VoicePTTButton } from './VoicePTTButton';
 import type { VoiceSessionState, VoiceSessionActions } from './useVoiceSession';
+import type { VoiceModelDownloadIpc } from './VoiceModelDownload';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -180,5 +185,79 @@ describe('VoicePTTButton', () => {
       fireEvent.click(btn);
       expect(session.setVadMode).toHaveBeenCalledWith('toggle');
     });
+  });
+});
+
+// ─── D-08 / SC4: lazy first-PTT model-readiness gate ─────────────────────────
+
+function makeIpc(overrides: Partial<VoiceModelDownloadIpc> = {}): VoiceModelDownloadIpc {
+  return {
+    voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, path: null, state: 0 }),
+    voiceDownloadModel: vi.fn().mockResolvedValue(undefined),
+    onVoiceModelProgress: vi.fn().mockReturnValue(() => undefined),
+    ...overrides,
+  };
+}
+
+describe('VoicePTTButton — lazy first-PTT model-readiness gate (D-08/SC4)', () => {
+  let session: ReturnType<typeof makeSession>;
+  let ipc: ReturnType<typeof makeIpc>;
+
+  beforeEach(() => {
+    session = makeSession();
+    ipc = makeIpc();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('click while model NOT ready opens the VoiceModelDownload modal', async () => {
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    // The modal wrapper should now be in the DOM
+    expect(screen.getByTestId('voice-model-download-modal')).toBeTruthy();
+  });
+
+  it('click while model NOT ready does NOT call startTurn', async () => {
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    expect(session.startTurn).not.toHaveBeenCalled();
+  });
+
+  it('Space keydown while model NOT ready opens the VoiceModelDownload modal', async () => {
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    await act(async () => { fireEvent.keyDown(window, { key: ' ', code: 'Space' }); });
+    expect(screen.getByTestId('voice-model-download-modal')).toBeTruthy();
+  });
+
+  it('Space keydown while model NOT ready does NOT call startTurn', async () => {
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    await act(async () => { fireEvent.keyDown(window, { key: ' ', code: 'Space' }); });
+    expect(session.startTurn).not.toHaveBeenCalled();
+  });
+
+  it('click while model IS ready proceeds normally (no modal)', async () => {
+    const readyIpc = makeIpc({
+      voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: true, path: '/models/whisper.bin', state: 1 }),
+    });
+    render(<VoicePTTButton _testSession={session} _testIpc={readyIpc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    expect(screen.queryByTestId('voice-model-download-modal')).toBeNull();
+    expect(session.startTurn).toHaveBeenCalled();
+  });
+
+  it('skipping the download modal closes it without entering listening', async () => {
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    // Modal is open — click skip
+    const skipBtn = screen.getByTestId('voice-download-skip');
+    await act(async () => { fireEvent.click(skipBtn); });
+    expect(screen.queryByTestId('voice-model-download-modal')).toBeNull();
+    expect(session.startTurn).not.toHaveBeenCalled();
   });
 });

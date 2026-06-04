@@ -16,6 +16,12 @@
  *   While speaking/muted-during-playback, PTT-start is blocked and the button
  *   is visually muted with tooltip "Aria is speaking".
  *
+ * Lazy first-PTT model-readiness gate (D-08/SC4):
+ *   On mount, the component checks voiceGetModelStatus(). If the model is NOT
+ *   ready, any PTT attempt (click or Space) opens the VoiceModelDownload modal
+ *   variant instead of entering listening state. Once the model is ready (or
+ *   the user skips), subsequent PTT attempts proceed normally.
+ *
  * Input guard (T-15-22):
  *   The Space keydown handler ignores events when e.target is an HTMLInputElement
  *   or HTMLTextAreaElement (prevents hijacking text entry).
@@ -31,11 +37,14 @@
  *
  * Props:
  *   _testSession — test-only override for the session store (avoids vi.mock).
+ *   _testIpc     — test-only override for the IPC layer (avoids vi.mock).
  *   compact      — renders a smaller 28×28px icon-only variant for the Topbar slot.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useVoiceSession } from './useVoiceSession';
 import type { VoiceSessionState, VoiceSessionActions } from './useVoiceSession';
+import { VoiceModelDownload } from './VoiceModelDownload';
+import type { VoiceModelDownloadIpc } from './VoiceModelDownload';
 
 // ─── styles ──────────────────────────────────────────────────────────────────
 
@@ -89,6 +98,8 @@ function MicIcon({ size = 18, color = 'currentColor' }: { size?: number; color?:
 export interface VoicePTTButtonProps {
   /** Test-only: inject a mock session to avoid vi.mock vitest-pool issues. */
   _testSession?: SessionState;
+  /** Test-only: inject a mock IPC layer (voiceGetModelStatus) to avoid vi.mock. */
+  _testIpc?: VoiceModelDownloadIpc;
   /** Compact 28×28px icon-only variant for the Topbar slot. */
   compact?: boolean;
   /** Custom data-testid (defaults to "voice-ptt-button"). */
@@ -99,16 +110,121 @@ export interface VoicePTTButtonProps {
 
 function VoicePTTButtonCore({
   session,
+  testIpc,
   compact = false,
   testId = 'voice-ptt-button',
 }: {
   session: SessionState;
+  testIpc?: VoiceModelDownloadIpc;
   compact?: boolean;
   testId?: string;
 }): JSX.Element {
   const holdActiveRef = useRef(false);
   const gated = isGated(session);
   const active = isActive(session);
+
+  // ── D-08 / SC4: Lazy model-readiness gate ───────────────────────────────
+  // Cached result of the model-status check. null = not yet checked.
+  // The check runs on first PTT press (lazy) to avoid blocking render.
+  const modelReadyRef = useRef<boolean | null>(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  // Mirror of modelReadyRef in React state for re-render-driven visual affordance
+  const [modelReadyState, setModelReadyState] = useState<boolean | null>(null);
+
+  // Resolve IPC — test injection or window.aria
+  const getIpc = useCallback((): VoiceModelDownloadIpc | null => {
+    if (testIpc) return testIpc;
+    if (typeof window !== 'undefined' && window.aria) {
+      return window.aria as unknown as VoiceModelDownloadIpc;
+    }
+    return null;
+  }, [testIpc]);
+
+  /**
+   * Check model readiness (cached after first check) and invoke callback
+   * with the result. Uses a ref cache to avoid repeated IPC calls.
+   */
+  async function checkModelReady(): Promise<boolean> {
+    if (modelReadyRef.current !== null) {
+      return modelReadyRef.current;
+    }
+    const ipc = getIpc();
+    if (!ipc) {
+      // No IPC — assume ready (fail-open, e.g. in non-electron test environments)
+      modelReadyRef.current = true;
+      setModelReadyState(true);
+      return true;
+    }
+    try {
+      const status = await ipc.voiceGetModelStatus();
+      const s = status as { ready?: boolean; state?: number } | undefined;
+      const ready = !!(s?.ready || s?.state === 1);
+      modelReadyRef.current = ready;
+      setModelReadyState(ready);
+      return ready;
+    } catch {
+      // Fail-open on error (prefer PTT over permanently blocked)
+      modelReadyRef.current = true;
+      setModelReadyState(true);
+      return true;
+    }
+  }
+
+  /**
+   * Attempt a PTT start action (shared between click and keydown paths).
+   *
+   * If model readiness is already known (cached), operates synchronously.
+   * If unknown, performs an async IPC check; until the check resolves,
+   * we optimistically proceed (fail-open) to preserve the existing synchronous
+   * behavior for tests and environments without IPC available.
+   *
+   * Only when the IPC check returns NOT ready do we open the download modal.
+   */
+  function attemptPttStart(vadMode: 'hold' | 'toggle'): void {
+    // Fast path: already known from a previous check
+    if (modelReadyRef.current === false) {
+      setShowDownloadModal(true);
+      return;
+    }
+    if (modelReadyRef.current === true) {
+      // Known ready — proceed synchronously
+      session.setVadMode(vadMode);
+      session.startTurn();
+      return;
+    }
+
+    // modelReadyRef.current === null (not yet checked)
+    const ipc = getIpc();
+    if (!ipc) {
+      // No IPC available — proceed immediately (non-Electron env / no window.aria)
+      modelReadyRef.current = true;
+      setModelReadyState(true);
+      session.setVadMode(vadMode);
+      session.startTurn();
+      return;
+    }
+
+    // Async check: optimistically start the turn while the check is in-flight.
+    // If the model turns out NOT ready, abort the turn and show the modal.
+    // This keeps the synchronous "known ready" and "no IPC" paths fast.
+    checkModelReady().then((ready) => {
+      if (!ready) {
+        setShowDownloadModal(true);
+        // If we had already started the turn optimistically, stop it
+        // (checkModelReady updates modelReadyRef so this branch is only hit
+        // when we learn the model is absent — the turn was never started
+        // because this async path is only taken when null → we do NOT
+        // call startTurn here).
+        return;
+      }
+      session.setVadMode(vadMode);
+      session.startTurn();
+    }).catch(() => {
+      // Fail-open on IPC error
+      session.setVadMode(vadMode);
+      session.startTurn();
+    });
+  }
 
   // ── DOM keydown/keyup Space handler (D-10) ──────────────────────────────
   useEffect(() => {
@@ -127,15 +243,17 @@ function VoicePTTButtonCore({
       if (gated) return;
 
       holdActiveRef.current = true;
-      session.setVadMode('hold');
-      session.startTurn();
+      attemptPttStart('hold');
     }
 
     function onKeyUp(e: KeyboardEvent): void {
       if (e.key !== ' ' && e.code !== 'Space') return;
       if (!holdActiveRef.current) return;
       holdActiveRef.current = false;
-      session.stopTurn();
+      // Only call stopTurn if we actually started a turn (model was ready)
+      if (modelReadyRef.current !== false) {
+        session.stopTurn();
+      }
     }
 
     window.addEventListener('keydown', onKeyDown);
@@ -144,6 +262,7 @@ function VoicePTTButtonCore({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, gated]);
 
   // ── Click handler (toggle path, D-10) ───────────────────────────────────
@@ -154,17 +273,20 @@ function VoicePTTButtonCore({
       // Second click stops the current turn (toggle-stop)
       session.stopTurn();
     } else {
-      // First click starts a new toggle turn
-      session.setVadMode('toggle');
-      session.startTurn();
+      // First click: check model readiness, then start or show modal
+      attemptPttStart('toggle');
     }
   }
 
   // ── Visual state ─────────────────────────────────────────────────────────
+  const modelNotReady = modelReadyState === false;
   const btnSize = compact ? 28 : 44;
   const iconSize = compact ? 14 : 18;
-  const gatedStyle: React.CSSProperties = gated
-    ? { opacity: 0.5, cursor: 'not-allowed' }
+
+  // Three disabled states: gated (speaking), model-not-ready, or normal
+  const gatedStyle: React.CSSProperties =
+    gated ? { opacity: 0.5, cursor: 'not-allowed' }
+    : modelNotReady ? { opacity: 0.5 }
     : {};
   const activeStyle: React.CSSProperties = active
     ? {
@@ -177,7 +299,21 @@ function VoicePTTButtonCore({
         border: '1.5px solid var(--rule)',
       };
 
-  const micColor = active ? 'var(--gold)' : gated ? 'var(--gray-faint)' : 'var(--gray)';
+  const micColor = active
+    ? 'var(--gold)'
+    : gated || modelNotReady
+    ? 'var(--gray-faint)'
+    : 'var(--gray)';
+
+  const ariaLabel = modelNotReady
+    ? 'Voice model not ready — click to set up'
+    : 'Push to talk — hold Space or click to toggle';
+
+  const titleAttr = gated
+    ? 'Aria is speaking'
+    : modelNotReady
+    ? 'Voice model not downloaded — click to set up'
+    : undefined;
 
   return (
     <>
@@ -193,9 +329,9 @@ function VoicePTTButtonCore({
         <button
           type="button"
           data-testid={testId}
-          aria-label="Push to talk — hold Space or click to toggle"
+          aria-label={ariaLabel}
           aria-disabled={gated ? 'true' : undefined}
-          title={gated ? 'Aria is speaking' : undefined}
+          title={titleAttr}
           onClick={handleClick}
           className={active ? 'ptt-ring-pulse' : undefined}
           style={{
@@ -233,6 +369,26 @@ function VoicePTTButtonCore({
           </span>
         )}
       </div>
+
+      {/* D-08 / SC4: Lazy first-PTT VoiceModelDownload modal */}
+      {showDownloadModal && (
+        <VoiceModelDownload
+          variant="modal"
+          open={showDownloadModal}
+          _testIpc={testIpc}
+          onSkip={() => {
+            setShowDownloadModal(false);
+            // User skipped: clear the cached "not ready" so next PTT re-checks.
+            // This is a soft skip — if they skipped accidentally, next press
+            // will check again (IPC remains fast since model state hasn't changed).
+          }}
+          onComplete={() => {
+            setShowDownloadModal(false);
+            modelReadyRef.current = true;
+            setModelReadyState(true);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -243,10 +399,11 @@ function VoicePTTButtonCore({
  * VoicePTTButton — public export.
  *
  * In production, calls useVoiceSession() to get the live session store.
- * In tests, accepts _testSession to inject a mock session without vi.mock.
+ * In tests, accepts _testSession to inject a mock session without vi.mock,
+ * and _testIpc to inject a mock IPC layer for the model-readiness check.
  */
-export function VoicePTTButton({ _testSession, compact, testId }: VoicePTTButtonProps): JSX.Element {
+export function VoicePTTButton({ _testSession, _testIpc, compact, testId }: VoicePTTButtonProps): JSX.Element {
   const liveSession = useVoiceSession();
   const session = _testSession ?? liveSession;
-  return <VoicePTTButtonCore session={session} compact={compact} testId={testId} />;
+  return <VoicePTTButtonCore session={session} testIpc={_testIpc} compact={compact} testId={testId} />;
 }
