@@ -22,6 +22,7 @@ directories are git-ignored (see `.gitignore`).
 **Artifact:** `whisper-bin-x64.zip`
 **Contents:**
   - `whisper-cli.exe` — the CLI binary
+  - `whisper.dll` — required Whisper runtime DLL (CRITICAL: omitting this causes STATUS_DLL_NOT_FOUND / exit 127 at runtime)
   - `ggml.dll`, `ggml-base.dll`, `ggml-cpu.dll` — required GGML runtime DLLs
 
 **Steps:**
@@ -113,7 +114,7 @@ signing pipeline blocked), do NOT re-architect mid-phase. Per D-04:
 {
   "from": "build/whisper/windows/",
   "to": ".",
-  "filter": ["whisper-cli.exe", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll"],
+  "filter": ["whisper-cli.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll"],
   "platform": "win32"
 },
 {
@@ -145,6 +146,7 @@ which is REQUIRED to pass macOS Gatekeeper on a clean install (§Pitfall 2).
 ## Verification Checklist (before packaged build)
 
 - [ ] `build/whisper/windows/whisper-cli.exe` exists and runs with `--help`
+- [ ] `build/whisper/windows/whisper.dll` present (REQUIRED — omitting causes STATUS_DLL_NOT_FOUND / exit 127)
 - [ ] `build/whisper/windows/ggml.dll` (and other DLLs) present
 - [ ] `build/whisper/macos/whisper-cli` exists, is executable, `otool -L` shows only system frameworks
 - [ ] Apple Developer ID cert available for macOS notarization (or `CSC_IDENTITY_AUTO_DISCOVERY=false` for dev build)

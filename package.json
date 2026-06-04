@@ -188,7 +188,7 @@
       {
         "from": "build/whisper/windows/",
         "to": ".",
-        "filter": ["whisper-cli.exe", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll"],
+        "filter": ["whisper-cli.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll"],
         "platform": "win32"
       },
       {

@@ -89,8 +89,26 @@ describe('Whisper binary packaging config — package.json invariants (D-02, §P
       expect(
         winEntry,
         'Expected a package.json build.extraResources entry with platform="win32" and filter including "whisper-cli.exe".\n' +
-        'Add: { "from": "build/whisper/windows/", "to": ".", "filter": ["whisper-cli.exe", ...], "platform": "win32" }',
+        'Add: { "from": "build/whisper/windows/", "to": ".", "filter": ["whisper-cli.exe", "whisper.dll", ...], "platform": "win32" }',
       ).toBeDefined();
+    });
+
+    it('Windows extraResources filter includes whisper.dll (required runtime DLL — omitting causes STATUS_DLL_NOT_FOUND / exit 127)', () => {
+      const entries = getExtraResources();
+      const winEntry = entries.find(
+        (e) =>
+          e.platform === 'win32' &&
+          Array.isArray(e.filter) &&
+          e.filter.some((f) => f.includes('whisper-cli.exe')),
+      );
+      expect(winEntry).toBeDefined();
+      expect(
+        winEntry?.filter,
+        'The Windows extraResources filter MUST include "whisper.dll".\n' +
+        'Removing whisper.dll causes whisper-cli.exe to exit with STATUS_DLL_NOT_FOUND (exit 127 / 1 output line) at runtime.\n' +
+        'This was verified empirically: with whisper.dll → exit 0 (73 lines); without whisper.dll → exit 127 (1 line).\n' +
+        'Add "whisper.dll" to the win32 extraResources filter in package.json.',
+      ).toContain('whisper.dll');
     });
 
     it('has a macOS extraResources entry that includes whisper-cli', () => {
