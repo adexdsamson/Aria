@@ -24,7 +24,7 @@
 ### Phases
 
 - [x] **Phase 14: Voice Safety / Confirm Contract** - Design the voice-confirm contract, the HARD GATE blocking voice from forced/high-severity, and the STATIC RATCHET on voice write-paths — before any fluency work. (completed 2026-06-03)
-- [ ] **Phase 15: Audio I/O + Model Runtime** - Renderer mic/VAD/playback + STT sidecar that survives packaging; prove AEC + ABI + RAM + device handling on the packaged app.
+- [x] **Phase 15: Audio I/O + Model Runtime** - Renderer mic/VAD/playback + STT sidecar that survives packaging; prove AEC + ABI + RAM + device handling on the packaged app. (completed 2026-06-04)
 - [ ] **Phase 16: Streaming Cascade + Barge-in (read-only)** - The "feels conversational" loop with zero write risk: streaming STT→LLM→TTS, barge-in, spoken briefing/answer playback.
 - [ ] **Phase 17: Voice-Confirm + Writes Through the Gate** - Voice-driven triage/scheduling/drafting via the confirm flow + assertApproved; mishear recovery; cloud opt-in consent + voice settings.
 - [ ] **Phase 18: Opt-in Wake-Word + Privacy Isolation** - "Hey Aria" in a privacy-isolated, provably-killable process, OFF by default — gated on the commercial wake-word licensing decision.
@@ -65,7 +65,7 @@
   - [x] 15-06-PLAN.md — Real Kokoro TTS playback + Zustand session store + half-duplex micGated gate (SC3)
   - [x] 15-07-PLAN.md — Mic-state surface: VoiceStatusDot + VoiceHUDBand + PTT + App/Topbar wiring
   - [x] 15-08-PLAN.md — Model-download UX: onboarding step + lazy modal + disabled-PTT affordance (SC4)
-  - [ ] 15-09-PLAN.md — Packaging: extraResources binary + mac.binaries signing + packaged-launch E2E (SC2) + RAM ceiling
+  - [x] 15-09-PLAN.md — Packaging: extraResources binary + mac.binaries signing + packaged-launch E2E (SC2) + RAM ceiling
 **UI hint**: yes
 
 ### Phase 16: Streaming Cascade + Barge-in (read-only)
@@ -123,7 +123,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
-| 15. Audio I/O + Model Runtime | 8/9 | In Progress|  |
+| 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
 | 16. Streaming Cascade + Barge-in | 0/0 | Not started | - |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |

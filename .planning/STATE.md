@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: executing
-last_updated: "2026-06-04T06:38:00.000Z"
+status: verifying
+last_updated: "2026-06-04T05:55:52.728Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 12
-  completed_plans: 11
-  percent: 17
+  completed_plans: 12
+  percent: 33
 ---
 
 # State
@@ -23,13 +23,18 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 9 of 9 (15-09 in-progress, paused at Task 2 human-action checkpoint)
+Phase: 15 (audio-i-o-model-runtime) — complete-with-deferred-verification
+Plan: 9 of 9 (15-09 complete; two open human-verify debts: macOS binary + packaged-launch+RAM)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 9 in-progress (packaging config + static guard done; paused at Task 2 human-action checkpoint: macOS whisper-cli binary procurement)
-**Status:** Executing Phase 15
+**Plan:** 9 complete — packaging config + ship-blocker fix (whisper.dll) + Windows binary staged/verified; macOS DEFERRED to CI; SC2/SC3/SC5 + RAM ceiling = OPEN human-verify debt
+**Status:** Phase 15 code-complete; packaged-verification pending user's 16 GB machine
 **Last activity:** 2026-06-04
+
+**Open verification debts (Phase 15):**
+
+- macOS whisper-cli binary: CI cmake -DWHISPER_METAL=ON + notarization; see build/whisper/README.md §Option A
+- Packaged-launch SC2 (no ABI crash) + SC3 (laptop-speaker half-duplex) + SC5 (device hot-swap) + RAM ceiling: requires packaged build on 16 GB machine; see tests/e2e/packaged-launch.spec.ts + .planning/phases/15-audio-i-o-model-runtime/15-RAM-CEILING.md
 
 **v2.0 phases (14–19), dependency-ordered:**
 
