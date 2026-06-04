@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-03T22:25:00.000Z"
+last_updated: "2026-06-04T04:59:04.263Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 12
   completed_plans: 10
-  percent: 19
+  percent: 17
 ---
 
 # State
@@ -24,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 15 (audio-i-o-model-runtime) — EXECUTING
-Plan: 6 of 9 (15-05 complete)
+Plan: 7 of 9 (15-07 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 15
-**Plan:** 6 complete (voice IPC wiring: registerVoiceHandlers + bootstrap sidecar/download/powerMonitor lifecycle — VOICE-01/04)
+**Plan:** 7 complete (voice UI surface: VoiceStatusDot + VoiceHUDBand + VoicePTTButton + App.tsx/Topbar wiring — VOICE-01/VOICE-07)
 **Status:** Executing Phase 15
-**Last activity:** 2026-06-03
+**Last activity:** 2026-06-04
 
 **v2.0 phases (14–19), dependency-ordered:**
 
@@ -55,6 +55,10 @@ Plan: 6 of 9 (15-05 complete)
 - Pre-unlock voice stubs (15-05): VOICE_FEED_AUDIO/DOWNLOAD/GET_STATUS/CANCEL stubs in ipc/index.ts replaced at bootstrap by real registerVoiceHandlers; voiceEmitter forward-ref bound post-mainWindow
 - IPC db-null skip trap (15-05): knowledge channels stubs always register + add to skip pre-unlock; entitlement else-branch covers all 5 channels
 - Handler-count invariant (15-05): 149/149 CHANNELS registered in registerHandlers — push-event no-op stubs + pre-unlock stubs close the gap
+- VoiceStatusDot (15-07): wraps StatusDot editorial primitive; state→kind: listening/processing→warn, speaking→ok, error→err, idle/muted→idle; prefers-reduced-motion suppresses pulse+spinner (D-14/D-16)
+- VoiceHUDBand (15-07): grid-template-rows 0fr/1fr collapse/expand chosen over max-height; inner overflow:hidden; role=status aria-live=polite aria-atomic=false; transcript plain text node (D-15/T-15-21)
+- VoicePTTButton (15-07): Public/Core split avoids conditional useVoiceSession hook; _testSession prop avoids vi.mock vitest-pool timeout; testId prop for Topbar aria-topbar-ptt slot (D-10/D-12)
+- stopTurn/setVadMode (15-07): added to VoiceSessionActions — stopTurn transitions listening→processing; setVadMode stores 'hold'|'toggle' for capture layer (D-10/D-11)
 
 ## Next Action
 
