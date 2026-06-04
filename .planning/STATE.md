@@ -71,7 +71,7 @@ Plan: 9 of 9 (15-09 complete; two open human-verify debts: macOS binary + packag
 
 ## Next Action
 
-`/gsd-plan-phase 14` — plan the Voice Safety / Confirm Contract phase (lighter research; extends existing assertApproved / approval-transition / static-grep patterns). Phase 15 and Phase 18 are flagged for deeper `/gsd-research-phase` at plan time.
+`/gsd-plan-phase 16` — plan Streaming Cascade + Barge-in (read-only). CONTEXT.md captured 2026-06-04 (13 decisions D-01..D-13, advisor mode). Lighter research (AI SDK streamText + sentence-split + streaming TTS patterns extending existing Aria source). Keep `workflow.use_worktrees=false` for Phase 16 execution (Windows node_modules-wipe hazard). Phase 15 packaged-verification debts remain open (need 16 GB machine + macOS CI binary).
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
