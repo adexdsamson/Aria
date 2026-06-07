@@ -32,6 +32,7 @@ import type { DbHolder } from './onboarding';
 import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
 import { getVoiceModelStatus } from '../voice/prefs';
+import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 
 export interface VoiceHandlersDeps {
   logger: Logger;
@@ -196,9 +197,18 @@ export function registerVoiceHandlers(
   //
   // D-06: read voice_latency_log rows. Debug-only; ARIA_DEBUG=1 required for
   // any rows to exist. Mirrors DIAGNOSTICS_ROUTING_LOG handler shape exactly.
-  // TODO(16-02): replace stub with readRecentVoiceLatencyLog(db, limit) call.
-  ipcMain.handle(CHANNELS.DIAGNOSTICS_VOICE_LATENCY, async () => {
-    return [];
+  ipcMain.handle(CHANNELS.DIAGNOSTICS_VOICE_LATENCY, async (_e, payload: unknown) => {
+    const req = (payload ?? {}) as { limit?: number };
+    const limit = typeof req.limit === 'number' && req.limit > 0 ? req.limit : 100;
+    const db = deps.dbHolder.db;
+    if (!db) {
+      return [];
+    }
+    try {
+      return readRecentVoiceLatencyLog(db, limit);
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
   });
 
   // ─── VOICE_FEED_ANSWER ───────────────────────────────────────────────────
