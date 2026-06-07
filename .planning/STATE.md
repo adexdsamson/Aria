@@ -23,12 +23,14 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 6 of 6 (Plans 01-05 complete; plan 04b paused at human-verify checkpoint)
+Phase: 16 (streaming-cascade-barge-in-read-only) — CODE-COMPLETE (runtime smoke deferred)
+Plan: 6 of 6 complete (sequential/no-worktree; node_modules intact throughout)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 05 COMPLETE — D-13 read-only static ratchet (a37a95d); 04b still paused at checkpoint:human-verify awaiting SC1-SC5 smoke test
-**Status:** Plan 05 complete; Plan 04b paused at human-verify checkpoint
+**Plan:** All 6 complete. Full streaming cascade wired: PTT→STT→streamVoiceAnswer(local-route)→TtsSegmenter→VOICE_TTS_CHUNK→useReadAloudQueue→Kokoro; barge-in (renderer-first abort + [interrupted] turn); briefing read-aloud (pause/skip/speed); multi-turn via rag thread; D-13 read-only ratchet green.
+**Status:** Phase 16 code-complete; 5-test runtime smoke (SC1–SC5) deferred to human-verify on running app
+**Verifier:** 13/13 must-haves (/ask shell-HUD player gap closed in `f168a6a`); 5 runtime-smoke items open (see 16-VERIFICATION.md). Typecheck flat at 84 baseline, 0 new across all 6 plans.
+**Open Phase-16 human-verify (run `pnpm dev`):** SC1 briefing pause/skip/speed · SC2 /ask first-audio <900ms + voice_latency_log 4 cols (ARIA_DEBUG=1) · SC3 barge-in <200ms · SC4 multi-turn "he" resolution · SC5 backchannel non-interruption
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -115,7 +117,10 @@ Plan: 6 of 6 (Plans 01-05 complete; plan 04b paused at human-verify checkpoint)
 
 ## Next Action
 
-`/gsd-execute-phase 16` — Plans 01-05 complete. Plan 04b paused at checkpoint:human-verify (2026-06-07). Tasks 1-2 complete (df00616, 597c47f). Plan 05 complete (a37a95d). Resume 04b after human smoke test SC1-SC5 passes. All 6 plans coded; phase awaiting human-verify gate.
+**Phase 16 CODE-COMPLETE (2026-06-07)** — all 6 plans done, verifier 13/13 (/ask player gap closed f168a6a). Two next options:
+1. **Run the 5-test runtime smoke** (`pnpm dev`): SC1 briefing pause/skip/speed · SC2 /ask first-audio <900ms + voice_latency_log (ARIA_DEBUG=1) · SC3 barge-in <200ms · SC4 multi-turn "he" · SC5 backchannel non-interruption. Report results to close the deferred human-verify.
+2. **`/gsd-plan-phase 17`** — Voice-Confirm + Writes Through the Gate (VOICE-05/08/09/11); depends on Phase 16 (read-only loop battle-tested) + Phase 14 (confirm contract). Note Phase 17 will add frontier voice streaming (deferred from 16) + cloud opt-in.
+Keep `workflow.use_worktrees=false` (Windows). NOT pushed — 30 commits ahead of origin (Phase 16 planning + execution). Phase 15 packaged-verify debts still open.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
