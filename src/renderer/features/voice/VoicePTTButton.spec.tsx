@@ -29,6 +29,7 @@ function makeSession(
     micGated: false,
     liveTranscript: '',
     modelProgress: null,
+    paused: false,             // Phase 16 / D-09 addition
     startTurn: vi.fn().mockReturnValue(true),
     stopTurn: vi.fn(),
     setVadMode: vi.fn(),
@@ -37,6 +38,9 @@ function makeSession(
     onPlaybackStart: vi.fn(),
     onPlaybackEnd: vi.fn(),
     subscribeToIpc: vi.fn(),
+    bargeIn: vi.fn(),          // Phase 16 / D-01 addition
+    pause: vi.fn(),            // Phase 16 / D-09 addition
+    resume: vi.fn(),           // Phase 16 / D-09 addition
     ...overrides,
   };
 }

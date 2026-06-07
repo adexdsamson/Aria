@@ -1,11 +1,14 @@
 /**
  * Phase 15 / Plan 15-06 — Voice session store + half-duplex gate.
+ * Phase 16 / Plan 16-03 — Barge-in + pause/resume (D-01/D-09).
  *
  * Implements:
  *   D-13: micGated=true on turn-start AND for the full TTS playback duration;
  *         PTT start blocked while speaking; micGated=false after ~800ms cooldown.
  *   D-17: VoiceState union includes 'speaking' (Phase 16 seam).
  *   VOICE-07: Aria never transcribes its own TTS (the gate enforces this).
+ *   D-01: bargeIn() replaces the no-op guard when voiceState==='speaking'.
+ *   D-09: pause()/resume() thread paused boolean through state; clearCooldown on pause.
  *
  * Architecture: a minimal observable store (no Zustand dependency — package not
  * installed). Exports createVoiceSessionStore() factory for testing and
@@ -14,6 +17,9 @@
  * State machine:
  *   idle ──startTurn()──→ listening ──setTranscript(final=true)──→ processing ──endTurn()──→ idle
  *   any  ──onPlaybackStart()──→ speaking ──onPlaybackEnd()──→ (cooldown ~800ms) ──→ idle
+ *   speaking ──bargeIn()──→ idle (D-01: fires voiceAbort IPC fire-and-forget)
+ *   speaking ──pause()──→ speaking/paused=true (D-09: caller suspends AudioContext)
+ *   speaking/paused ──resume()──→ speaking/paused=false (D-09: caller resumes AudioContext)
  *
  * IPC push subscriptions:
  *   window.aria.onVoiceTranscript  → setTranscript
@@ -45,6 +51,12 @@ export interface VoiceSessionState {
   liveTranscript: string;
   /** Model download progress (for the download modal). */
   modelProgress: { receivedBytes: number; totalBytes: number } | null;
+  /**
+   * Phase 16 / D-09: true while TTS playback is suspended via AudioContext.suspend().
+   * Stays alongside voiceState='speaking' so the HUD displays correctly.
+   * Callers (VoiceHUDBand) call player.suspend()/player.resume() directly.
+   */
+  paused: boolean;
 }
 
 // ─── store actions type ───────────────────────────────────────────────────────
@@ -52,7 +64,8 @@ export interface VoiceSessionState {
 export interface VoiceSessionActions {
   /**
    * Initiate a PTT turn. Sets state='listening' + micGated=true.
-   * NO-OP (returns false) if state==='speaking' — D-13 half-duplex gate.
+   * When state==='speaking', calls bargeIn() instead of returning false (D-01).
+   * NO-OP (returns false) if state==='muted-during-playback' — D-13 half-duplex gate.
    */
   startTurn(): boolean;
 
@@ -101,6 +114,32 @@ export interface VoiceSessionActions {
    * Mirrors the AppShellNavigateListener useEffect pattern (App.tsx:201-218).
    */
   subscribeToIpc(aria: AriaApi): () => void;
+
+  /**
+   * Phase 16 / D-01: Interrupt Aria's TTS playback.
+   * No-op if voiceState !== 'speaking'. When speaking:
+   *   1. clearCooldown() — cancel in-flight cooldown timer
+   *   2. Fire voiceAbort IPC without await (D-02 fire-and-forget)
+   *   3. Transition to idle (voiceState='idle', micGated=false, paused=false)
+   * SC5: ambient sound without PTT press never triggers anything — no-op guard.
+   * NOTE: Caller (VoiceHUDBand 16-04b) is responsible for readAloudQueue.cancel()
+   * and player.resume() if paused.
+   */
+  bargeIn(): void;
+
+  /**
+   * Phase 16 / D-09: Suspend TTS playback.
+   * Cancels the cooldown timer and sets paused=true.
+   * NOTE: Caller (VoiceHUDBand 16-04b) is responsible for player.suspend().
+   */
+  pause(): void;
+
+  /**
+   * Phase 16 / D-09: Resume TTS playback.
+   * Sets paused=false.
+   * NOTE: Caller (VoiceHUDBand 16-04b) is responsible for player.resume().
+   */
+  resume(): void;
 }
 
 export type VoiceSessionStore = {
@@ -122,10 +161,15 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     micGated: false,
     liveTranscript: '',
     modelProgress: null,
+    paused: false,
   };
 
   const listeners = new Set<() => void>();
   let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
+  // Phase 16 / D-01: current session ID for voiceAbort IPC payload.
+  // Wave 2 VoiceSessionManager establishes the real session ID via IPC;
+  // for now we generate a lightweight ID on each startTurn().
+  let currentSessionId = '';
 
   function notify(): void {
     for (const listener of listeners) {
@@ -150,13 +194,24 @@ export function createVoiceSessionStore(): VoiceSessionStore {
 
   const actions: VoiceSessionActions = {
     startTurn(): boolean {
-      // D-13 half-duplex gate: blocked while speaking (or muted-during-playback)
-      if (state.voiceState === 'speaking' || state.voiceState === 'muted-during-playback') {
+      // Phase 16 / D-01: re-pressing PTT while speaking = barge-in, not a no-op.
+      if (state.voiceState === 'speaking') {
+        actions.bargeIn();
+        return false;
+      }
+      // D-13 half-duplex gate: still blocked while muted-during-playback
+      if (state.voiceState === 'muted-during-playback') {
         return false;
       }
       // vadMode is read here so the capture layer can adjust VAD thresholds (D-11).
       // The current mode is logged/accessible for the PCM pipeline.
       void vadMode; // referenced — VAD capture layer will read this in Plan 15-05 integration
+      // Phase 16 / D-01: generate a session ID for the new turn.
+      // Wave 2 VoiceSessionManager will supply the canonical sessionId via IPC;
+      // this lightweight fallback covers the renderer-only path.
+      currentSessionId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `vses_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       setState({ voiceState: 'listening', micGated: true, liveTranscript: '' });
       return true;
     },
@@ -202,6 +257,35 @@ export function createVoiceSessionStore(): VoiceSessionStore {
         cooldownTimer = null;
         setState({ voiceState: 'idle', micGated: false });
       }, HALF_DUPLEX_COOLDOWN_MS);
+    },
+
+    bargeIn(): void {
+      // D-01: no-op when not speaking (SC5: ambient sound without PTT never interrupts)
+      if (state.voiceState !== 'speaking') return;
+      // 1. Cancel any in-flight cooldown timer (D-09)
+      clearCooldown();
+      // 2. Fire one-way IPC abort — NO await (D-02 fire-and-forget, ~5ms renderer-side cancel)
+      //    Caller (VoiceHUDBand 16-04b) is responsible for readAloudQueue.cancel() and
+      //    player.resume() if AudioContext is suspended.
+      //    Guard against test environments where window.aria is undefined.
+      if (typeof window !== 'undefined' && window.aria) {
+        (window.aria as AriaApi).voiceAbort?.({ sessionId: currentSessionId });
+      }
+      // 3. Transition to idle — clears paused=false, micGated=false
+      setState({ voiceState: 'idle', micGated: false, paused: false, liveTranscript: '' });
+    },
+
+    pause(): void {
+      // D-09: cancel cooldown timer on pause, set paused=true.
+      // Caller (VoiceHUDBand 16-04b) is responsible for player.suspend().
+      clearCooldown();
+      setState({ paused: true });
+    },
+
+    resume(): void {
+      // D-09: set paused=false.
+      // Caller (VoiceHUDBand 16-04b) is responsible for player.resume().
+      setState({ paused: false });
     },
 
     subscribeToIpc(aria: AriaApi): () => void {

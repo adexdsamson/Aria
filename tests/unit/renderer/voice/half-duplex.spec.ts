@@ -22,7 +22,7 @@ describe('Half-duplex gate (VOICE-07 / SC3 automated proxy)', () => {
     vi.useRealTimers();
   });
 
-  it('PTT-start (startTurn) is rejected while state === speaking', () => {
+  it('PTT-start (startTurn) returns false while state === speaking (D-01: calls bargeIn)', () => {
     const store = createVoiceSessionStore();
 
     // Transition to speaking
@@ -33,13 +33,13 @@ describe('Half-duplex gate (VOICE-07 / SC3 automated proxy)', () => {
     // Attempt PTT-start during TTS playback
     const startTurnResult = store.getState().startTurn();
 
-    // The gate must hold: state stays speaking, micGated stays true
-    expect(store.getState().voiceState).toBe('speaking');
-    expect(store.getState().micGated).toBe(true);
-
-    // startTurn should indicate it was blocked (returns false or undefined)
-    // Either false or undefined is acceptable — what matters is the gate holds
-    expect(startTurnResult).toBeFalsy();
+    // Phase 16 / D-01: startTurn() now calls bargeIn() when speaking.
+    // Returns false (not a new listening turn), and transitions to idle.
+    // The mic does NOT stay gated for the old turn — barge-in clears it.
+    expect(startTurnResult).toBe(false);
+    // State transitions to idle (bargeIn was called)
+    expect(store.getState().voiceState).toBe('idle');
+    expect(store.getState().micGated).toBe(false);
   });
 
   it('micGated=true blocks feedAudio acknowledgement during speaking', () => {
