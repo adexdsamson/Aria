@@ -33,6 +33,7 @@ import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
 import { getVoiceModelStatus } from '../voice/prefs';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
+import { createVoiceSessionManager } from '../voice/voice-session-manager';
 
 export interface VoiceHandlersDeps {
   logger: Logger;
@@ -50,6 +51,12 @@ export interface VoiceHandlersDeps {
   voiceSessionManager?: {
     startAnswer(args: { sessionId: string; question: string }): Promise<void>;
     onBargeIn(args: { sessionId: string }): void;
+    /** WARNING 2 fix: store renderer timing marks into VoiceSession for latency log. */
+    markLatency(args: {
+      sessionId: string;
+      mark: 'kokoro_synth_start' | 'first_audio_out';
+      t: number;
+    }): void;
   };
 }
 
@@ -58,6 +65,24 @@ export function registerVoiceHandlers(
   deps: VoiceHandlersDeps,
 ): void {
   const { logger, sttSidecar, downloadController } = deps;
+
+  // Phase 16 / Plan 16-04a: Wire the real VoiceSessionManager if not already provided.
+  // Creates the manager from available deps (db, emitToRenderer, sessionAbortControllers)
+  // so VOICE_ABORT, VOICE_FEED_ANSWER, and VOICE_LATENCY_MARK resolve to real implementations.
+  if (!deps.voiceSessionManager && deps.dbHolder.db && deps.emitToRenderer) {
+    const abortControllers: Map<string, AbortController> =
+      deps.sessionAbortControllers ?? new Map();
+    // Re-assign the shared map so VOICE_ABORT can find the controllers too.
+    if (!deps.sessionAbortControllers) {
+      deps.sessionAbortControllers = abortControllers;
+    }
+    deps.voiceSessionManager = createVoiceSessionManager({
+      db: deps.dbHolder.db,
+      logger,
+      emitToRenderer: deps.emitToRenderer,
+      sessionAbortControllers: abortControllers,
+    });
+  }
 
   // ─── VOICE_FEED_AUDIO ────────────────────────────────────────────────────
   //
@@ -229,10 +254,24 @@ export function registerVoiceHandlers(
 
   // ─── VOICE_LATENCY_MARK ──────────────────────────────────────────────────
   //
-  // D-06 / SC2: renderer fires this fire-and-forget channel to report
-  // t_kokoro_synth_start and t_first_audio_out timing marks. No-op stub —
-  // real handler updating VoiceSession timing fields lands in 16-04a.
-  ipcMain.handle(CHANNELS.VOICE_LATENCY_MARK, async () => {
+  // D-06 / SC2 / WARNING 2 fix: renderer fires this fire-and-forget channel
+  // to report t_kokoro_synth_start and t_first_audio_out timing marks into
+  // the in-memory VoiceSession. Upgraded from no-op stub (16-01) to real
+  // wiring: delegates to voiceSessionManager.markLatency so all four t_*
+  // columns are populated when writeVoiceLatencyLog fires on stream completion.
+  ipcMain.handle(CHANNELS.VOICE_LATENCY_MARK, async (_e, payload: unknown) => {
+    const req = (payload ?? {}) as {
+      sessionId?: string;
+      mark?: 'kokoro_synth_start' | 'first_audio_out';
+      t?: number;
+    };
+    if (req.sessionId && req.mark && typeof req.t === 'number') {
+      deps.voiceSessionManager?.markLatency({
+        sessionId: req.sessionId,
+        mark: req.mark,
+        t: req.t,
+      });
+    }
     return undefined;
   });
 }

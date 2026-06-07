@@ -30,10 +30,12 @@ vi.mock('../../../../src/main/rag/answer-service', () => ({
 }));
 
 vi.mock('../../../../src/main/voice/tts-segmenter', () => ({
-  TtsSegmenter: vi.fn(() => ({
-    push: vi.fn(() => []),
-    flush: vi.fn(() => ''),
-  })),
+  TtsSegmenter: vi.fn(function () {
+    return {
+      push: vi.fn(() => []),
+      flush: vi.fn(() => ''),
+    };
+  }),
 }));
 
 vi.mock('../../../../src/main/voice/voice-latency-log', () => ({
