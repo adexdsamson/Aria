@@ -1,9 +1,18 @@
 /**
  * Phase 15 / Plan 15-06 — Renderer Kokoro-82M TTS playback hook.
+ * Phase 16 / Plan 16-03 — Speed type fix (D-08) + suspend/resume (D-09) + cancel (D-02).
  *
  * Implements D-18 (CONTEXT.md): stand up the REAL kokoro-js (Kokoro-82M)
  * playback path in the renderer. The trigger is a minimal utterance (a fixed
  * confirmation or echo of the transcript) — NOT briefing/answer content.
+ *
+ * Phase 16 additions (WARNING 3 fix — full interface contract declared here so
+ * 16-04b can call suspend()/resume()/cancel() without any guesswork):
+ *   - KokoroTtsInstance.generate() accepts speed?: number (D-08)
+ *   - KokoroPlayerHandle.speak() accepts options?: {speed?:number} (D-08)
+ *   - KokoroPlayerHandle.cancel() stops the current AudioBufferSourceNode (D-02)
+ *   - KokoroPlayerHandle.suspend() wraps AudioContext.suspend() (D-09 Pitfall 6)
+ *   - KokoroPlayerHandle.resume() wraps AudioContext.resume() (D-09 Pitfall 6)
  *
  * Device strategy (RESEARCH §Pattern 3):
  *   1. If navigator.gpu is present → try device:'webgpu' (fp32)
@@ -30,7 +39,11 @@ import { useRef, useCallback } from 'react';
 export interface KokoroTtsInstance {
   generate(
     text: string,
-    options?: { voice?: string }
+    options?: {
+      voice?: string;
+      /** Phase 16 / D-08: speed 0.5–2x via StyleTTS2 duration scaling (pitch-neutral). */
+      speed?: number;
+    }
   ): Promise<{ audio: Float32Array; sampling_rate: number }> | { audio: Float32Array; sampling_rate: number };
 }
 
@@ -87,8 +100,30 @@ export interface KokoroPlayerHandle {
    * Synthesize and play `text` through an AudioBufferSourceNode.
    * Fires onPlaybackStart before play, onPlaybackEnd after the buffer ends.
    * Resolves when playback is complete (or if speak is called without init).
+   * Phase 16 / D-08: accepts options.speed (0.5–2x) threaded to generate().
    */
-  speak(text: string): Promise<void>;
+  speak(text: string, options?: { speed?: number }): Promise<void>;
+
+  /**
+   * Phase 16 / D-02: Stop the current AudioBufferSourceNode immediately.
+   * Safe to call even when not speaking (no-op if no active source).
+   * Called by useReadAloudQueue.cancel() as part of Pitfall 5 fix.
+   */
+  cancel(): void;
+
+  /**
+   * Phase 16 / D-09 (WARNING 3 fix): Suspend the AudioContext.
+   * Wraps audioCtx.suspend() — fire-and-forget (not awaited) for UI responsiveness.
+   * Caller: VoiceHUDBand (Plan 16-04b) on pause button press.
+   */
+  suspend(): void;
+
+  /**
+   * Phase 16 / D-09 (WARNING 3 fix): Resume the AudioContext.
+   * Wraps audioCtx.resume() — fire-and-forget (not awaited) for UI responsiveness.
+   * Caller: VoiceHUDBand (Plan 16-04b) on resume button press / barge-in completion.
+   */
+  resume(): void;
 
   /** True once init() has completed successfully. */
   readonly ready: boolean;
@@ -120,6 +155,8 @@ export function createKokoroPlayer(options: KokoroPlayerOptions = {}): KokoroPla
   let ttsInstance: KokoroTtsInstance | null = null;
   let audioCtx: AudioContext | null = null;
   let _ready = false;
+  // Phase 16 / D-02: track the active AudioBufferSourceNode for cancel().
+  let sourceRef: AudioBufferSourceNode | null = null;
 
   async function loadTts(): Promise<KokoroTtsInstance> {
     // Resolve the factory: injected (test) or the real kokoro-js (production)
@@ -170,7 +207,7 @@ export function createKokoroPlayer(options: KokoroPlayerOptions = {}): KokoroPla
       _ready = true;
     },
 
-    async speak(text: string): Promise<void> {
+    async speak(text: string, options?: { speed?: number }): Promise<void> {
       if (!ttsInstance) {
         // Not initialized — silently skip rather than crash
         return;
@@ -178,8 +215,11 @@ export function createKokoroPlayer(options: KokoroPlayerOptions = {}): KokoroPla
 
       const ctx = getAudioContext();
 
-      // Generate audio — kokoro-js returns { audio: Float32Array, sampling_rate: number }
-      const result = await Promise.resolve(ttsInstance.generate(text, { voice: defaultVoice }));
+      // Phase 16 / D-08: pass speed through to generate().
+      // kokoro-js@1.2.1 accepts speed in GenerateOptions (verified in RESEARCH.md).
+      const result = await Promise.resolve(
+        ttsInstance.generate(text, { voice: defaultVoice, speed: options?.speed })
+      );
       const { audio, sampling_rate } = result;
 
       // Create an AudioBuffer from the Float32Array
@@ -196,14 +236,48 @@ export function createKokoroPlayer(options: KokoroPlayerOptions = {}): KokoroPla
       source.buffer = buffer;
       source.connect(ctx.destination);
 
+      // Phase 16 / D-02: store source so cancel() can stop it
+      sourceRef = source;
+
       // Resolve the returned promise when the buffer ends, firing onPlaybackEnd
       await new Promise<void>((resolve) => {
         source.onended = () => {
+          sourceRef = null;
           onPlaybackEnd?.();
           resolve();
         };
         source.start();
       });
+    },
+
+    cancel(): void {
+      // Phase 16 / D-02: stop the current source node immediately.
+      // Safe to call when no source is active (sourceRef is null).
+      if (sourceRef) {
+        try {
+          sourceRef.stop();
+        } catch {
+          // stop() may throw if the node was already stopped — ignore.
+        }
+        sourceRef = null;
+      }
+    },
+
+    suspend(): void {
+      // Phase 16 / D-09: suspend AudioContext — instant, bit-perfect on resume.
+      // Fire-and-forget (not awaited) for UI responsiveness per D-09.
+      // Guard: only suspend if context exists and is in a running state.
+      if (audioCtx && audioCtx.state === 'running') {
+        void audioCtx.suspend();
+      }
+    },
+
+    resume(): void {
+      // Phase 16 / D-09: resume AudioContext after suspend().
+      // Fire-and-forget (not awaited) for UI responsiveness per D-09.
+      if (audioCtx && audioCtx.state === 'suspended') {
+        void audioCtx.resume();
+      }
     },
   };
 }
@@ -236,11 +310,20 @@ export function useKokoroPlayer(options: KokoroPlayerOptions = {}): KokoroPlayer
   }
 
   const init = useCallback(() => playerRef.current!.init(), []);
-  const speak = useCallback((text: string) => playerRef.current!.speak(text), []);
+  const speak = useCallback(
+    (text: string, options?: { speed?: number }) => playerRef.current!.speak(text, options),
+    []
+  );
+  const cancel = useCallback(() => playerRef.current!.cancel(), []);
+  const suspend = useCallback(() => playerRef.current!.suspend(), []);
+  const resume = useCallback(() => playerRef.current!.resume(), []);
 
   return {
     get ready() { return playerRef.current!.ready; },
     init,
     speak,
+    cancel,
+    suspend,
+    resume,
   };
 }
