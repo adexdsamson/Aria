@@ -42,6 +42,14 @@ export interface VoiceHandlersDeps {
   downloadController: ModelDownloadController;
   /** Push event sink — the bootstrap wires this to mainWindow.webContents.send. */
   emitToRenderer?: (channel: string, payload?: unknown) => void;
+  // Phase 16 / Plan 16-01 additions (real implementations land in 16-04a):
+  /** Map of sessionId → AbortController for active streaming turns (D-02/D-03). */
+  sessionAbortControllers?: Map<string, AbortController>;
+  /** Voice session manager for streaming cascade and barge-in (D-03/D-11/D-12). */
+  voiceSessionManager?: {
+    startAnswer(args: { sessionId: string; question: string }): Promise<void>;
+    onBargeIn(args: { sessionId: string }): void;
+  };
 }
 
 export function registerVoiceHandlers(
@@ -144,5 +152,77 @@ export function registerVoiceHandlers(
   // mic signal. Currently a pure ack; Phase 17 may add write-side state.
   ipcMain.handle(CHANNELS.VOICE_CANCEL_TTS, async () => {
     return { ok: true };
+  });
+
+  // ─── Phase 16 / Plan 16-01 stub handlers ─────────────────────────────────
+  //
+  // Five new channels added in Wave 0. All five must be registered here so the
+  // handler-count invariant (Object.keys(CHANNELS).length === handlers.size) stays
+  // green. Real implementations land in 16-04a (VOICE_ABORT/VOICE_FEED_ANSWER/
+  // VOICE_LATENCY_MARK full wiring) and 16-02 (DIAGNOSTICS_VOICE_LATENCY reader).
+  //
+  // db-null safety: none of these five channels are added to the db-null skip-set.
+  // abort/latency channels are read-only or no-op (safe pre-unlock);
+  // voiceFeedAnswer stubs out to { ok: true } when voiceSessionManager is absent.
+
+  // ─── VOICE_TTS_CHUNK ─────────────────────────────────────────────────────
+  //
+  // D-05: push channel — main pushes text chunks TO renderer via webContents.send.
+  // ipcMain.handle is a no-op stub to satisfy the handler-count invariant;
+  // the real push direction is emitToRenderer(VOICE_TTS_CHUNK, ...) in the
+  // voice-session-manager streaming loop (Plan 16-04a).
+  ipcMain.handle(CHANNELS.VOICE_TTS_CHUNK, async () => {
+    return { ok: true };
+  });
+
+  // ─── VOICE_ABORT ─────────────────────────────────────────────────────────
+  //
+  // D-02: renderer fires this one-way after AudioBufferSourceNode.stop().
+  // Main aborts the streamText AbortController for the session (~40ms, races
+  // independently of renderer audio cancel ~5ms). NOT awaited by renderer.
+  // Also calls voiceSessionManager.onBargeIn for D-12 synthetic turn write.
+  ipcMain.handle(CHANNELS.VOICE_ABORT, async (_e, payload: unknown) => {
+    const req = (payload ?? {}) as { sessionId?: string };
+    if (req.sessionId) {
+      deps.sessionAbortControllers?.get(req.sessionId)?.abort();
+      if (req.sessionId && deps.voiceSessionManager) {
+        deps.voiceSessionManager.onBargeIn({ sessionId: req.sessionId });
+      }
+    }
+    return { ok: true as const };
+  });
+
+  // ─── DIAGNOSTICS_VOICE_LATENCY ───────────────────────────────────────────
+  //
+  // D-06: read voice_latency_log rows. Debug-only; ARIA_DEBUG=1 required for
+  // any rows to exist. Mirrors DIAGNOSTICS_ROUTING_LOG handler shape exactly.
+  // TODO(16-02): replace stub with readRecentVoiceLatencyLog(db, limit) call.
+  ipcMain.handle(CHANNELS.DIAGNOSTICS_VOICE_LATENCY, async () => {
+    return [];
+  });
+
+  // ─── VOICE_FEED_ANSWER ───────────────────────────────────────────────────
+  //
+  // D-05: renderer sends the STT transcript to trigger the main-process streaming
+  // cascade (hybridRetrieve → streamText → D-04 segmenter → TTS chunk push).
+  // Stub returns { ok: true } until 16-04a wires the real VoiceSessionManager.
+  ipcMain.handle(CHANNELS.VOICE_FEED_ANSWER, async (_e, payload: unknown) => {
+    const req = (payload ?? {}) as { sessionId?: string; question?: string };
+    if (req.sessionId && req.question && deps.voiceSessionManager) {
+      await deps.voiceSessionManager.startAnswer({
+        sessionId: req.sessionId,
+        question: req.question,
+      });
+    }
+    return { ok: true as const };
+  });
+
+  // ─── VOICE_LATENCY_MARK ──────────────────────────────────────────────────
+  //
+  // D-06 / SC2: renderer fires this fire-and-forget channel to report
+  // t_kokoro_synth_start and t_first_audio_out timing marks. No-op stub —
+  // real handler updating VoiceSession timing fields lands in 16-04a.
+  ipcMain.handle(CHANNELS.VOICE_LATENCY_MARK, async () => {
+    return undefined;
   });
 }

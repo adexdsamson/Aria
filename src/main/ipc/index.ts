@@ -601,6 +601,37 @@ export function registerHandlers(
     voiceInvokeChannels.forEach((c) => skip.add(c));
   }
 
+  // Phase 16 / Plan 16-01 — 5 new voice channels (Wave 0 stubs).
+  // VOICE_TTS_CHUNK is a push-only channel (main→renderer). The four invoke-direction
+  // channels (VOICE_ABORT, DIAGNOSTICS_VOICE_LATENCY, VOICE_FEED_ANSWER, VOICE_LATENCY_MARK)
+  // are stub-registered here so the handler-count invariant stays green in Wave 0.
+  // db-null safety: none require db pre-unlock (abort/latency are read-only or no-op).
+  const voice16Channels = [
+    CHANNELS.VOICE_TTS_CHUNK,
+    CHANNELS.VOICE_ABORT,
+    CHANNELS.DIAGNOSTICS_VOICE_LATENCY,
+    CHANNELS.VOICE_FEED_ANSWER,
+    CHANNELS.VOICE_LATENCY_MARK,
+  ];
+  if (!voice16Channels.every((c) => skip.has(c))) {
+    if (!skip.has(CHANNELS.VOICE_TTS_CHUNK)) {
+      ipcMain.handle(CHANNELS.VOICE_TTS_CHUNK, () => ({ ok: true }));
+    }
+    if (!skip.has(CHANNELS.VOICE_ABORT)) {
+      ipcMain.handle(CHANNELS.VOICE_ABORT, () => ({ ok: true }));
+    }
+    if (!skip.has(CHANNELS.DIAGNOSTICS_VOICE_LATENCY)) {
+      ipcMain.handle(CHANNELS.DIAGNOSTICS_VOICE_LATENCY, () => []);
+    }
+    if (!skip.has(CHANNELS.VOICE_FEED_ANSWER)) {
+      ipcMain.handle(CHANNELS.VOICE_FEED_ANSWER, () => ({ ok: true }));
+    }
+    if (!skip.has(CHANNELS.VOICE_LATENCY_MARK)) {
+      ipcMain.handle(CHANNELS.VOICE_LATENCY_MARK, () => undefined);
+    }
+    voice16Channels.forEach((c) => skip.add(c));
+  }
+
   // Phase 12 / Phase 15 — push-event channel stubs.
   // These channels are MAIN → RENDERER push events (main calls webContents.send).
   // ipcMain.handle registrations are stubs to satisfy the handler-count test;
