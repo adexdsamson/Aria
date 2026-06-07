@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: executing
-last_updated: "2026-06-07T19:10:00Z"
+status: paused
+last_updated: "2026-06-07T20:29:15.981Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 18
-  completed_plans: 16
-  percent: 33
+  completed_plans: 18
+  percent: 50
 ---
 
 # State
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 5 of 6 (Plans 01-04b in-progress, paused at human-verify checkpoint)
+Plan: 6 of 6 (Plans 01-05 complete; plan 04b paused at human-verify checkpoint)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 04b PAUSED at checkpoint:human-verify — VoiceHUDBand transport controls (df00616) + BriefingScreen read-aloud section walker (597c47f) complete; awaiting smoke test SC1-SC5
-**Status:** Paused at human-verify checkpoint (plan 04b), Tasks 1-2 complete
+**Plan:** 05 COMPLETE — D-13 read-only static ratchet (a37a95d); 04b still paused at checkpoint:human-verify awaiting SC1-SC5 smoke test
+**Status:** Plan 05 complete; Plan 04b paused at human-verify checkpoint
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -107,9 +107,15 @@ Plan: 5 of 6 (Plans 01-04b in-progress, paused at human-verify checkpoint)
 - buildSectionText() caps at top-3 items per section (matches CONTEXT top-3 budget for concise TTS); returns empty-state string when no items
 - Stop button shown when isReading=true (currentSectionIndex>=0); Read Aloud button shown otherwise
 
+## Decisions (Phase 16, Plan 05)
+
+- confirm.ts excluded from D-13 scan: it DEFINES voiceConfirm (Phase-14 write-seam) not a caller; identifier-boundary RE cannot distinguish definition from call-site
+- WRITE_CHOKEPOINTS named distinctly from Phase-14 CHOKEPOINT_NAMES to make Phase-16 extension intent explicit
+- Single it() block with { file, chokepoint } pair offenders array mirrors Phase-14 template structure
+
 ## Next Action
 
-`/gsd-execute-phase 16` — Plan 04b paused at checkpoint:human-verify (2026-06-07). Tasks 1-2 complete (df00616, 597c47f). Resume after human smoke test SC1-SC5 passes. Next unstarted plan: 05 (D-13 read-only ratchet).
+`/gsd-execute-phase 16` — Plans 01-05 complete. Plan 04b paused at checkpoint:human-verify (2026-06-07). Tasks 1-2 complete (df00616, 597c47f). Plan 05 complete (a37a95d). Resume 04b after human smoke test SC1-SC5 passes. All 6 plans coded; phase awaiting human-verify gate.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 

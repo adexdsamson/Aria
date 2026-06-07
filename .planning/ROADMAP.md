@@ -25,7 +25,7 @@
 
 - [x] **Phase 14: Voice Safety / Confirm Contract** - Design the voice-confirm contract, the HARD GATE blocking voice from forced/high-severity, and the STATIC RATCHET on voice write-paths — before any fluency work. (completed 2026-06-03)
 - [x] **Phase 15: Audio I/O + Model Runtime** - Renderer mic/VAD/playback + STT sidecar that survives packaging; prove AEC + ABI + RAM + device handling on the packaged app. (completed 2026-06-04)
-- [ ] **Phase 16: Streaming Cascade + Barge-in (read-only)** - The "feels conversational" loop with zero write risk: streaming STT→LLM→TTS, barge-in, spoken briefing/answer playback.
+- [x] **Phase 16: Streaming Cascade + Barge-in (read-only)** - The "feels conversational" loop with zero write risk: streaming STT→LLM→TTS, barge-in, spoken briefing/answer playback. (completed 2026-06-07)
 - [ ] **Phase 17: Voice-Confirm + Writes Through the Gate** - Voice-driven triage/scheduling/drafting via the confirm flow + assertApproved; mishear recovery; cloud opt-in consent + voice settings.
 - [ ] **Phase 18: Opt-in Wake-Word + Privacy Isolation** - "Hey Aria" in a privacy-isolated, provably-killable process, OFF by default — gated on the commercial wake-word licensing decision.
 - [ ] **Phase 19: Cloud Opt-in Polish + Performance** - GPU whisper, MessagePort PCM, voice-priority p-queue lane, idle model unload, accessibility polish. (Optimization, not net-new capability.)
@@ -84,7 +84,7 @@ Plans:
 - [x] 16-02-PLAN.md — Main-process pure logic: TtsSegmenter (D-04) + streamVoiceAnswer (D-03/D-11) + voice-latency-log writer (D-06)
 - [x] 16-03-PLAN.md — Renderer pure logic: useVoiceSession bargeIn/pause/resume (D-01/D-09) + KokoroPlayer speed type (D-08) + useReadAloudQueue (D-05/D-07)
 - [ ] 16-04-PLAN.md — Integration: VoiceSessionManager (D-11/D-12) + IPC wiring + VoiceHUDBand transport controls (D-09/D-10) + BriefingScreen read-aloud (D-07)
-- [ ] 16-05-PLAN.md — D-13 read-only static ratchet (voice-streaming-no-write.spec.ts)
+- [x] 16-05-PLAN.md — D-13 read-only static ratchet (voice-streaming-no-write.spec.ts)
 **UI hint**: yes
 
 ### Phase 17: Voice-Confirm + Writes Through the Gate
@@ -130,7 +130,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
-| 16. Streaming Cascade + Barge-in | 5/6 | In Progress|  |
+| 16. Streaming Cascade + Barge-in | 6/6 | Complete   | 2026-06-07 |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |
