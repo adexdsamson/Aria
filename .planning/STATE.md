@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-07T18:48:31.475Z"
+last_updated: "2026-06-07T19:10:00Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 5 of 6 (Plans 01-04a complete 2026-06-07)
+Plan: 5 of 6 (Plans 01-04b in-progress, paused at human-verify checkpoint)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 4a complete — VoiceSessionManager factory (startAnswer/onBargeIn/markLatency/getSession), VOICE_LATENCY_MARK upgraded from stub to real wiring, voice-session-manager.spec.ts 3/3 GREEN (onChunk accumulator + fast-abort + D-12)
-**Status:** Executing Phase 16, Plan 04b next
+**Plan:** 04b PAUSED at checkpoint:human-verify — VoiceHUDBand transport controls (df00616) + BriefingScreen read-aloud section walker (597c47f) complete; awaiting smoke test SC1-SC5
+**Status:** Paused at human-verify checkpoint (plan 04b), Tasks 1-2 complete
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -98,9 +98,18 @@ Plan: 5 of 6 (Plans 01-04a complete 2026-06-07)
 - TtsSegmenter constructor mock: vi.fn(function(){}) not vi.fn(() => {}) — arrow functions not constructable in Vitest
 - Auto-wire guard in registerVoiceHandlers: creates VoiceSessionManager only when db + emitToRenderer both present
 
+## Decisions (Phase 16, Plan 04b)
+
+- noopPlayer fallback in VoiceHUDBand: hook always receives valid KokoroPlayerHandle (avoids conditional hook call rule violation)
+- Transport controls visible only when player prop present AND voiceState==='speaking' (guards against briefing context where player may not have initialized)
+- VOICE_TTS_CHUNK subscription placed in useEffect with queue as dependency (stable via useCallback in useReadAloudQueue)
+- synthStartFiredRef / firstAudioOutFiredRef reset when state leaves 'speaking' — one mark per speaking episode (not per chunk)
+- buildSectionText() caps at top-3 items per section (matches CONTEXT top-3 budget for concise TTS); returns empty-state string when no items
+- Stop button shown when isReading=true (currentSectionIndex>=0); Read Aloud button shown otherwise
+
 ## Next Action
 
-`/gsd-execute-phase 16` — Plans 01-04a complete (2026-06-07). Next: Plan 04b (VoiceHUDBand transport controls — renderer side).
+`/gsd-execute-phase 16` — Plan 04b paused at checkpoint:human-verify (2026-06-07). Tasks 1-2 complete (df00616, 597c47f). Resume after human smoke test SC1-SC5 passes. Next unstarted plan: 05 (D-13 read-only ratchet).
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
