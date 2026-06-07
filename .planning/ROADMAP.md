@@ -130,7 +130,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
-| 16. Streaming Cascade + Barge-in | 3/6 | In Progress|  |
+| 16. Streaming Cascade + Barge-in | 4/6 | In Progress|  |
 | 17. Voice-Confirm + Writes Through the Gate | 0/0 | Not started | - |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |

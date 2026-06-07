@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-07T18:31:00.672Z"
+last_updated: "2026-06-07T18:48:31.475Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
   percent: 33
 ---
 
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 4 of 6 (Plans 01-03 complete 2026-06-07)
+Plan: 5 of 6 (Plans 01-04a complete 2026-06-07)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 3 complete — D-01/D-09 bargeIn()/pause()/resume() + paused state in useVoiceSession (13/13 tests GREEN), D-08 KokoroTtsInstance speed type fix + D-09 suspend()/resume() + cancel() on KokoroPlayerHandle (WARNING 3 fix, 16-04b known interface), D-05/D-07 useReadAloudQueue promise-chain queue with Pitfall-5 cancel (4/4 tests GREEN)
-**Status:** Executing Phase 16, Plan 04a next
+**Plan:** 4a complete — VoiceSessionManager factory (startAnswer/onBargeIn/markLatency/getSession), VOICE_LATENCY_MARK upgraded from stub to real wiring, voice-session-manager.spec.ts 3/3 GREEN (onChunk accumulator + fast-abort + D-12)
+**Status:** Executing Phase 16, Plan 04b next
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -91,9 +91,16 @@ Plan: 4 of 6 (Plans 01-03 complete 2026-06-07)
 - Retrieval failure path writes empty assistant turn (not silent skip) for D-12 barge-in context integrity
 - DIAGNOSTICS_VOICE_LATENCY handler upgraded in voice.ts (not deferred): db-null guard + limit passthrough to readRecentVoiceLatencyLog
 
+## Decisions (Phase 16, Plan 04a)
+
+- sessions Map does NOT delete on onDone — sessions persist for D-11 multi-turn context; spec requires getSession() post-completion
+- getSession() exposed on VoiceSessionManager return type for test + diagnostics access
+- TtsSegmenter constructor mock: vi.fn(function(){}) not vi.fn(() => {}) — arrow functions not constructable in Vitest
+- Auto-wire guard in registerVoiceHandlers: creates VoiceSessionManager only when db + emitToRenderer both present
+
 ## Next Action
 
-`/gsd-execute-phase 16` — Plans 01-03 complete (2026-06-07). Next: Plan 04a (VoiceSessionManager) or Plan 04b (VoiceHUDBand transport controls). Wave 1 complete: all pure-logic units implemented and tested.
+`/gsd-execute-phase 16` — Plans 01-04a complete (2026-06-07). Next: Plan 04b (VoiceHUDBand transport controls — renderer side).
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
