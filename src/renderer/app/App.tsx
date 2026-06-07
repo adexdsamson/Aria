@@ -15,6 +15,7 @@ import { TrialBanner } from '../features/entitlement/TrialBanner';
 import { AppLogo } from '../components/editorial/Logo';
 import { VoiceHUDBand } from '../features/voice/VoiceHUDBand';
 import { useVoiceSession } from '../features/voice/useVoiceSession';
+import { useKokoroPlayer } from '../features/voice/tts/useKokoroPlayer';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -237,9 +238,16 @@ function shellStyle(): React.CSSProperties {
 // Reads voiceState + liveTranscript from the session store and passes them
 // to VoiceHUDBand. Mounted unconditionally in the App shell's main column,
 // immediately before TrialBanner (D-15). Collapses to 0-height when idle.
+//
+// Phase 16 / VOICE-03 fix: instantiate a real KokoroPlayerHandle here so the
+// /ask streaming voice answer produces audio. Without `player`, VoiceHUDBand
+// falls back to its internal no-op handle and TTS chunks are silently dropped.
+// `mode` is intentionally omitted (defaults to 'ask') — the briefing-only
+// Skip control must NOT appear on the shell HUD.
 // ---------------------------------------------------------------------------
 function VoiceHUDBandConnected(): JSX.Element {
   const { voiceState, liveTranscript } = useVoiceSession();
-  return <VoiceHUDBand state={voiceState} transcript={liveTranscript} />;
+  const player = useKokoroPlayer();
+  return <VoiceHUDBand state={voiceState} transcript={liveTranscript} player={player} />;
 }
 
