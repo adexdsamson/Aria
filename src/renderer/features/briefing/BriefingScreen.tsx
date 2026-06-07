@@ -15,10 +15,18 @@
  *   - Regenerate button: scale(0.97) on :active, color shift on :hover
  *   - prefers-reduced-motion guard removes all transforms; keeps opacity
  *
+ * Phase 16 / Plan 16-04b — Briefing read-aloud (D-07/D-10):
+ *   - "Read Aloud" button reads BriefingPayload sections (calendar/email/news)
+ *     via useReadAloudQueue — NO LLM streaming (Pitfall 4 explicitly avoided)
+ *   - Section walker: currentSectionIndex over ['calendar','email','news']
+ *   - Skip wired to VoiceHUDBand onSkipSection: queue.cancel() + next section
+ *   - Pause/resume via VoiceHUDBand transport controls
+ *   - Stop: voiceState leaving 'speaking' resets currentSectionIndex to -1
+ *
  * IPC + state + data-testids preserved verbatim from prior implementation.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { BriefingPayload, IpcError } from '../../../shared/ipc-contract';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { BriefingItem, BriefingNewsItem, BriefingPayload, IpcError } from '../../../shared/ipc-contract';
 import { RouteBadge } from '../../components/editorial';
 import { GenerateNowAffordance } from './GenerateNowAffordance';
 import { SectionCalendar } from './SectionCalendar';
@@ -27,8 +35,53 @@ import { SectionNews } from './SectionNews';
 import { InlineApprovalsPreview } from '../approvals/InlineApprovalsPreview';
 import { BriefingFeedbackChips } from './BriefingFeedbackChips';
 import { SkeletonRoot, SkeletonBlock, SkeletonLine } from '../../components/Skeleton';
+import { useKokoroPlayer } from '../voice/tts/useKokoroPlayer';
+import { useReadAloudQueue } from '../voice/useReadAloudQueue';
+import { useVoiceSession } from '../voice/useVoiceSession';
+import { VoiceHUDBand } from '../voice/VoiceHUDBand';
 
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+// ─── Section keys for D-10 walker ─────────────────────────────────────────────
+
+const BRIEFING_SECTION_KEYS = ['calendar', 'email', 'news'] as const;
+
+/**
+ * Build a plain-text TTS string from a briefing section.
+ * Pitfall 4: reads from already-loaded BriefingPayload — no LLM streaming.
+ */
+function buildSectionText(
+  sectionKey: 'calendar' | 'email' | 'news',
+  items: BriefingItem[] | BriefingNewsItem[],
+): string {
+  if (!items || items.length === 0) {
+    const sectionNames: Record<string, string> = {
+      calendar: 'calendar',
+      email: 'email',
+      news: 'news',
+    };
+    return `No ${sectionNames[sectionKey] ?? sectionKey} items today.`;
+  }
+
+  const sectionIntros: Record<string, string> = {
+    calendar: 'Calendar.',
+    email: 'Email highlights.',
+    news: 'News.',
+  };
+  const intro = sectionIntros[sectionKey] ?? '';
+
+  const lines = items
+    .slice(0, 3) // cap at 3 items for concise TTS (CONTEXT top-3 budget)
+    .map((item, i) => {
+      const parts: string[] = [`${i + 1}. ${item.title}`];
+      if (item.why) parts.push(item.why);
+      return parts.join('. ');
+    });
+
+  return `${intro} ${lines.join('. ')}.`;
+}
+
+// ─── Utility guards ────────────────────────────────────────────────────────────
 
 async function dismissBriefingInsight(briefingDate: string, kind: string): Promise<void> {
   try {
@@ -96,8 +149,66 @@ export function BriefingScreen(): JSX.Element {
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // Phase 16 / D-10: section walker state (-1 = not reading)
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(-1);
+
   const today = useMemo(() => new Date(), []);
   const todayVolume = useMemo(() => volumeForDate(today), [today]);
+
+  // Phase 16 / D-07: Kokoro player + shared read-aloud queue
+  const [speed] = useState(1.0);
+  const { voiceState } = useVoiceSession();
+  const player = useKokoroPlayer();
+  const queue = useReadAloudQueue(player, speed);
+
+  // Build the section text array from the loaded payload.
+  // Memoised so it only recalculates when payload changes.
+  const sectionTexts = useMemo((): string[] => {
+    if (!payload) return [];
+    return BRIEFING_SECTION_KEYS.map((key) => {
+      const items = payload[key] as BriefingItem[];
+      return buildSectionText(key, items);
+    });
+  }, [payload]);
+
+  // Track previous voiceState for stop detection.
+  const prevVoiceStateRef = useRef(voiceState);
+
+  // Phase 16: Stop read-aloud when voiceState leaves 'speaking'.
+  useEffect(() => {
+    const prev = prevVoiceStateRef.current;
+    prevVoiceStateRef.current = voiceState;
+
+    if (prev === 'speaking' && voiceState !== 'speaking') {
+      // Playback ended or was interrupted — reset walker.
+      queue.cancel();
+      setCurrentSectionIndex(-1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceState]);
+
+  // Phase 16 / D-10: advance section walker — enqueue the next section when
+  // currentSectionIndex changes to a valid index.
+  useEffect(() => {
+    if (currentSectionIndex < 0 || currentSectionIndex >= sectionTexts.length) return;
+    const text = sectionTexts[currentSectionIndex];
+    if (text) {
+      queue.enqueue(text);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSectionIndex]);
+
+  // Phase 16 / D-10: Skip section handler — cancel current + advance.
+  const handleSkipSection = useCallback(() => {
+    queue.cancel();
+    setCurrentSectionIndex((idx) => {
+      const next = idx + 1;
+      if (next >= sectionTexts.length) {
+        return -1; // done
+      }
+      return next;
+    });
+  }, [queue, sectionTexts.length]);
 
   const load = useCallback(async (): Promise<void> => {
     const res = await window.aria.briefingToday();
@@ -266,6 +377,7 @@ export function BriefingScreen(): JSX.Element {
   // ── Populated state ─────────────────────────────────────────────────────
   const dateLabel = formatHeader(payload.date, payload.tz);
   const mastheadDate = formatMastheadDate(payload.date, payload.tz);
+  const isReading = currentSectionIndex >= 0;
 
   return (
     <section
@@ -274,7 +386,16 @@ export function BriefingScreen(): JSX.Element {
     >
       {animationStyles}
 
-      {/* Masthead row — volume / date / route badge / regenerate */}
+      {/* Phase 16: VoiceHUDBand in briefing mode — transport controls + skip */}
+      <VoiceHUDBand
+        state={voiceState}
+        transcript=""
+        player={player}
+        mode="briefing"
+        onSkipSection={handleSkipSection}
+      />
+
+      {/* Masthead row — volume / date / route badge / regenerate / read-aloud */}
       <MastheadRow
         volume={todayVolume}
         dateLabel={mastheadDate}
@@ -282,6 +403,70 @@ export function BriefingScreen(): JSX.Element {
         cascadeIndex={0}
         rightContent={
           <>
+            {/* Phase 16 / D-10: Read Aloud button */}
+            {!isReading && (
+              <button
+                type="button"
+                data-testid="briefing-read-aloud-btn"
+                data-aria-press
+                onClick={() => {
+                  // Start the section walker from the beginning.
+                  // The useEffect watching currentSectionIndex will enqueue section 0.
+                  setCurrentSectionIndex(0);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '4px 8px',
+                  marginLeft: 4,
+                  cursor: 'pointer',
+                  color: 'var(--gold)',
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  borderRadius: 'var(--radius-sm)',
+                  transition: `color 180ms ease, background 180ms ease, transform 140ms ${EASE_OUT}`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--gold-deep)';
+                  e.currentTarget.style.background = 'rgba(184,134,11,0.06)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--gold)';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                ▶ Read Aloud
+              </button>
+            )}
+            {isReading && (
+              <button
+                type="button"
+                data-testid="briefing-stop-aloud-btn"
+                data-aria-press
+                onClick={() => {
+                  queue.cancel();
+                  setCurrentSectionIndex(-1);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '4px 8px',
+                  marginLeft: 4,
+                  cursor: 'pointer',
+                  color: 'var(--rose)',
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  borderRadius: 'var(--radius-sm)',
+                  transition: `color 180ms ease, background 180ms ease, transform 140ms ${EASE_OUT}`,
+                }}
+              >
+                ■ Stop
+              </button>
+            )}
             <span data-testid={`route-badge-${payload.route}`}>
               <RouteBadge route={payload.route} />
             </span>
