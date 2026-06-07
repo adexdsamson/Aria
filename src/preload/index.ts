@@ -72,6 +72,17 @@ const api = buildApi();
   return () => ipcRenderer.removeListener(CHANNELS.VOICE_MODEL_PROGRESS, handler);
 };
 
+// Phase 16 / Plan 16-01 — Voice TTS chunk push channel.
+// VOICE_TTS_CHUNK is a main→renderer push channel (mirrors VOICE_TRANSCRIPT_DELTA).
+// VOICE_ABORT, DIAGNOSTICS_VOICE_LATENCY, VOICE_FEED_ANSWER, and VOICE_LATENCY_MARK
+// are invoke/send channels (renderer→main) — auto-mapped by buildApi(), no override needed.
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onVoiceTtsChunk = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.VOICE_TTS_CHUNK, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.VOICE_TTS_CHUNK, handler);
+};
+
 // E2E-only escape hatches; gated by ARIA_E2E env var so production builds
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.

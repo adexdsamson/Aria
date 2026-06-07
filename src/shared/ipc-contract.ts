@@ -189,6 +189,14 @@ export const CHANNELS = {
   VOICE_TRANSCRIPT_DELTA: 'aria:voice:transcript-delta', // TranscriptDelta payload
   VOICE_STATE_CHANGED: 'aria:voice:state-changed',        // VoiceState payload
   VOICE_MODEL_PROGRESS: 'aria:voice:model-progress',      // { receivedBytes, totalBytes }
+  // Phase 16 — Streaming Cascade + Barge-in (16-01)
+  // Push channel (main → renderer via ipcRenderer.on):
+  VOICE_TTS_CHUNK: 'aria:voice:tts-chunk',          // { text: string; sessionId: string }
+  // Invoke channels (renderer → main):
+  VOICE_ABORT: 'aria:voice:abort',                   // D-02: fire-and-forget abort; renderer does NOT await
+  DIAGNOSTICS_VOICE_LATENCY: 'aria:diagnostics:voice-latency', // D-06: read voice_latency_log (debug)
+  VOICE_FEED_ANSWER: 'aria:voice:feed-answer',       // D-05: trigger streaming cascade
+  VOICE_LATENCY_MARK: 'aria:voice:latency-mark',     // D-06: renderer→main fire-and-forget timing mark
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -1073,6 +1081,35 @@ export interface AriaApi {
   onVoiceTranscript?: (cb: (delta: TranscriptDelta) => void) => () => void;
   onVoiceState?: (cb: (state: VoiceState) => void) => () => void;
   onVoiceModelProgress?: (cb: (progress: { receivedBytes: number; totalBytes: number }) => void) => () => void;
+
+  // Phase 16 / Plan 16-01 — Streaming Cascade + Barge-in additions.
+  // Push subscription (main → renderer, preload-registered ipcRenderer.on):
+  onVoiceTtsChunk?: (cb: (chunk: { text: string; sessionId: string }) => void) => () => void;
+  // Invoke methods (renderer → main, auto-mapped by buildApi()):
+  voiceAbort(req: { sessionId: string }): Promise<{ ok: true } | IpcError>;
+  diagnosticsVoiceLatency(req?: { limit?: number }): Promise<VoiceLatencyLogRow[] | IpcError>;
+  voiceFeedAnswer(req: { sessionId: string; question: string }): Promise<{ ok: true } | IpcError>;
+  // Fire-and-forget timing mark from renderer (returns Promise<void>):
+  voiceLatencyMark(req: { sessionId: string; mark: 'kokoro_synth_start' | 'first_audio_out'; t: number }): Promise<void>;
+}
+
+// Phase 16 / Plan 16-01 — Voice Latency Log DTO (D-06) ---------------------
+
+/** Row shape returned by DIAGNOSTICS_VOICE_LATENCY. Debug-only (ARIA_DEBUG=1). */
+export interface VoiceLatencyLogRow {
+  id: number;
+  session_id: string;
+  /** ms offset from session start: STT complete. */
+  t_stt_done: number;
+  /** ms offset: first LLM token received. Null if stream was aborted before first token. */
+  t_llm_first_token: number | null;
+  /** ms offset: first TTS chunk dispatched to renderer. */
+  t_first_sentence_ready: number | null;
+  /** ms offset: Kokoro generate() called in renderer. */
+  t_kokoro_synth_start: number | null;
+  /** ms offset: AudioBufferSourceNode.start() called. */
+  t_first_audio_out: number | null;
+  recorded_at: string;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1471,6 +1508,12 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   VOICE_TRANSCRIPT_DELTA: 'onVoiceTranscript',
   VOICE_STATE_CHANGED: 'onVoiceState',
   VOICE_MODEL_PROGRESS: 'onVoiceModelProgress',
+  // Phase 16 — Streaming Cascade + Barge-in (16-01)
+  VOICE_TTS_CHUNK: 'onVoiceTtsChunk',
+  VOICE_ABORT: 'voiceAbort',
+  DIAGNOSTICS_VOICE_LATENCY: 'diagnosticsVoiceLatency',
+  VOICE_FEED_ANSWER: 'voiceFeedAnswer',
+  VOICE_LATENCY_MARK: 'voiceLatencyMark',
 } as const;
 
 // ---------------------------------------------------------------------------
