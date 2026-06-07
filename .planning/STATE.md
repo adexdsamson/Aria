@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: paused
-last_updated: "2026-06-07T20:29:15.981Z"
+status: verifying
+last_updated: "2026-06-07T22:10:37.398Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
@@ -117,10 +117,10 @@ Plan: 6 of 6 complete (sequential/no-worktree; node_modules intact throughout)
 
 ## Next Action
 
-**Phase 16 CODE-COMPLETE (2026-06-07)** — all 6 plans done, verifier 13/13 (/ask player gap closed f168a6a). Two next options:
-1. **Run the 5-test runtime smoke** (`pnpm dev`): SC1 briefing pause/skip/speed · SC2 /ask first-audio <900ms + voice_latency_log (ARIA_DEBUG=1) · SC3 barge-in <200ms · SC4 multi-turn "he" · SC5 backchannel non-interruption. Report results to close the deferred human-verify.
-2. **`/gsd-plan-phase 17`** — Voice-Confirm + Writes Through the Gate (VOICE-05/08/09/11); depends on Phase 16 (read-only loop battle-tested) + Phase 14 (confirm contract). Note Phase 17 will add frontier voice streaming (deferred from 16) + cloud opt-in.
-Keep `workflow.use_worktrees=false` (Windows). NOT pushed — 30 commits ahead of origin (Phase 16 planning + execution). Phase 15 packaged-verify debts still open.
+**Phase 17 CONTEXT captured (2026-06-04, advisor mode) → `/gsd-plan-phase 17`.** 17 decisions D-01..D-17 locked (full text in 17-CONTEXT.md). Headline: voice intent = keyword-prefilter→per-domain extraction + thin-wrapper service dispatch (only ask.ts→ask-service.ts needs extraction); dual-channel confirm = spoken-affirmative short-STT + visible ApprovalCard → voiceConfirm seam; template read-back of RESOLVED entities; LLM confirm-classifier + re-prompt; forced→on-screen tap (renderer suppresses voice-confirm); pre-staging person-resolver disambiguation; cancel = PTT-to-cancel + Cancel button → new 'cancelled' approval state (state.ts union + transitions; migration ≥137 if DB CHECK); cloud = STT + NON-streaming cloud answer (buffered PII round-trip), frontier STREAMING + StreamingRehydrator DEFERRED to Phase 18; single master consent toggle + disclosure + audit; per-turn sensitivity fail-safe local; voice settings via voice/prefs.ts KV honored per-turn; D-17 update voice-streaming-no-write ratchet for write-capability (allow voiceConfirm, keep banning raw write-chokepoint imports).
+
+**Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user (`pnpm dev`). **Phase 15** packaged-verify debts open.
+Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~32 commits ahead of origin.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
