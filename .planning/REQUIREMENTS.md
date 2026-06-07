@@ -11,11 +11,11 @@ Voice is a **modality layered over Aria's existing shipped surfaces** (briefing,
 ### Core Voice I/O & Pipeline
 
 - [x] **VOICE-01** — User can talk to Aria via push-to-talk (hold hotkey / click) with live transcription shown.
-- [ ] **VOICE-02** — Aria reads the daily briefing aloud (TTS) with pause / skip / speed controls.
-- [ ] **VOICE-03** — Aria speaks `/ask` answers aloud.
+- [x] **VOICE-02** — Aria reads the daily briefing aloud (TTS) with pause / skip / speed controls.
+- [x] **VOICE-03** — Aria speaks `/ask` answers aloud.
 - [x] **VOICE-04** — Voice runs on-device by default (local STT + local TTS); no audio leaves the machine unless the user explicitly opts in.
 - [ ] **VOICE-05** — User can opt into cloud STT/TTS for higher quality via an explicit consent gate + data-handling disclosure; sensitivity-flagged turns stay on-device regardless of the opt-in.
-- [ ] **VOICE-06** — Conversational multi-turn loop: Aria maintains context across turns and supports barge-in (user interrupt → Aria stops promptly via a single AbortController across LLM + TTS + audio).
+- [x] **VOICE-06** — Conversational multi-turn loop: Aria maintains context across turns and supports barge-in (user interrupt → Aria stops promptly via a single AbortController across LLM + TTS + audio).
 - [x] **VOICE-07** — Mic state is always visible (listening / processing / speaking); the mic is gated during playback (half-duplex) so Aria never transcribes its own TTS (Electron AEC is unreliable — #47043).
 - [ ] **VOICE-08** — User can set voice/output preferences (voice, speed, local vs cloud) in Settings.
 
@@ -50,11 +50,11 @@ Voice is a **modality layered over Aria's existing shipped surfaces** (briefing,
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | VOICE-01 | Phase 15 | Complete |
-| VOICE-02 | Phase 16 | Pending |
-| VOICE-03 | Phase 16 | Pending |
+| VOICE-02 | Phase 16 | Complete |
+| VOICE-03 | Phase 16 | Complete |
 | VOICE-04 | Phase 15 | Complete |
 | VOICE-05 | Phase 17 | Pending |
-| VOICE-06 | Phase 16 | Pending |
+| VOICE-06 | Phase 16 | Complete |
 | VOICE-07 | Phase 15 | Complete |
 | VOICE-08 | Phase 17 | Pending |
 | VOICE-09 | Phase 17 | Pending |

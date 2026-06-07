@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: verifying
-last_updated: "2026-06-04T08:39:26.033Z"
-last_activity: 2026-06-04
+status: executing
+last_updated: "2026-06-07T17:33:37.559Z"
+last_activity: 2026-06-07
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 18
+  completed_plans: 13
   percent: 33
 ---
 
@@ -23,14 +23,13 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 15 (audio-i-o-model-runtime) — complete-with-deferred-verification
-Plan: 9 of 9 (15-09 complete; two open human-verify debts: macOS binary + packaged-launch+RAM)
+Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
+Plan: 2 of 6 (Plan 01 complete 2026-06-07)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
-**Phase:** 15
-**Plan:** 9 complete — packaging config + ship-blocker fix (whisper.dll) + Windows binary staged/verified; macOS DEFERRED to CI; SC2/SC3/SC5 + RAM ceiling = OPEN human-verify debt
-**Status:** Phase 15 code-complete; packaged-verification pending user's 16 GB machine
-**Verifier:** 9/10 must-haves (lazy first-PTT→download-modal gap closed in `1e848c6`); 5 packaged/hardware human-verify items open (see 15-VERIFICATION.md)
-**Last activity:** 2026-06-04
+**Phase:** 16
+**Plan:** 1 complete — Wave-0 contract: 5 new IPC channels (VOICE_TTS_CHUNK/VOICE_ABORT/DIAGNOSTICS_VOICE_LATENCY/VOICE_FEED_ANSWER/VOICE_LATENCY_MARK), migration 136 voice_latency_log, stub handlers (handler-count invariant GREEN 154/154), 4 failing RED spec scaffolds for Wave 1-2 units
+**Status:** Executing Phase 16, Plan 02 next
+**Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
 
@@ -69,9 +68,16 @@ Plan: 9 of 9 (15-09 complete; two open human-verify debts: macOS binary + packag
 - OnboardingWizard voice step (15-08): password → voice → sealing sequence; seal() called from voice step onSkip/onComplete; __forceStep__ test-only prop; sealing extracted to own render branch
 - Voice step isolation (15-08): Card.data-testid limitation worked around with wrapper div; voice step never blocks seal (T-15-24 mitigated)
 
+## Decisions (Phase 16, Plan 01)
+
+- VOICE_LATENCY_MARK stub: registered as ipcMain.handle(no-op → undefined) in both voice.ts and ipc/index.ts stubs (satisfies handler-count invariant; real timing handler in 16-04a)
+- migration 136 position: appended at tail of EMBEDDED_MIGRATIONS (after 135, ascending order maintained for correct new-install application)
+- voice-latency-log spec: uses better-sqlite3-multiple-ciphers (not better-sqlite3 — matches project convention; was corrected as Rule 1 auto-fix)
+- handler-count invariant: 154/154 CHANNELS registered (149 Phase-15 + 5 Phase-16 new); uses Object.keys(CHANNELS).length dynamically (no hardcoded count)
+
 ## Next Action
 
-`/gsd-execute-phase 16` — Phase 16 PLANNED (2026-06-07): 6 plans / 4 waves, plan-checker PASS iter 2 (3 blockers + 3 warnings resolved in revision). Waves: W0=16-01 (5 new IPC channels + migration 136 + 4 failing scaffolds incl. voice-session-manager.spec); W1 parallel 16-02 (main: TtsSegmenter + streamVoiceAnswer LOCAL-route + voice-latency-log) / 16-03 (renderer: bargeIn/pause/resume + KokoroPlayerHandle suspend/resume + useReadAloudQueue); W2 parallel 16-04a (main wiring: VoiceSessionManager + voice.ts) / 16-04b (renderer wiring: VoiceHUDBand transport + BriefingScreen read-aloud + human-verify checkpoint); W3=16-05 (D-13 read-only static ratchet). Keep `workflow.use_worktrees=false` (Windows hazard). NOT pushed (8 commits ahead). Phase 15 packaged-verification debts still open (16 GB machine + macOS CI binary).
+`/gsd-execute-phase 16` — Plan 01 complete (2026-06-07, commits ae3096f/67f916f/1ad1815). Next: Plan 02 (W1: TtsSegmenter + streamVoiceAnswer LOCAL-route + voice-latency-log) and Plan 03 (W1: bargeIn/pause/resume + KokoroPlayerHandle + useReadAloudQueue) — both Wave 1, can run in parallel. Phase 16 Wave 0 foundation complete.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
