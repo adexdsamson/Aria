@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-07T17:33:37.559Z"
+last_updated: "2026-06-07T18:05:04.260Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 18
-  completed_plans: 13
+  completed_plans: 15
   percent: 33
 ---
 
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 2 of 6 (Plan 01 complete 2026-06-07)
+Plan: 3 of 6 (Plans 01-02 complete 2026-06-07)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 1 complete — Wave-0 contract: 5 new IPC channels (VOICE_TTS_CHUNK/VOICE_ABORT/DIAGNOSTICS_VOICE_LATENCY/VOICE_FEED_ANSWER/VOICE_LATENCY_MARK), migration 136 voice_latency_log, stub handlers (handler-count invariant GREEN 154/154), 4 failing RED spec scaffolds for Wave 1-2 units
-**Status:** Executing Phase 16, Plan 02 next
+**Plan:** 2 complete — D-04 TtsSegmenter (first-chunk + abbreviation/decimal deny-list, 9/9 tests GREEN), D-06 voice-latency-log (ARIA_DEBUG-gated writer/reader, 4/4 tests GREEN), D-03 streamVoiceAnswer (LOCAL-route, onChunk accumulator for spokenSoFar, abortSignal wired, appendTurn both turns, ask() unchanged 132/132 RAG tests GREEN)
+**Status:** Executing Phase 16, Plan 03 next
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -75,9 +75,16 @@ Plan: 2 of 6 (Plan 01 complete 2026-06-07)
 - voice-latency-log spec: uses better-sqlite3-multiple-ciphers (not better-sqlite3 — matches project convention; was corrected as Rule 1 auto-fix)
 - handler-count invariant: 154/154 CHANNELS registered (149 Phase-15 + 5 Phase-16 new); uses Object.keys(CHANNELS).length dynamically (no hardcoded count)
 
+## Decisions (Phase 16, Plan 02)
+
+- AI SDK 6 text-delta chunk property is chunk.text (not chunk.textDelta as in RESEARCH.md) — auto-fixed Rule 1 in Task 3
+- streamVoiceAnswer does NOT include db in StreamVoiceAnswerArgs (deps carries it; cleaner separation)
+- Retrieval failure path writes empty assistant turn (not silent skip) for D-12 barge-in context integrity
+- DIAGNOSTICS_VOICE_LATENCY handler upgraded in voice.ts (not deferred): db-null guard + limit passthrough to readRecentVoiceLatencyLog
+
 ## Next Action
 
-`/gsd-execute-phase 16` — Plan 01 complete (2026-06-07, commits ae3096f/67f916f/1ad1815). Next: Plan 02 (W1: TtsSegmenter + streamVoiceAnswer LOCAL-route + voice-latency-log) and Plan 03 (W1: bargeIn/pause/resume + KokoroPlayerHandle + useReadAloudQueue) — both Wave 1, can run in parallel. Phase 16 Wave 0 foundation complete.
+`/gsd-execute-phase 16` — Plans 01-02 complete (2026-06-07). Next: Plan 03 (W1: bargeIn/pause/resume + KokoroPlayerHandle speed type + useReadAloudQueue). Phase 16 Wave 1 pure-logic units (02+03) running in parallel.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
