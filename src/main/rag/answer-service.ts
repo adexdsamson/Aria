@@ -17,9 +17,14 @@
  *
  * Logging hygiene: never log raw question/answer/chunk text. Routing-log entry
  * via writeRoutingLog with prompt_hash only.
+ *
+ * Plan 16-02 Task 3 — streamVoiceAnswer (D-03/D-05 streaming path).
+ * Adds a standalone exported async function alongside ask(). NOT added to the
+ * AnswerService interface. LOCAL-route only (PII round-trip deferred, Pitfall 8).
  */
 import type Database from 'better-sqlite3-multiple-ciphers';
 import type { Logger } from 'pino';
+import { streamText } from 'ai';
 import {
   routeAnswer,
   buildFrontierPrompt,
@@ -52,6 +57,7 @@ import {
   rehydrate,
 } from '../llm/redaction-roundtrip';
 import { writeRoutingLog, hashPrompt } from '../llm/routingLog';
+import { getLocalModel } from '../llm/providers';
 import type { Db } from '../db/connect';
 
 type DbAny = Database.Database;
@@ -469,3 +475,128 @@ export function createAnswerService(deps: AnswerServiceDeps): AnswerService {
 }
 
 export { REFUSAL_TEXT, ERROR_TEXT };
+
+// ---------------------------------------------------------------------------
+// Phase 16 / Plan 16-02 Task 3 — D-03/D-05 streaming voice answer path
+// ---------------------------------------------------------------------------
+
+/**
+ * Arguments for streamVoiceAnswer. Separate from AnswerServiceDeps because
+ * this is a standalone exported function (not part of the AnswerService interface)
+ * and callers supply the per-turn arguments alongside a per-call signal.
+ */
+export interface StreamVoiceAnswerArgs {
+  question: string;
+  threadId: string;
+  /** AbortController.signal — D-03: allows barge-in to cancel mid-stream. */
+  signal: AbortSignal;
+  /**
+   * Called for each text-delta token from streamText.
+   * D-03: spokenSoFar is accumulated here (NOT in onAbort per AI SDK #8088).
+   */
+  onChunk: (textDelta: string) => void;
+  /**
+   * Called after the stream ends (or aborts) with the full accumulated text.
+   * The voice-session-manager uses this for the assistant appendTurn write.
+   */
+  onDone: (fullText: string) => void;
+}
+
+/**
+ * Streaming voice answer function — D-03/D-05 streaming path for VOICE-03.
+ *
+ * Adds a new streaming capability alongside (NOT replacing) the existing ask().
+ * Key constraints:
+ *   - LOCAL route only (PII frontier streaming deferred to Phase 17 / Pitfall 8)
+ *   - 4096-char question cap (ASVS V5 — mirrors ask())
+ *   - spokenSoFar accumulated in onChunk, NOT in onAbort (AI SDK #8088 mitigation)
+ *   - appendTurn for both user and assistant roles (D-11 thread persistence)
+ *   - citations omitted on the streaming path (trade-off for latency, per D-03)
+ *
+ * NOT added to the AnswerService interface (standalone module-level export).
+ */
+export async function streamVoiceAnswer(
+  deps: Pick<AnswerServiceDeps, 'db' | 'embedClient' | 'vectorStore'>,
+  args: StreamVoiceAnswerArgs,
+): Promise<void> {
+  const { db, embedClient, vectorStore } = deps;
+  const { question, threadId, signal, onChunk, onDone } = args;
+
+  // ASVS V5: 4096-char question cap — mirrors ask()
+  if (question.length > 4096) {
+    onDone('');
+    return;
+  }
+
+  // D-11: persist user turn before streaming begins
+  appendTurn(db, { threadId, role: 'user', text: question });
+
+  // Retrieve context chunks (same as ask() — no account filter on voice path)
+  let retrieved: Awaited<ReturnType<typeof hybridRetrieve>> = [];
+  try {
+    retrieved = await hybridRetrieve(
+      { db, embedClient, vectorStore },
+      question,
+      { topK: 10 },
+    );
+  } catch {
+    // Retrieval failure — stream empty response and persist an assistant turn
+    onDone('');
+    appendTurn(db, {
+      threadId,
+      role: 'assistant',
+      text: '',
+      routing: { route: 'LOCAL', reason: 'voice-answer:retrieve-failed', sensitivity: 'none' },
+    });
+    return;
+  }
+
+  // Load thread history for context (D-11: lastN=6 matches ask() pattern)
+  let threadHistory: ThreadTurnSummary[] = [];
+  const threadData = getThread(db, threadId, { lastN: 6 });
+  if (threadData) {
+    threadHistory = threadData.turns.map((tr) => ({ role: tr.role, text: tr.text }));
+  }
+
+  // LOCAL route only (Pitfall 8 — PII frontier streaming deferred to Phase 17)
+  const routerChunks = retrieved.map(asRouterChunk);
+  const prompt = buildLocalPrompt({ question, chunks: routerChunks, threadHistory });
+
+  // D-03: accumulate spokenSoFar in onChunk — NOT in onAbort (AI SDK #8088)
+  let spokenSoFar = '';
+
+  const result = streamText({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: getLocalModel() as any,
+    prompt,
+    abortSignal: signal,
+    onChunk: ({ chunk }) => {
+      if (chunk.type === 'text-delta') {
+        spokenSoFar += chunk.text;
+        onChunk(chunk.text);
+      }
+    },
+    onError: ({ error }) => {
+      // D-03: fast abort (<~500ms) redirects here instead of onAbort per AI SDK
+      // #8088. spokenSoFar is safe in the accumulator above regardless of which
+      // error path fires.
+      void error;
+    },
+  });
+
+  // Drain the stream so onChunk fires for every token
+  for await (const _ of result.textStream) {
+    /* consumed via onChunk callback above */
+  }
+
+  // D-11: persist assistant turn with the accumulated spoken text
+  appendTurn(db, {
+    threadId,
+    role: 'assistant',
+    text: spokenSoFar,
+    routing: { route: 'LOCAL', reason: 'voice-answer:stream', sensitivity: 'none' },
+  });
+
+  // Notify caller with full accumulated text (for D-12 barge-in context)
+  onDone(spokenSoFar);
+}
