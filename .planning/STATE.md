@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-07T18:05:04.260Z"
+last_updated: "2026-06-07T18:31:00.672Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 6
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 16 (streaming-cascade-barge-in-read-only) — EXECUTING
-Plan: 3 of 6 (Plans 01-02 complete 2026-06-07)
+Plan: 4 of 6 (Plans 01-03 complete 2026-06-07)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 16
-**Plan:** 2 complete — D-04 TtsSegmenter (first-chunk + abbreviation/decimal deny-list, 9/9 tests GREEN), D-06 voice-latency-log (ARIA_DEBUG-gated writer/reader, 4/4 tests GREEN), D-03 streamVoiceAnswer (LOCAL-route, onChunk accumulator for spokenSoFar, abortSignal wired, appendTurn both turns, ask() unchanged 132/132 RAG tests GREEN)
-**Status:** Executing Phase 16, Plan 03 next
+**Plan:** 3 complete — D-01/D-09 bargeIn()/pause()/resume() + paused state in useVoiceSession (13/13 tests GREEN), D-08 KokoroTtsInstance speed type fix + D-09 suspend()/resume() + cancel() on KokoroPlayerHandle (WARNING 3 fix, 16-04b known interface), D-05/D-07 useReadAloudQueue promise-chain queue with Pitfall-5 cancel (4/4 tests GREEN)
+**Status:** Executing Phase 16, Plan 04a next
 **Last activity:** 2026-06-07
 
 **Open verification debts (Phase 15):**
@@ -75,6 +75,15 @@ Plan: 3 of 6 (Plans 01-02 complete 2026-06-07)
 - voice-latency-log spec: uses better-sqlite3-multiple-ciphers (not better-sqlite3 — matches project convention; was corrected as Rule 1 auto-fix)
 - handler-count invariant: 154/154 CHANNELS registered (149 Phase-15 + 5 Phase-16 new); uses Object.keys(CHANNELS).length dynamically (no hardcoded count)
 
+## Decisions (Phase 16, Plan 03)
+
+- bargeIn() guards window.aria undefined in test environments (null-check before voiceAbort IPC call)
+- cancel()/suspend()/resume() on KokoroPlayerHandle return void (fire-and-forget; not awaited per D-09)
+- suspend() guards audioCtx.state === 'running'; resume() guards 'suspended' (safe state transitions only)
+- sourceRef cleared on source.onended as well as cancel() (no dangling source refs)
+- half-duplex.spec.ts test updated to reflect D-01 behavior (PTT-during-speaking now calls bargeIn → idle)
+- currentSessionId via crypto.randomUUID() with Date.now() fallback (Wave 2 VoiceSessionManager supplies canonical ID)
+
 ## Decisions (Phase 16, Plan 02)
 
 - AI SDK 6 text-delta chunk property is chunk.text (not chunk.textDelta as in RESEARCH.md) — auto-fixed Rule 1 in Task 3
@@ -84,7 +93,7 @@ Plan: 3 of 6 (Plans 01-02 complete 2026-06-07)
 
 ## Next Action
 
-`/gsd-execute-phase 16` — Plans 01-02 complete (2026-06-07). Next: Plan 03 (W1: bargeIn/pause/resume + KokoroPlayerHandle speed type + useReadAloudQueue). Phase 16 Wave 1 pure-logic units (02+03) running in parallel.
+`/gsd-execute-phase 16` — Plans 01-03 complete (2026-06-07). Next: Plan 04a (VoiceSessionManager) or Plan 04b (VoiceHUDBand transport controls). Wave 1 complete: all pure-logic units implemented and tested.
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
