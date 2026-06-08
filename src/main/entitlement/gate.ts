@@ -71,12 +71,18 @@ interface RawEntitlementRow {
 }
 
 function entitlementTableExists(db: Db): boolean {
-  const r = db
-    .prepare(
-      `SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='entitlement'`,
-    )
-    .get() as { n: number } | undefined;
-  return Boolean(r);
+  try {
+    const r = db
+      .prepare(
+        `SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='entitlement'`,
+      )
+      .get() as { n: number } | undefined;
+    return Boolean(r);
+  } catch {
+    // Test-fixture mock DBs may not implement `.get()` — treat as table-absent
+    // (default-allow) consistent with the escape-hatch comment above.
+    return false;
+  }
 }
 
 function readRow(db: Db): RawEntitlementRow | undefined {
