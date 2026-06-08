@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-08T11:22:16.350Z"
+last_updated: "2026-06-08T12:54:55.803Z"
 last_activity: 2026-06-08
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 25
-  completed_plans: 19
+  completed_plans: 20
   percent: 50
 ---
 
@@ -24,11 +24,12 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 17 (voice-confirm-writes-through-the-gate) — EXECUTING
-Plan: 2 of 7 (Plan 01 complete)
+Plan: 3 of 7 (Plans 01–02 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 17
 **Plan 01:** Complete. Migration 137 ('cancelled' state CHECK + PRAGMA legacy_alter_table=ON table-rebuild); state.ts + isTerminal + DEFAULT_LIST_STATES updated; 4 new IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) stub-registered; voice/prefs.ts extended for speed/voiceId/useCloud. Handler-count invariant green. Typecheck flat at 84 baseline.
-**Status:** Executing Phase 17 — Plan 02 next
+**Plan 02:** Complete. performAsk() extracted from ipc/ask.ts to rag/ask-service.ts (D-02); ipc/ask.ts is thin wrapper (entitlement gate + performAsk call); ask.spec.ts UNCHANGED 5/5; ask-service.spec.ts 12/12. [Rule 1] gate.ts entitlementTableExists try/catch for pre-existing Phase 08.1 mock DB incompatibility. Typecheck flat 84 baseline.
+**Status:** Executing Phase 17 — Plan 03 next
 **Last activity:** 2026-06-08
 
 **Open verification debts (Phase 15):**
@@ -121,9 +122,16 @@ Plan: 2 of 7 (Plan 01 complete)
 - VoicePrefsDto (speed/voiceId/useCloud) is the IPC DTO type; settings KV only — no user_prefs table (D-16)
 - embedded.ts canonical DDL updated to include migration 137 (new installs get 'cancelled' state from scratch)
 
+## Decisions (Phase 17, Plan 02)
+
+- AskServiceDeps uses writeRoutingLogFn override for test injection without real DB; production uses dbGetter() → writeRoutingLog directly
+- classifyFrontierError moved to ask-service.ts and re-exported; ipc/ask.ts no longer references it
+- AskDeps interface in ipc/ask.ts UNCHANGED — preserved as ask.spec.ts injection boundary
+- gate.ts entitlementTableExists wrapped in try/catch: pre-existing Phase 08.1 incompatibility where mock DB missing .get() method; escape-hatch comment already intended this behavior (Rule 1 auto-fix)
+
 ## Next Action
 
-`/gsd-execute-phase 17` — **Phase 17 Plan 01 COMPLETE (2026-06-08)**. Next: Plan 02 (ask.ts → ask-service.ts performAsk extraction). Remaining waves: W1=17-02 (ask-service extraction); W2 17-03 (VoiceIntentRouter + read-back template) ∥ 17-04 (cloud-stt + real VOICE_GET/SET_PREFS + consent); W3 17-05 (voiceConfirm wired live + confirm-classifier + cancel) ∥ 17-06 (VoiceSection + ApprovalCard affordance); W4=17-07 (D-17 ratchet + integration test + human-verify). No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
+`/gsd-execute-phase 17` — **Phase 17 Plan 02 COMPLETE (2026-06-08)**. Next: Plan 03 (VoiceIntentRouter + read-back template). Remaining waves: W2 17-03 (VoiceIntentRouter + read-back template) ∥ 17-04 (cloud-stt + real VOICE_GET/SET_PREFS + consent); W3 17-05 (voiceConfirm wired live + confirm-classifier + cancel) ∥ 17-06 (VoiceSection + ApprovalCard affordance); W4=17-07 (D-17 ratchet + integration test + human-verify). No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
 
 **Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user (`pnpm dev`). **Phase 15** packaged-verify debts open.
 
