@@ -1098,7 +1098,8 @@ export interface AriaApi {
   // Fire-and-forget timing mark from renderer (returns Promise<void>):
   voiceLatencyMark(req: { sessionId: string; mark: 'kokoro_synth_start' | 'first_audio_out'; t: number }): Promise<void>;
   // Phase 17 — Voice-Confirm + Writes Through the Gate (17-01)
-  voiceConfirmApproval(req: { approvalId: string }): Promise<{ ok: true } | { error: string }>;
+  // transcript?: optional STT utterance for confirm-classifier path (D-06)
+  voiceConfirmApproval(req: { approvalId: string; transcript?: string }): Promise<{ ok: true } | { error: string }>;
   voiceCancelApproval(req: { approvalId: string }): Promise<{ ok: true } | { error: string }>;
   voiceGetPrefs(): Promise<VoicePrefsDto>;
   voiceSetPrefs(patch: Partial<VoicePrefsPatchDto>): Promise<VoicePrefsDto | { error: string }>;

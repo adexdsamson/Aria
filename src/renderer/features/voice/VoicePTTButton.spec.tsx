@@ -30,6 +30,7 @@ function makeSession(
     liveTranscript: '',
     modelProgress: null,
     paused: false,             // Phase 16 / D-09 addition
+    pendingApprovalId: null,   // Phase 17 / D-10 addition
     startTurn: vi.fn().mockReturnValue(true),
     stopTurn: vi.fn(),
     setVadMode: vi.fn(),
@@ -41,6 +42,8 @@ function makeSession(
     bargeIn: vi.fn(),          // Phase 16 / D-01 addition
     pause: vi.fn(),            // Phase 16 / D-09 addition
     resume: vi.fn(),           // Phase 16 / D-09 addition
+    setPendingApproval: vi.fn(),  // Phase 17 / D-10 addition
+    clearPendingApproval: vi.fn(), // Phase 17 / D-10 addition
     ...overrides,
   };
 }

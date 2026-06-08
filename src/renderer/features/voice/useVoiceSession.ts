@@ -1,6 +1,7 @@
 /**
  * Phase 15 / Plan 15-06 — Voice session store + half-duplex gate.
  * Phase 16 / Plan 16-03 — Barge-in + pause/resume (D-01/D-09).
+ * Phase 17 / Plan 17-05 — pendingApprovalId + confirm-aware setTranscript/bargeIn.
  *
  * Implements:
  *   D-13: micGated=true on turn-start AND for the full TTS playback duration;
@@ -9,6 +10,13 @@
  *   VOICE-07: Aria never transcribes its own TTS (the gate enforces this).
  *   D-01: bargeIn() replaces the no-op guard when voiceState==='speaking'.
  *   D-09: pause()/resume() thread paused boolean through state; clearCooldown on pause.
+ *   D-10: pendingApprovalId ref — non-null during awaiting-confirm sub-state.
+ *         bargeIn() while pendingApprovalId non-null fires voiceCancelApproval IPC
+ *         before the existing voiceAbort logic.
+ *         setTranscript(text, final=true) with pendingApprovalId non-null routes
+ *         to voiceConfirmApproval IPC (confirm classifier path) instead of
+ *         voiceFeedAnswer (Pitfall 4 guard).
+ *   D-12: After cancel: pendingApprovalId cleared, session returns to idle.
  *
  * Architecture: a minimal observable store (no Zustand dependency — package not
  * installed). Exports createVoiceSessionStore() factory for testing and
@@ -20,6 +28,9 @@
  *   speaking ──bargeIn()──→ idle (D-01: fires voiceAbort IPC fire-and-forget)
  *   speaking ──pause()──→ speaking/paused=true (D-09: caller suspends AudioContext)
  *   speaking/paused ──resume()──→ speaking/paused=false (D-09: caller resumes AudioContext)
+ *   [awaiting-confirm sub-state: pendingApprovalId non-null]
+ *     bargeIn() → voiceCancelApproval + voiceAbort → idle, pendingApprovalId=null
+ *     setTranscript(final=true) → voiceConfirmApproval (with transcript) → clears pendingApprovalId
  *
  * IPC push subscriptions:
  *   window.aria.onVoiceTranscript  → setTranscript
@@ -57,6 +68,15 @@ export interface VoiceSessionState {
    * Callers (VoiceHUDBand) call player.suspend()/player.resume() directly.
    */
   paused: boolean;
+  /**
+   * Phase 17 / D-10: non-null during awaiting-confirm sub-state.
+   * Set by setPendingApproval() when read-back TTS starts for an approval.
+   * Cleared on terminal transitions (confirm → approved, cancel → cancelled, barge-in).
+   * When non-null:
+   *   - setTranscript(final=true) sends to voiceConfirmApproval instead of voiceFeedAnswer
+   *   - bargeIn() fires voiceCancelApproval before voiceAbort
+   */
+  pendingApprovalId: string | null;
 }
 
 // ─── store actions type ───────────────────────────────────────────────────────
@@ -140,6 +160,21 @@ export interface VoiceSessionActions {
    * NOTE: Caller (VoiceHUDBand 16-04b) is responsible for player.resume().
    */
   resume(): void;
+
+  /**
+   * Phase 17 / D-10: Set the pending approval ID (enter awaiting-confirm sub-state).
+   * Called by useVoiceConfirm.triggerReadBack() when read-back TTS begins for an approval.
+   * While pendingApprovalId is set:
+   *   - setTranscript(final=true) routes to voiceConfirmApproval instead of voiceFeedAnswer
+   *   - bargeIn() fires voiceCancelApproval before voiceAbort
+   */
+  setPendingApproval(approvalId: string): void;
+
+  /**
+   * Phase 17 / D-10: Clear the pending approval ID (exit awaiting-confirm sub-state).
+   * Called after a terminal confirm/cancel transition.
+   */
+  clearPendingApproval(): void;
 }
 
 export type VoiceSessionStore = {
@@ -162,6 +197,7 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     liveTranscript: '',
     modelProgress: null,
     paused: false,
+    pendingApprovalId: null,
   };
 
   const listeners = new Set<() => void>();
@@ -236,6 +272,26 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     setTranscript(text: string, final: boolean): void {
       if (final) {
         setState({ liveTranscript: text, voiceState: 'processing' });
+
+        // Phase 17 / D-10 / Pitfall 4: if we are in the awaiting-confirm sub-state,
+        // route the final transcript to the confirm classifier (VOICE_CONFIRM_APPROVAL)
+        // instead of the normal answer path (VOICE_FEED_ANSWER).
+        if (state.pendingApprovalId !== null) {
+          const approvalId = state.pendingApprovalId;
+          // Clear pendingApprovalId immediately after dispatching (fire-and-forget)
+          setState({ pendingApprovalId: null });
+          if (typeof window !== 'undefined' && window.aria) {
+            (window.aria as AriaApi).voiceConfirmApproval?.({
+              approvalId,
+              transcript: text,
+            });
+          }
+        } else {
+          // Normal answer turn: existing VOICE_FEED_ANSWER path is handled by
+          // the IPC push subscription (onVoiceTranscript → setTranscript).
+          // The voiceFeedAnswer IPC is called externally by the capture layer
+          // after receiving the final transcript — we don't call it here.
+        }
       } else {
         setState({ liveTranscript: text });
       }
@@ -264,14 +320,26 @@ export function createVoiceSessionStore(): VoiceSessionStore {
       if (state.voiceState !== 'speaking') return;
       // 1. Cancel any in-flight cooldown timer (D-09)
       clearCooldown();
-      // 2. Fire one-way IPC abort — NO await (D-02 fire-and-forget, ~5ms renderer-side cancel)
+      // 2. Phase 17 / D-10: if in awaiting-confirm sub-state, cancel the pending approval
+      //    BEFORE the voiceAbort (fire-and-forget). This ensures the 'ready' row gets
+      //    transitioned to 'cancelled' rather than left orphaned.
+      if (state.pendingApprovalId !== null) {
+        if (typeof window !== 'undefined' && window.aria) {
+          (window.aria as AriaApi).voiceCancelApproval?.({
+            approvalId: state.pendingApprovalId,
+          });
+        }
+        // Clear pendingApprovalId immediately (fire-and-forget — no await)
+        setState({ pendingApprovalId: null });
+      }
+      // 3. Fire one-way IPC abort — NO await (D-02 fire-and-forget, ~5ms renderer-side cancel)
       //    Caller (VoiceHUDBand 16-04b) is responsible for readAloudQueue.cancel() and
       //    player.resume() if AudioContext is suspended.
       //    Guard against test environments where window.aria is undefined.
       if (typeof window !== 'undefined' && window.aria) {
         (window.aria as AriaApi).voiceAbort?.({ sessionId: currentSessionId });
       }
-      // 3. Transition to idle — clears paused=false, micGated=false
+      // 4. Transition to idle — clears paused=false, micGated=false
       setState({ voiceState: 'idle', micGated: false, paused: false, liveTranscript: '' });
     },
 
@@ -286,6 +354,17 @@ export function createVoiceSessionStore(): VoiceSessionStore {
       // D-09: set paused=false.
       // Caller (VoiceHUDBand 16-04b) is responsible for player.resume().
       setState({ paused: false });
+    },
+
+    setPendingApproval(approvalId: string): void {
+      // Phase 17 / D-10: enter awaiting-confirm sub-state.
+      // Called by useVoiceConfirm.triggerReadBack() when read-back TTS begins.
+      setState({ pendingApprovalId: approvalId });
+    },
+
+    clearPendingApproval(): void {
+      // Phase 17 / D-10: exit awaiting-confirm sub-state after terminal transition.
+      setState({ pendingApprovalId: null });
     },
 
     subscribeToIpc(aria: AriaApi): () => void {
