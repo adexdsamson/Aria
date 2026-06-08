@@ -99,7 +99,7 @@ Plans:
   5. User can set voice / speed / local-vs-cloud output preferences in Settings, and the choice is honored per turn.
 **Plans**: 7 plans (4 waves)
 Plans:
-- [ ] 17-01-PLAN.md — Wave 1: migration 137 ('cancelled' state) + state.ts + new IPC channels (VOICE_CONFIRM_APPROVAL/CANCEL/GET_PREFS/SET_PREFS) + stub handlers + voice/prefs.ts extension + ApprovalCard/approvals list 'cancelled' update
+- [x] 17-01-PLAN.md — Wave 1: migration 137 ('cancelled' state) + state.ts + new IPC channels (VOICE_CONFIRM_APPROVAL/CANCEL/GET_PREFS/SET_PREFS) + stub handlers + voice/prefs.ts extension + ApprovalCard/approvals list 'cancelled' update
 - [ ] 17-02-PLAN.md — Wave 1: ask-service.ts extraction from ipc/ask.ts (D-02) — ask.spec.ts passes UNCHANGED
 - [ ] 17-03-PLAN.md — Wave 2: VoiceIntentRouter (D-01/D-03) + read-back template builder (D-05)
 - [ ] 17-04-PLAN.md — Wave 2: cloud-stt.ts (D-13) + shouldUseCloud() sensitivity gate (D-15) + real VOICE_GET/SET_PREFS handlers (D-16)
@@ -139,7 +139,7 @@ Plans:
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
 | 16. Streaming Cascade + Barge-in | 6/6 | Complete   | 2026-06-07 |
-| 17. Voice-Confirm + Writes Through the Gate | 0/7 | In progress | - |
+| 17. Voice-Confirm + Writes Through the Gate | 1/7 | In Progress|  |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |
 

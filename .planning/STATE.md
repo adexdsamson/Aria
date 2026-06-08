@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: verifying
-last_updated: "2026-06-07T22:10:37.398Z"
-last_activity: 2026-06-07
+status: executing
+last_updated: "2026-06-08T11:22:16.350Z"
+last_activity: 2026-06-08
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 25
+  completed_plans: 19
   percent: 50
 ---
 
@@ -23,15 +23,13 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 16 (streaming-cascade-barge-in-read-only) — CODE-COMPLETE (runtime smoke deferred)
-Plan: 6 of 6 complete (sequential/no-worktree; node_modules intact throughout)
+Phase: 17 (voice-confirm-writes-through-the-gate) — EXECUTING
+Plan: 2 of 7 (Plan 01 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
-**Phase:** 16
-**Plan:** All 6 complete. Full streaming cascade wired: PTT→STT→streamVoiceAnswer(local-route)→TtsSegmenter→VOICE_TTS_CHUNK→useReadAloudQueue→Kokoro; barge-in (renderer-first abort + [interrupted] turn); briefing read-aloud (pause/skip/speed); multi-turn via rag thread; D-13 read-only ratchet green.
-**Status:** Phase 16 code-complete; 5-test runtime smoke (SC1–SC5) deferred to human-verify on running app
-**Verifier:** 13/13 must-haves (/ask shell-HUD player gap closed in `f168a6a`); 5 runtime-smoke items open (see 16-VERIFICATION.md). Typecheck flat at 84 baseline, 0 new across all 6 plans.
-**Open Phase-16 human-verify (run `pnpm dev`):** SC1 briefing pause/skip/speed · SC2 /ask first-audio <900ms + voice_latency_log 4 cols (ARIA_DEBUG=1) · SC3 barge-in <200ms · SC4 multi-turn "he" resolution · SC5 backchannel non-interruption
-**Last activity:** 2026-06-07
+**Phase:** 17
+**Plan 01:** Complete. Migration 137 ('cancelled' state CHECK + PRAGMA legacy_alter_table=ON table-rebuild); state.ts + isTerminal + DEFAULT_LIST_STATES updated; 4 new IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) stub-registered; voice/prefs.ts extended for speed/voiceId/useCloud. Handler-count invariant green. Typecheck flat at 84 baseline.
+**Status:** Executing Phase 17 — Plan 02 next
+**Last activity:** 2026-06-08
 
 **Open verification debts (Phase 15):**
 
@@ -115,9 +113,17 @@ Plan: 6 of 6 complete (sequential/no-worktree; node_modules intact throughout)
 - WRITE_CHOKEPOINTS named distinctly from Phase-14 CHOKEPOINT_NAMES to make Phase-16 extension intent explicit
 - Single it() block with { file, chokepoint } pair offenders array mirrors Phase-14 template structure
 
+## Decisions (Phase 17, Plan 01)
+
+- Migration 137 uses PRAGMA legacy_alter_table=ON + full table-rebuild (mirror of migration 134) to extend approval state CHECK — SQLite cannot ALTER a CHECK constraint
+- 'cancelled' is a distinct terminal state from 'rejected' (deliberate deny) — used only for voice-path aborts per D-11
+- 4 IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) land with stubs in Wave 0 so handler-count invariant stays green; real impls in Plans 04/05
+- VoicePrefsDto (speed/voiceId/useCloud) is the IPC DTO type; settings KV only — no user_prefs table (D-16)
+- embedded.ts canonical DDL updated to include migration 137 (new installs get 'cancelled' state from scratch)
+
 ## Next Action
 
-`/gsd-execute-phase 17` — **Phase 17 PLANNED (2026-06-08): 7 plans / 4 waves, plan-checker PASS iter 2** (2 blockers + 3 warnings resolved). Waves: W0=17-01 (migration 137 'cancelled' state via legacy_alter_table table-rebuild + 4 new IPC channels + voice-prefs KV) ∥ 17-02 (ask.ts→ask-service.ts performAsk extraction, ask.spec unchanged + new ask-service.spec); W2 17-03 (VoiceIntentRouter keyword-prefilter→per-domain + read-back template + pre-staging person-resolver disambig) ∥ 17-04 (cloud-stt whisper-1 + shouldUseCloud sensitivity gate + real VOICE_GET/SET_PREFS + settings-KV consent — action_audit_log is a VIEW); W3 17-05 (voiceConfirm wired live + confirm-classifier + pendingApprovalId + useVoiceConfirm + cancel→'cancelled') ∥ 17-06 (VoiceSection Settings + ApprovalCard Cancel/forced-suppression; depends 17-05); W4=17-07 (D-17 ratchet update + voice-write-path integration test proving no-bypass + human-verify checkpoint). No new npm deps; no frontier streaming (Phase 18). Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~38 commits ahead of origin.
+`/gsd-execute-phase 17` — **Phase 17 Plan 01 COMPLETE (2026-06-08)**. Next: Plan 02 (ask.ts → ask-service.ts performAsk extraction). Remaining waves: W1=17-02 (ask-service extraction); W2 17-03 (VoiceIntentRouter + read-back template) ∥ 17-04 (cloud-stt + real VOICE_GET/SET_PREFS + consent); W3 17-05 (voiceConfirm wired live + confirm-classifier + cancel) ∥ 17-06 (VoiceSection + ApprovalCard affordance); W4=17-07 (D-17 ratchet + integration test + human-verify). No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
 
 **Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user (`pnpm dev`). **Phase 15** packaged-verify debts open.
 
