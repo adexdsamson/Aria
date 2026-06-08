@@ -20,12 +20,13 @@ export type ApprovalState =
   | 'sent'
   | 'sending'
   | 'failed'
-  | 'needs-operator-decision';
+  | 'needs-operator-decision'
+  | 'cancelled'; // Phase 17 D-11: voice-path abort (distinct from rejected = deliberate deny)
 
 const ALLOWED: Record<ApprovalState, readonly ApprovalState[]> = {
   pending: ['generating'],
   generating: ['ready', 'interrupted'],
-  ready: ['approved', 'rejected', 'snoozed'],
+  ready: ['approved', 'rejected', 'snoozed', 'cancelled'], // 'cancelled' added Phase 17 D-11
   approved: ['sent', 'sending'],
   rejected: [],
   snoozed: ['ready'],
@@ -34,6 +35,7 @@ const ALLOWED: Record<ApprovalState, readonly ApprovalState[]> = {
   sending: ['sent', 'failed', 'needs-operator-decision'],
   failed: ['needs-operator-decision'],
   'needs-operator-decision': [],
+  cancelled: [], // Phase 17 D-11: terminal state — no further transitions
 };
 
 export function assertTransition(from: ApprovalState, to: ApprovalState): void {
