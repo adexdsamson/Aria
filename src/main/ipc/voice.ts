@@ -31,9 +31,10 @@ import { CHANNELS } from '../../shared/ipc-contract';
 import type { DbHolder } from './onboarding';
 import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
-import { getVoiceModelStatus } from '../voice/prefs';
+import { getVoiceModelStatus, getVoicePrefs } from '../voice/prefs';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 import { createVoiceSessionManager } from '../voice/voice-session-manager';
+import type { VoicePrefsDto } from '../../shared/ipc-contract';
 
 export interface VoiceHandlersDeps {
   logger: Logger;
@@ -273,5 +274,48 @@ export function registerVoiceHandlers(
       });
     }
     return undefined;
+  });
+
+  // ─── Phase 17 / Plan 17-01 stubs ─────────────────────────────────────────
+  //
+  // Four new channels added in Wave 0. All four must be registered here so the
+  // handler-count invariant (Object.keys(CHANNELS).length === handlers.size) stays
+  // green. Real implementations land in Plans 17-04 (VOICE_GET/SET_PREFS) and
+  // 17-05 (VOICE_CONFIRM/CANCEL_APPROVAL).
+
+  // ─── VOICE_CONFIRM_APPROVAL ──────────────────────────────────────────────
+  //
+  // D-04: ready→approved via voiceConfirm (Phase-14 dormant seam).
+  // Stub returns { error: 'NOT_IMPLEMENTED' } until Plan 17-05 wires the real
+  // voiceConfirm dispatch.
+  ipcMain.handle(CHANNELS.VOICE_CONFIRM_APPROVAL, async () => {
+    return { error: 'NOT_IMPLEMENTED' };
+  });
+
+  // ─── VOICE_CANCEL_APPROVAL ───────────────────────────────────────────────
+  //
+  // D-09/D-11: ready→cancelled via transitionTo.
+  // Stub returns { error: 'NOT_IMPLEMENTED' } until Plan 17-05 wires the real
+  // transitionTo(db, id, 'cancelled') call.
+  ipcMain.handle(CHANNELS.VOICE_CANCEL_APPROVAL, async () => {
+    return { error: 'NOT_IMPLEMENTED' };
+  });
+
+  // ─── VOICE_GET_PREFS ─────────────────────────────────────────────────────
+  //
+  // D-16: read voice prefs (speed / voiceId / useCloud).
+  // Returns VOICE_PREF_DEFAULTS when db is null (pre-unlock). Real read
+  // implementation is already functional via getVoicePrefs — this stub
+  // delegates immediately.
+  ipcMain.handle(CHANNELS.VOICE_GET_PREFS, (): VoicePrefsDto => {
+    return getVoicePrefs(deps.dbHolder.db);
+  });
+
+  // ─── VOICE_SET_PREFS ─────────────────────────────────────────────────────
+  //
+  // D-16: write voice prefs. Stub returns { error: 'NOT_IMPLEMENTED' } until
+  // Plan 17-04 adds the Zod validation and per-key write dispatch.
+  ipcMain.handle(CHANNELS.VOICE_SET_PREFS, async () => {
+    return { error: 'NOT_IMPLEMENTED' };
   });
 }

@@ -1,5 +1,6 @@
 /**
  * Phase 15 / Plan 15-01 — Voice model-readiness KV preferences.
+ * Phase 17 / Plan 17-01 — Extended with D-16 voice settings keys.
  *
  * Mirrors src/main/background/prefs.ts EXACTLY — namespaced keys in the
  * existing `settings(k, v)` KV table from migration 001.
@@ -15,10 +16,24 @@
  */
 import type { Database as Db } from 'better-sqlite3';
 import type { VoiceModelStatus } from '../../shared/voice-types';
+import type { VoicePrefsDto } from '../../shared/ipc-contract';
 
 const KEY_PREFIX = 'voice.';
 
-type VoicePrefKey = 'modelReady' | 'modelPath' | 'modelState';
+type VoicePrefKey =
+  | 'modelReady' | 'modelPath' | 'modelState'   // Phase 15 (unchanged)
+  | 'speed'                                       // Phase 17 D-16: TTS speed ('0.75'|'1.0'|'1.25'|'1.5')
+  | 'voiceId'                                     // Phase 17 D-16: Kokoro voice name
+  | 'useCloud'                                    // Phase 17 D-16: cloud STT/TTS enabled ('1'|'0')
+  | 'cloudAudio.consented'                        // Phase 17 D-14: cloud consent ('1'|'0')
+  | 'cloudAudio.consentedAt';                     // Phase 17 D-14: consent ISO timestamp
+
+/** Defaults for the Phase 17 D-16 voice prefs. */
+export const VOICE_PREF_DEFAULTS: VoicePrefsDto = {
+  speed: 1.0,
+  voiceId: '',
+  useCloud: false,
+};
 
 function fullKey(key: VoicePrefKey): string {
   return KEY_PREFIX + key;
@@ -115,4 +130,51 @@ export function setVoiceModelDownloading(db: Db | null): void {
   db.prepare(
     `DELETE FROM settings WHERE k = ?`,
   ).run(fullKey('modelPath'));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 17 / Plan 17-01 — D-16 voice prefs (speed / voiceId / useCloud)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the current voice prefs from the settings KV table.
+ *
+ * Returns VOICE_PREF_DEFAULTS when:
+ *   - db is null (pre-unlock / vault sealed)
+ *   - rows are missing (first run)
+ *   - the underlying query throws
+ *
+ * db-null tolerant — safe to call before unlock.
+ */
+export function getVoicePrefs(db: Db | null): VoicePrefsDto {
+  if (!db) return { ...VOICE_PREF_DEFAULTS };
+
+  try {
+    const speedRaw = readStr(db, 'speed');
+    const voiceIdRaw = readStr(db, 'voiceId');
+    const useCloudRaw = readStr(db, 'useCloud');
+
+    return {
+      speed: speedRaw !== undefined ? parseFloat(speedRaw) : VOICE_PREF_DEFAULTS.speed,
+      voiceId: voiceIdRaw !== undefined ? voiceIdRaw : VOICE_PREF_DEFAULTS.voiceId,
+      useCloud: useCloudRaw === '1',
+    };
+  } catch {
+    return { ...VOICE_PREF_DEFAULTS };
+  }
+}
+
+/**
+ * Write a single voice preference KV entry.
+ *
+ * Thin wrapper over writeStr — exposes the VoicePrefKey type to callers
+ * so that the Phase-15 keys and Phase-17 keys share one write surface.
+ *
+ * Throws if db is null (vault sealed) — callers must gate on db !== null.
+ */
+export function writeVoicePref(db: Db | null, key: VoicePrefKey, value: string): void {
+  if (!db) {
+    throw new Error('writeVoicePref: db is null (vault sealed)');
+  }
+  writeStr(db, key, value);
 }

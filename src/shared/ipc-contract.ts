@@ -197,6 +197,11 @@ export const CHANNELS = {
   DIAGNOSTICS_VOICE_LATENCY: 'aria:diagnostics:voice-latency', // D-06: read voice_latency_log (debug)
   VOICE_FEED_ANSWER: 'aria:voice:feed-answer',       // D-05: trigger streaming cascade
   VOICE_LATENCY_MARK: 'aria:voice:latency-mark',     // D-06: renderer→main fire-and-forget timing mark
+  // Phase 17 — Voice-Confirm + Writes Through the Gate (17-01)
+  VOICE_CONFIRM_APPROVAL: 'aria:voice:confirm-approval',   // D-04: ready→approved via voiceConfirm
+  VOICE_CANCEL_APPROVAL: 'aria:voice:cancel-approval',     // D-09/D-11: ready→cancelled
+  VOICE_GET_PREFS: 'aria:voice:get-prefs',                 // D-16: read voice prefs
+  VOICE_SET_PREFS: 'aria:voice:set-prefs',                 // D-16: write voice prefs
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -583,7 +588,8 @@ export type ApprovalUiState =
   | 'sent'
   | 'sending'
   | 'failed'
-  | 'needs-operator-decision';
+  | 'needs-operator-decision'
+  | 'cancelled'; // Phase 17 D-11: voice-path abort terminal state
 
 export interface ApprovalRowDto {
   id: string;
@@ -1091,6 +1097,11 @@ export interface AriaApi {
   voiceFeedAnswer(req: { sessionId: string; question: string }): Promise<{ ok: true } | IpcError>;
   // Fire-and-forget timing mark from renderer (returns Promise<void>):
   voiceLatencyMark(req: { sessionId: string; mark: 'kokoro_synth_start' | 'first_audio_out'; t: number }): Promise<void>;
+  // Phase 17 — Voice-Confirm + Writes Through the Gate (17-01)
+  voiceConfirmApproval(req: { approvalId: string }): Promise<{ ok: true } | { error: string }>;
+  voiceCancelApproval(req: { approvalId: string }): Promise<{ ok: true } | { error: string }>;
+  voiceGetPrefs(): Promise<VoicePrefsDto>;
+  voiceSetPrefs(patch: Partial<VoicePrefsPatchDto>): Promise<VoicePrefsDto | { error: string }>;
 }
 
 // Phase 16 / Plan 16-01 — Voice Latency Log DTO (D-06) ---------------------
@@ -1110,6 +1121,22 @@ export interface VoiceLatencyLogRow {
   /** ms offset: AudioBufferSourceNode.start() called. */
   t_first_audio_out: number | null;
   recorded_at: string;
+}
+
+// Phase 17 / Plan 17-01 — Voice Prefs DTOs (D-16) ---------------------------
+
+/** Voice preferences returned by VOICE_GET_PREFS. */
+export interface VoicePrefsDto {
+  speed: number;      // TTS playback speed. Default: 1.0
+  voiceId: string;    // Kokoro voice name. Default: '' (use Kokoro default)
+  useCloud: boolean;  // Enable cloud STT/TTS. Default: false
+}
+
+/** Patch payload for VOICE_SET_PREFS — all fields optional. */
+export interface VoicePrefsPatchDto {
+  speed?: number;
+  voiceId?: string;
+  useCloud?: boolean;
 }
 
 // Plan 08-03 Learning DTOs --------------------------------------------------
@@ -1514,6 +1541,11 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   DIAGNOSTICS_VOICE_LATENCY: 'diagnosticsVoiceLatency',
   VOICE_FEED_ANSWER: 'voiceFeedAnswer',
   VOICE_LATENCY_MARK: 'voiceLatencyMark',
+  // Phase 17 — Voice-Confirm + Writes Through the Gate (17-01)
+  VOICE_CONFIRM_APPROVAL: 'voiceConfirmApproval',
+  VOICE_CANCEL_APPROVAL: 'voiceCancelApproval',
+  VOICE_GET_PREFS: 'voiceGetPrefs',
+  VOICE_SET_PREFS: 'voiceSetPrefs',
 } as const;
 
 // ---------------------------------------------------------------------------

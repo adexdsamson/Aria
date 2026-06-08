@@ -45,6 +45,7 @@ const DEFAULT_LIST_STATES: ApprovalUiState[] = [
   'needs-operator-decision',
   'interrupted',
   'snoozed',
+  'cancelled', // Phase 17 D-11 — show cancelled rows in approval list for audit visibility
 ];
 
 function notReady(): { error: string } {

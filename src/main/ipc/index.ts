@@ -632,6 +632,32 @@ export function registerHandlers(
     voice16Channels.forEach((c) => skip.add(c));
   }
 
+  // Phase 17 / Plan 17-01 — 4 new voice channels (Wave 0 stubs).
+  // VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL: real impls in Plan 17-05.
+  // VOICE_GET_PREFS, VOICE_SET_PREFS: real impls in Plan 17-04.
+  // Stubs registered here so the handler-count invariant stays green NOW.
+  const voice17Channels = [
+    CHANNELS.VOICE_CONFIRM_APPROVAL,
+    CHANNELS.VOICE_CANCEL_APPROVAL,
+    CHANNELS.VOICE_GET_PREFS,
+    CHANNELS.VOICE_SET_PREFS,
+  ];
+  if (!voice17Channels.every((c) => skip.has(c))) {
+    if (!skip.has(CHANNELS.VOICE_CONFIRM_APPROVAL)) {
+      ipcMain.handle(CHANNELS.VOICE_CONFIRM_APPROVAL, () => ({ error: 'NOT_IMPLEMENTED' }));
+    }
+    if (!skip.has(CHANNELS.VOICE_CANCEL_APPROVAL)) {
+      ipcMain.handle(CHANNELS.VOICE_CANCEL_APPROVAL, () => ({ error: 'NOT_IMPLEMENTED' }));
+    }
+    if (!skip.has(CHANNELS.VOICE_GET_PREFS)) {
+      ipcMain.handle(CHANNELS.VOICE_GET_PREFS, () => ({ speed: 1.0, voiceId: '', useCloud: false }));
+    }
+    if (!skip.has(CHANNELS.VOICE_SET_PREFS)) {
+      ipcMain.handle(CHANNELS.VOICE_SET_PREFS, () => ({ error: 'NOT_IMPLEMENTED' }));
+    }
+    voice17Channels.forEach((c) => skip.add(c));
+  }
+
   // Phase 12 / Phase 15 — push-event channel stubs.
   // These channels are MAIN → RENDERER push events (main calls webContents.send).
   // ipcMain.handle registrations are stubs to satisfy the handler-count test;

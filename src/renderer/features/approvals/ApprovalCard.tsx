@@ -238,7 +238,7 @@ function EmailApprovalCard(props: ApprovalCardProps): JSX.Element {
 
   const isInterrupted = row.state === 'interrupted';
   const isSending = row.state === 'sending';
-  const isTerminal = row.state === 'sent' || row.state === 'failed';
+  const isTerminal = row.state === 'sent' || row.state === 'failed' || row.state === 'cancelled'; // Phase 17 D-11
   const canApprove = row.state === 'ready' || row.state === 'approved';
   const showApprovalActions = canApprove || isSending || isTerminal;
   const isDiffed = row.body_edited !== null && row.body_edited !== row.body_original;
@@ -737,7 +737,7 @@ export function CalendarApprovalCard(props: ApprovalCardProps): JSX.Element {
   }, []);
 
   const isSending = row.state === 'sending';
-  const isTerminal = row.state === 'sent' || row.state === 'failed';
+  const isTerminal = row.state === 'sent' || row.state === 'failed' || row.state === 'cancelled'; // Phase 17 D-11
   const canApprove = row.state === 'ready' || row.state === 'approved';
   const showApprovalActions = canApprove || isSending || isTerminal;
   const hardConflicts = conflicts.filter((c) => c.severity === 'hard');
