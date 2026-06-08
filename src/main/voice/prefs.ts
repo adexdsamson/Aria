@@ -20,7 +20,7 @@ import type { VoicePrefsDto } from '../../shared/ipc-contract';
 
 const KEY_PREFIX = 'voice.';
 
-type VoicePrefKey =
+export type VoicePrefKey =
   | 'modelReady' | 'modelPath' | 'modelState'   // Phase 15 (unchanged)
   | 'speed'                                       // Phase 17 D-16: TTS speed ('0.75'|'1.0'|'1.25'|'1.5')
   | 'voiceId'                                     // Phase 17 D-16: Kokoro voice name
@@ -177,4 +177,18 @@ export function writeVoicePref(db: Db | null, key: VoicePrefKey, value: string):
     throw new Error('writeVoicePref: db is null (vault sealed)');
   }
   writeStr(db, key, value);
+}
+
+/**
+ * Read a single voice preference KV entry as a raw string.
+ *
+ * Returns undefined when db is null (pre-unlock) or the key is absent.
+ * db-null tolerant — safe to call before unlock.
+ *
+ * Used by handlers that need to read a single key (e.g. cloudAudio.consented
+ * for the D-14 consent audit) without fetching the full VoicePrefsDto.
+ */
+export function readVoicePref(db: Db | null, key: VoicePrefKey): string | undefined {
+  if (!db) return undefined;
+  return readStr(db, key);
 }

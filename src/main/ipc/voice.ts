@@ -31,10 +31,23 @@ import { CHANNELS } from '../../shared/ipc-contract';
 import type { DbHolder } from './onboarding';
 import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
-import { getVoiceModelStatus, getVoicePrefs } from '../voice/prefs';
+import { getVoiceModelStatus, getVoicePrefs, writeVoicePref, readVoicePref } from '../voice/prefs';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 import { createVoiceSessionManager } from '../voice/voice-session-manager';
+import { z } from 'zod';
 import type { VoicePrefsDto } from '../../shared/ipc-contract';
+
+/**
+ * Zod schema for VOICE_SET_PREFS payload (T-17-10: strict() rejects unknown keys;
+ * bounds prevent tampered speed values).
+ */
+const VoicePrefsPatchSchema = z
+  .object({
+    speed: z.number().min(0.5).max(2).optional(),
+    voiceId: z.string().max(100).optional(),
+    useCloud: z.boolean().optional(),
+  })
+  .strict();
 
 export interface VoiceHandlersDeps {
   logger: Logger;
@@ -304,18 +317,54 @@ export function registerVoiceHandlers(
   // ─── VOICE_GET_PREFS ─────────────────────────────────────────────────────
   //
   // D-16: read voice prefs (speed / voiceId / useCloud).
-  // Returns VOICE_PREF_DEFAULTS when db is null (pre-unlock). Real read
-  // implementation is already functional via getVoicePrefs — this stub
-  // delegates immediately.
+  // Returns VOICE_PREF_DEFAULTS when db is null (pre-unlock); db-null tolerant.
+  // Mirrors BG_GET_PREFS handler pattern from src/main/ipc/background.ts.
   ipcMain.handle(CHANNELS.VOICE_GET_PREFS, (): VoicePrefsDto => {
     return getVoicePrefs(deps.dbHolder.db);
   });
 
   // ─── VOICE_SET_PREFS ─────────────────────────────────────────────────────
   //
-  // D-16: write voice prefs. Stub returns { error: 'NOT_IMPLEMENTED' } until
-  // Plan 17-04 adds the Zod validation and per-key write dispatch.
-  ipcMain.handle(CHANNELS.VOICE_SET_PREFS, async () => {
-    return { error: 'NOT_IMPLEMENTED' };
+  // D-16: write voice prefs (speed / voiceId / useCloud).
+  // Validates payload via VoicePrefsPatchSchema.strict() before writing (T-17-10).
+  // Returns updated VoicePrefsDto on success, { error } on failure.
+  //
+  // D-14 consent audit: when useCloud is first set to true AND
+  // voice.cloudAudio.consented is not already '1', record consent in settings KV:
+  //   voice.cloudAudio.consented = '1'
+  //   voice.cloudAudio.consentedAt = ISO timestamp
+  // NOTE: D-14 consent recorded in settings KV only — action_audit_log is a VIEW
+  // (not a table) defined in migration 129, so direct INSERT would fail at runtime.
+  ipcMain.handle(CHANNELS.VOICE_SET_PREFS, async (_event, payload: unknown) => {
+    const db = deps.dbHolder.db;
+    if (!db) {
+      return { error: 'db-locked' };
+    }
+    const parsed = VoicePrefsPatchSchema.safeParse(payload);
+    if (!parsed.success) {
+      return { error: 'invalid-payload' };
+    }
+    try {
+      const patch = parsed.data;
+      if (patch.speed !== undefined) {
+        writeVoicePref(db, 'speed', String(patch.speed));
+      }
+      if (patch.voiceId !== undefined) {
+        writeVoicePref(db, 'voiceId', patch.voiceId);
+      }
+      if (patch.useCloud !== undefined) {
+        writeVoicePref(db, 'useCloud', patch.useCloud ? '1' : '0');
+        // D-14: record cloud audio consent on first opt-in.
+        // action_audit_log is a VIEW (not a table) — INSERT would fail at runtime.
+        // Consent audit uses settings KV only: voice.cloudAudio.consented + consentedAt.
+        if (patch.useCloud && readVoicePref(db, 'cloudAudio.consented') !== '1') {
+          writeVoicePref(db, 'cloudAudio.consented', '1');
+          writeVoicePref(db, 'cloudAudio.consentedAt', new Date().toISOString());
+        }
+      }
+      return getVoicePrefs(db);
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
   });
 }
