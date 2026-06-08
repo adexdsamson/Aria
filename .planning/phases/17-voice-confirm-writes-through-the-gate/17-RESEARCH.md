@@ -555,7 +555,9 @@ async function shouldUseCloud(
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three are Claude's-discretion items per CONTEXT.md with inline recommendations below; no blocking architectural unknowns remain.
 
 1. **Confirm classifier prompt quality**
    - What we know: `generateObject` + Zod `{intent: 'confirm'|'cancel'|'ambiguous'}` is the pattern
