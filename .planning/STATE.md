@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-08T15:42:59.694Z"
+last_updated: "2026-06-08T16:56:29.748Z"
 last_activity: 2026-06-08
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
   percent: 50
 ---
 
@@ -24,13 +24,14 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 17 (voice-confirm-writes-through-the-gate) — EXECUTING
-Plan: 5 of 7 (Plans 01–03 complete)
+Plan: 6 of 7 (Plans 01–05 complete)
 **Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
 **Phase:** 17
 **Plan 01:** Complete. Migration 137 ('cancelled' state CHECK + PRAGMA legacy_alter_table=ON table-rebuild); state.ts + isTerminal + DEFAULT_LIST_STATES updated; 4 new IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) stub-registered; voice/prefs.ts extended for speed/voiceId/useCloud. Handler-count invariant green. Typecheck flat at 84 baseline.
 **Plan 02:** Complete. performAsk() extracted from ipc/ask.ts to rag/ask-service.ts (D-02); ipc/ask.ts is thin wrapper (entitlement gate + performAsk call); ask.spec.ts UNCHANGED 5/5; ask-service.spec.ts 12/12. [Rule 1] gate.ts entitlementTableExists try/catch for pre-existing Phase 08.1 mock DB incompatibility. Typecheck flat 84 baseline.
 **Plan 03:** Complete. VoiceIntentRouter (D-01 keyword pre-filter → per-domain dispatch → insertApproval(ready)) + buildReadBackText() (D-05 pure template from resolved ApprovalRow fields). [Rule 1] hasWord() word-boundary fix (ask substring in task) + ask-domain-first ordering fix. 34 tests green; typecheck flat 84 baseline.
 **Plan 04:** Complete. cloud-stt.ts (cloudTranscribe() D-13 whisper-1 wrapper + shouldUseCloud() D-15 fail-safe local gate); real VOICE_GET/SET_PREFS handlers replacing Plan-01 stubs (D-16); D-14 consent in settings KV only (action_audit_log is a VIEW). 9 cloud-stt.spec.ts tests green; handler-count 4/4; typecheck flat 84 baseline.
+**Plan 05:** Complete. VOICE_CONFIRM/CANCEL_APPROVAL stubs → real handlers; confirm-classifier (generateObject+Zod {confirm|cancel|ambiguous}); voiceConfirm seam wired live; pendingApprovalId in useVoiceSession; bargeIn-to-cancel (D-10); useVoiceConfirm.ts hook created (triggerReadBack/cancel). 10 integration tests green; renderer voice 22/22; ratchet PASS; typecheck flat 84 baseline.
 **Status:** Ready to execute
 **Last activity:** 2026-06-08
 
@@ -147,9 +148,18 @@ Plan: 5 of 7 (Plans 01–03 complete)
 - VoicePrefKey type exported from voice/prefs.ts; readVoicePref() added for single-key reads in handlers
 - VoicePrefsPatchSchema.strict() bounds: speed min(0.5).max(2), voiceId max(100), useCloud boolean (T-17-10)
 
+## Decisions (Phase 17, Plan 05)
+
+- Exported handleVoiceConfirmApproval()+handleVoiceCancelApproval() as standalone functions so integration tests can call them without full IPC scaffolding
+- classifyConfirmUtterance() defaults to 'ambiguous' on LLM failure (T-17-13: never auto-confirm on error)
+- pendingApprovalId cleared immediately in setTranscript before IPC dispatch (fire-and-forget pattern, same as bargeIn voiceAbort)
+- useVoiceConfirm hook uses a ref (not state) for pendingApprovalId to avoid extra re-render cycle on set/clear
+- voiceConfirmApproval IPC contract signature extended with transcript?: string for confirm-classifier path
+- [Rule 1 fix] VoicePTTButton.spec.tsx mock updated with pendingApprovalId/setPendingApproval/clearPendingApproval for new required interface fields
+
 ## Next Action
 
-`/gsd-execute-phase 17` — **Phase 17 Plan 04 COMPLETE (2026-06-08)**. Next: Plan 05 (voiceConfirm wired live + confirm-classifier + cancel). Remaining waves: W3 17-05 (voiceConfirm wired live + confirm-classifier + cancel) ∥ 17-06 (VoiceSection + ApprovalCard affordance); W4=17-07 (D-17 ratchet + integration test + human-verify). No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
+`/gsd-execute-phase 17` — **Phase 17 Plan 05 COMPLETE (2026-06-08)**. Next: Plan 06 (VoiceSection + ApprovalCard voice-confirm affordance). Remaining waves: W3 17-06 (VoiceSection settings UI + ApprovalCard voice button); W4=17-07 (D-17 ratchet + integration test + human-verify). No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
 
 **Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user (`pnpm dev`). **Phase 15** packaged-verify debts open.
 
