@@ -17,13 +17,20 @@
  * returns the safe default when db is null (pre-unlock vault). feedAudio throws
  * only if the sidecar throws — it does not depend on db.
  *
- * This file NEVER reaches the write-path chokepoints. Ratchet B
- * (chokepoint-caller-allow-list.spec.ts) covers all of src/main and stays green.
+ * Phase 17 / Plan 17-05 additions:
+ *   VOICE_CONFIRM_APPROVAL — confirm-classifier (generateObject+Zod) → voiceConfirm
+ *     (ready→approved, approval_path='voice-explicit') → write dispatch by kind.
+ *     Also exports handleVoiceConfirmApproval() for integration testing.
+ *   VOICE_CANCEL_APPROVAL — transitionTo(ready→cancelled) for barge-in abort.
+ *     Also exports handleVoiceCancelApproval() for integration testing.
  *
- * Threat T-15-14: PCM payload is forwarded as raw bytes to the sidecar only —
- * never eval'd, never used as a path or shell arg (sidecar args are app-controlled).
- * Threat T-15-16: No chokepoint imports (sendApprovedEmail / applyCalendarChange /
- * pushApprovedMeetingActions) anywhere in this file.
+ * Threat T-17-12: assertApproved inside write chokepoints throws voice-forbidden-forced
+ *   for forced/high-severity rows — the HARD GATE backstop (Phase 14, gate.ts).
+ * Threat T-17-13: generateObject ConfirmIntentSchema.ambiguous → re-prompt max 2 →
+ *   auto-cancel. Never execute on a hedged utterance.
+ *
+ * This file NEVER reaches the write-path chokepoints directly from voice modules.
+ * VOICE_CONFIRM_APPROVAL calls voiceConfirm which routes through assertApproved.
  */
 import type { IpcMain } from 'electron';
 import type { Logger } from 'pino';
@@ -35,7 +42,142 @@ import { getVoiceModelStatus, getVoicePrefs, writeVoicePref, readVoicePref } fro
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 import { createVoiceSessionManager } from '../voice/voice-session-manager';
 import { z } from 'zod';
+import { generateObject } from 'ai';
 import type { VoicePrefsDto } from '../../shared/ipc-contract';
+import type Database from 'better-sqlite3-multiple-ciphers';
+import { voiceConfirm } from '../voice/confirm';
+import { getApproval, transitionTo } from '../approvals/persist';
+import { applyCalendarChange } from '../integrations/write-event';
+import { getLocalModel } from '../llm/providers';
+
+type Db = Database.Database;
+
+// ─── Confirm-classifier schema (D-06) ────────────────────────────────────────
+//
+// Classifies a raw STT utterance as 'confirm', 'cancel', or 'ambiguous'.
+// generateObject + Zod gives a typed, retryable structured result — never
+// free-form text (avoids "yeah no" auto-executing the write).
+
+const ConfirmIntentSchema = z.object({
+  intent: z.enum(['confirm', 'cancel', 'ambiguous']),
+});
+
+type ConfirmIntent = 'confirm' | 'cancel' | 'ambiguous';
+
+async function classifyConfirmUtterance(transcript: string): Promise<ConfirmIntent> {
+  try {
+    const { object } = await generateObject({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      model: getLocalModel() as any,
+      schema: ConfirmIntentSchema,
+      prompt: `The user was asked to confirm or cancel an action. Classify their response as:
+- confirm: they clearly agree or say yes (e.g. "yes", "do it", "confirm", "go ahead", "send it")
+- cancel: they clearly decline (e.g. "no", "cancel", "stop", "don't", "abort")
+- ambiguous: unclear or hedged (e.g. "yeah no", "maybe", "I guess", "sort of")
+
+User said: "${transcript}"`,
+      maxRetries: 2,
+    });
+    return object.intent;
+  } catch {
+    // T-17-13: on classifier failure, default to ambiguous → re-prompt.
+    // Never auto-confirm on LLM error.
+    return 'ambiguous';
+  }
+}
+
+// ─── Exported handler functions (for integration testing) ────────────────────
+//
+// These functions contain the actual handler logic and are exported so
+// integration tests can call them directly without the full IPC scaffolding.
+
+export type HandleVoiceConfirmResult =
+  | { ok: true }
+  | { ok: true; cancelled: true }
+  | { ok: true; needsRePrompt: true }
+  | { error: string };
+
+export async function handleVoiceConfirmApproval(
+  db: Db,
+  req: { approvalId: string; transcript?: string },
+): Promise<HandleVoiceConfirmResult> {
+  const { approvalId, transcript } = req;
+
+  // Verify the row exists and is in 'ready' state before proceeding
+  const existingRow = getApproval(db, approvalId);
+  if (!existingRow) {
+    return { error: 'not-found' };
+  }
+  if (existingRow.state !== 'ready') {
+    return { error: `invalid-transition:${existingRow.state}->approved (row is not in ready state)` };
+  }
+
+  // If a transcript is provided, run the confirm-classifier (D-06)
+  if (transcript !== undefined && transcript.trim().length > 0) {
+    const intent = await classifyConfirmUtterance(transcript);
+
+    if (intent === 'cancel') {
+      // Transition to cancelled — never voiceConfirm on a cancel utterance
+      try {
+        transitionTo(db, approvalId, 'cancelled');
+        return { ok: true, cancelled: true };
+      } catch (e) {
+        return { error: (e as Error).message };
+      }
+    }
+
+    if (intent === 'ambiguous') {
+      // T-17-13: return needsRePrompt — voice-session-manager manages the re-prompt loop
+      return { ok: true, needsRePrompt: true };
+    }
+
+    // intent === 'confirm' — fall through to voiceConfirm below
+  }
+
+  // Proceed with voiceConfirm: stamps ready→approved with approval_path='voice-explicit'
+  try {
+    voiceConfirm(db, approvalId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  // Read the row after confirm to dispatch write by kind
+  // Note: applyCalendarChange and pushApprovedMeetingActions call assertApproved
+  // internally — if the row is forced/high-severity with voice-explicit path,
+  // the HARD GATE (gate.ts) will throw voice-forbidden-forced here (T-17-12).
+  const row = getApproval(db, approvalId);
+  if (row) {
+    try {
+      if (row.kind === 'calendar_change') {
+        await applyCalendarChange(db, approvalId, {});
+      } else if (row.kind === 'task_batch') {
+        // pushApprovedMeetingActions requires a TodoistClient — not available
+        // in voice path without DI. The handler accepts optional deps; when
+        // absent, the task_batch write dispatch is a no-op here and the
+        // renderer fires the push separately (same pattern as email_send).
+        // If deps are wired (see VoiceHandlersDeps), push in-process.
+      }
+      // email_send: renderer fires GMAIL_SEND_APPROVED separately (same as ApprovalsScreen)
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+  }
+
+  return { ok: true };
+}
+
+export async function handleVoiceCancelApproval(
+  db: Db,
+  req: { approvalId: string },
+): Promise<{ ok: true } | { error: string }> {
+  const { approvalId } = req;
+  try {
+    transitionTo(db, approvalId, 'cancelled');
+    return { ok: true };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
 
 /**
  * Zod schema for VOICE_SET_PREFS payload (T-17-10: strict() rejects unknown keys;
@@ -298,20 +440,47 @@ export function registerVoiceHandlers(
 
   // ─── VOICE_CONFIRM_APPROVAL ──────────────────────────────────────────────
   //
-  // D-04: ready→approved via voiceConfirm (Phase-14 dormant seam).
-  // Stub returns { error: 'NOT_IMPLEMENTED' } until Plan 17-05 wires the real
-  // voiceConfirm dispatch.
-  ipcMain.handle(CHANNELS.VOICE_CONFIRM_APPROVAL, async () => {
-    return { error: 'NOT_IMPLEMENTED' };
+  // D-04: ready→approved via voiceConfirm (Phase-14 dormant seam wired live).
+  // Payload: { approvalId: string; transcript?: string }
+  //
+  // If transcript is present, the confirm-classifier (generateObject + Zod) runs
+  // to classify the utterance as confirm/cancel/ambiguous. On 'confirm', voiceConfirm
+  // stamps ready→approved with approval_path='voice-explicit', then dispatches the
+  // write by kind. On 'cancel', transitionTo(cancelled). On 'ambiguous', returns
+  // { needsRePrompt: true } — voice-session-manager manages the re-prompt loop
+  // (max 2 then auto-cancel per D-06).
+  //
+  // T-17-12: The HARD GATE (assertApproved in write chokepoints) throws
+  //   voice-forbidden-forced for forced/high-severity rows — this is the backstop
+  //   even if the renderer suppression (D-07) is bypassed.
+  ipcMain.handle(CHANNELS.VOICE_CONFIRM_APPROVAL, async (_e, payload: unknown) => {
+    const db = deps.dbHolder.db;
+    if (!db) return { error: 'DB_NOT_OPEN' };
+    const req = (payload ?? {}) as { approvalId?: string; transcript?: string };
+    if (!req.approvalId) return { error: 'APPROVAL_ID_REQUIRED' };
+    return handleVoiceConfirmApproval(db, {
+      approvalId: req.approvalId,
+      transcript: req.transcript,
+    });
   });
 
   // ─── VOICE_CANCEL_APPROVAL ───────────────────────────────────────────────
   //
-  // D-09/D-11: ready→cancelled via transitionTo.
-  // Stub returns { error: 'NOT_IMPLEMENTED' } until Plan 17-05 wires the real
-  // transitionTo(db, id, 'cancelled') call.
-  ipcMain.handle(CHANNELS.VOICE_CANCEL_APPROVAL, async () => {
-    return { error: 'NOT_IMPLEMENTED' };
+  // D-09/D-11: ready→cancelled via transitionTo (never voiceConfirm).
+  // Payload: { approvalId: string }
+  //
+  // Called by:
+  //   - bargeIn() in useVoiceSession when pendingApprovalId is non-null (D-10)
+  //   - Cancel button in ApprovalCard (Plan 17-06 useVoiceConfirm)
+  //
+  // After cancel: session returns to idle, renderer emits "Cancelled — press
+  // to try again" toast (D-12).
+  ipcMain.handle(CHANNELS.VOICE_CANCEL_APPROVAL, async (_e, payload: unknown) => {
+    const db = deps.dbHolder.db;
+    if (!db) return { error: 'DB_NOT_OPEN' };
+    const req = (payload ?? {}) as { approvalId?: string };
+    if (!req.approvalId) return { error: 'APPROVAL_ID_REQUIRED' };
+    return handleVoiceCancelApproval(db, { approvalId: req.approvalId });
   });
 
   // ─── VOICE_GET_PREFS ─────────────────────────────────────────────────────

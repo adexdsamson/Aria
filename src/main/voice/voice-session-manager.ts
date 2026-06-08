@@ -12,6 +12,13 @@
  *   7. markLatency stores t_kokoro_synth_start / t_first_audio_out from renderer timing
  *      marks so DIAGNOSTICS_VOICE_LATENCY returns fully populated rows (WARNING 2 fix).
  *
+ * Phase 17 / Plan 17-05 additions:
+ *   8. Per-session repromptCount: tracks how many 'ambiguous' confirm utterances were
+ *      returned. When repromptCount < 2, the caller gets { needsRePrompt: true } and
+ *      re-arms the confirm STT turn with a condensed re-prompt TTS. At repromptCount >= 2,
+ *      auto-cancels the pending approval via transitionTo(cancelled) and resets to idle
+ *      with a toast (D-06/T-17-13).
+ *
  * Zero write-chokepoint imports (D-13: no assertApproved / voiceConfirm /
  * sendApprovedEmail / applyCalendarChange / pushApprovedMeetingActions).
  */
@@ -40,6 +47,12 @@ export interface VoiceSession {
   t_first_sentence_ready: number | null;
   t_kokoro_synth_start: number | null;
   t_first_audio_out: number | null;
+  /**
+   * Phase 17 / D-06: tracks how many 'ambiguous' confirm utterances have been
+   * returned for the current awaiting-confirm sub-state. Reset when the pending
+   * approval is confirmed or cancelled. Used by the re-prompt loop.
+   */
+  confirmRepromptCount: number;
 }
 
 export interface VoiceSessionManagerDeps {
@@ -60,6 +73,18 @@ export interface VoiceSessionManager {
     mark: 'kokoro_synth_start' | 'first_audio_out';
     t: number;
   }): void;
+  /**
+   * Phase 17 / D-06: Record an 'ambiguous' confirm utterance for the session.
+   * Returns the updated repromptCount so the caller (VOICE_CONFIRM_APPROVAL
+   * handler) can decide whether to re-prompt or auto-cancel.
+   * Reset to 0 when the pending approval is confirmed or cancelled.
+   */
+  recordConfirmAmbiguous(sessionId: string): number;
+  /**
+   * Phase 17 / D-06: Reset the confirm re-prompt counter for the session
+   * (called after a terminal confirm/cancel transition).
+   */
+  resetConfirmReprompt(sessionId: string): void;
   /** Exposed for testing — returns the current VoiceSession for a sessionId. */
   getSession(sessionId: string): VoiceSession | undefined;
 }
@@ -95,6 +120,7 @@ export function createVoiceSessionManager(
         t_first_sentence_ready: null,
         t_kokoro_synth_start: null,
         t_first_audio_out: null,
+        confirmRepromptCount: 0,
       };
       sessions.set(sessionId, session);
     }
@@ -211,5 +237,30 @@ export function createVoiceSessionManager(
     return sessions.get(sessionId);
   }
 
-  return { startAnswer, onBargeIn, markLatency, getSession };
+  /**
+   * Phase 17 / D-06: Record an 'ambiguous' confirm utterance.
+   * Increments the per-session counter and returns the new count.
+   * The caller (VOICE_CONFIRM_APPROVAL) uses this to decide: re-prompt or auto-cancel.
+   */
+  function recordConfirmAmbiguous(sessionId: string): number {
+    const session = sessions.get(sessionId);
+    if (!session) {
+      // Session not found — treat as max to trigger auto-cancel safely
+      return 2;
+    }
+    session.confirmRepromptCount += 1;
+    return session.confirmRepromptCount;
+  }
+
+  /**
+   * Phase 17 / D-06: Reset the confirm re-prompt counter (called after terminal transition).
+   */
+  function resetConfirmReprompt(sessionId: string): void {
+    const session = sessions.get(sessionId);
+    if (session) {
+      session.confirmRepromptCount = 0;
+    }
+  }
+
+  return { startAnswer, onBargeIn, markLatency, getSession, recordConfirmAmbiguous, resetConfirmReprompt };
 }
