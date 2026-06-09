@@ -263,6 +263,33 @@ export const VOICE_HANDLER_CHANNELS = [
   CHANNELS.VOICE_SET_PREFS,
 ] as const;
 
+/**
+ * Lazy-init helper for VoiceSessionManager (quick 260609-poa / Bug 1 fix).
+ *
+ * registerVoiceHandlers() is called before vault unlock (deps.dbHolder.db is null
+ * at registration time). Creating the manager eagerly would silently assign
+ * deps.voiceSessionManager = undefined — every handler would permanently take
+ * the hasManager:false stub branch. Instead, this helper is called as the FIRST
+ * line of every handler that needs the manager; by the time a real IPC call
+ * arrives the vault is unlocked and deps.dbHolder.db is live.
+ */
+function ensureVoiceSessionManager(deps: VoiceHandlersDeps, logger: Logger): void {
+  if (!deps.voiceSessionManager && deps.dbHolder.db && deps.emitToRenderer) {
+    const abortControllers: Map<string, AbortController> =
+      deps.sessionAbortControllers ?? new Map();
+    // Re-assign the shared map so VOICE_ABORT can find the controllers too.
+    if (!deps.sessionAbortControllers) {
+      deps.sessionAbortControllers = abortControllers;
+    }
+    deps.voiceSessionManager = createVoiceSessionManager({
+      db: deps.dbHolder.db,
+      logger,
+      emitToRenderer: deps.emitToRenderer,
+      sessionAbortControllers: abortControllers,
+    });
+  }
+}
+
 export function registerVoiceHandlers(
   ipcMain: IpcMain,
   deps: VoiceHandlersDeps,
@@ -290,24 +317,6 @@ export function registerVoiceHandlers(
   if (!wavUtilsResolved) {
     void import('../voice/stt/wav').then((m) => {
       wavUtilsResolved = m;
-    });
-  }
-
-  // Phase 16 / Plan 16-04a: Wire the real VoiceSessionManager if not already provided.
-  // Creates the manager from available deps (db, emitToRenderer, sessionAbortControllers)
-  // so VOICE_ABORT, VOICE_FEED_ANSWER, and VOICE_LATENCY_MARK resolve to real implementations.
-  if (!deps.voiceSessionManager && deps.dbHolder.db && deps.emitToRenderer) {
-    const abortControllers: Map<string, AbortController> =
-      deps.sessionAbortControllers ?? new Map();
-    // Re-assign the shared map so VOICE_ABORT can find the controllers too.
-    if (!deps.sessionAbortControllers) {
-      deps.sessionAbortControllers = abortControllers;
-    }
-    deps.voiceSessionManager = createVoiceSessionManager({
-      db: deps.dbHolder.db,
-      logger,
-      emitToRenderer: deps.emitToRenderer,
-      sessionAbortControllers: abortControllers,
     });
   }
 
@@ -492,6 +501,7 @@ export function registerVoiceHandlers(
   // independently of renderer audio cancel ~5ms). NOT awaited by renderer.
   // Also calls voiceSessionManager.onBargeIn for D-12 synthetic turn write.
   ipcMain.handle(CHANNELS.VOICE_ABORT, async (_e, payload: unknown) => {
+    ensureVoiceSessionManager(deps, logger);
     const req = (payload ?? {}) as { sessionId?: string };
     if (req.sessionId) {
       deps.sessionAbortControllers?.get(req.sessionId)?.abort();
@@ -526,6 +536,7 @@ export function registerVoiceHandlers(
   // cascade (hybridRetrieve → streamText → D-04 segmenter → TTS chunk push).
   // Stub returns { ok: true } until 16-04a wires the real VoiceSessionManager.
   ipcMain.handle(CHANNELS.VOICE_FEED_ANSWER, async (_e, payload: unknown) => {
+    ensureVoiceSessionManager(deps, logger);
     const req = (payload ?? {}) as { sessionId?: string; question?: string };
     // [diag 260609] did the renderer reach the answer path, and is the manager wired?
     logger.info(
@@ -549,6 +560,7 @@ export function registerVoiceHandlers(
   // wiring: delegates to voiceSessionManager.markLatency so all four t_*
   // columns are populated when writeVoiceLatencyLog fires on stream completion.
   ipcMain.handle(CHANNELS.VOICE_LATENCY_MARK, async (_e, payload: unknown) => {
+    ensureVoiceSessionManager(deps, logger);
     const req = (payload ?? {}) as {
       sessionId?: string;
       mark?: 'kokoro_synth_start' | 'first_audio_out';
