@@ -516,6 +516,54 @@ function EmailApprovalCard(props: ApprovalCardProps): JSX.Element {
             >
               Edit
             </Button>
+            {/* D-07: voice-confirm affordance suppressed when forceExplicit=true.
+                For normal (non-forced) ready rows the user can speak "confirm"
+                as a second channel alongside the Approve button. Disabled when
+                forceExplicit so forced/high-severity rows are on-screen-tap only.
+                Phase-14 HARD GATE (assertApproved throws voice-forbidden-forced)
+                is the backstop even if this UI suppression is bypassed. */}
+            {row.state === 'ready' && (
+              <Button
+                variant="ghost"
+                data-testid={`approval-voice-confirm-${row.id}`}
+                disabled={busy || forceExplicit}
+                title={
+                  forceExplicit
+                    ? 'Voice confirm disabled — explicit tap required for this approval type'
+                    : 'Confirm this approval by voice'
+                }
+                onClick={() => {
+                  void window.aria.voiceConfirmApproval({
+                    approvalId: row.id,
+                    transcript: 'confirm',
+                  });
+                }}
+                style={{
+                  minHeight: 32,
+                  padding: '0 12px',
+                  fontSize: 12.5,
+                  opacity: forceExplicit ? 0.35 : 1,
+                }}
+              >
+                Confirm by voice
+              </Button>
+            )}
+            {/* D-09/D-12: Always-visible Cancel button for ready-state rows.
+                The reliable second channel for aborting a staged voice approval.
+                Calls voiceCancelApproval directly (ready→cancelled). */}
+            {row.state === 'ready' && (
+              <Button
+                variant="ghost"
+                data-testid={`approval-cancel-voice-${row.id}`}
+                disabled={busy}
+                onClick={() => {
+                  void window.aria.voiceCancelApproval({ approvalId: row.id });
+                }}
+                style={{ minHeight: 32, padding: '0 12px', fontSize: 12.5 }}
+              >
+                Cancel
+              </Button>
+            )}
             <Button
               variant="ghost"
               data-testid={`approval-reject-${row.id}`}
