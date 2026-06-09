@@ -244,6 +244,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260602-l4c | Fix dark-mode white backgrounds in Phase 11 Research UI | 2026-06-02 | 2a11048 |
 | 260602-m2g | Fix invisible system-tray icon (dedicated gold tray glyphs) | 2026-06-02 | 7b1165f |
 | 260609-bgh | Fix duplicate IPC handler crash (BG prefs stub-vs-real registration) | 2026-06-09 | 5e7b5f9 |
+| 260609-vte | Fix voice (tts-chunk) + entitlement (activate) double-registration crashes; canonical channel lists | 2026-06-09 | 442bd05 |
 
 ## Workflow Config
 
