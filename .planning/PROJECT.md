@@ -14,22 +14,21 @@ A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actio
 
 **Carried tech debt:** Phase 9 design walkthrough, Phase 2/8 live/release verification, macOS tray UAT, dark-mode `--aria-gray-*` gap, typecheck-on-WIP.
 
-## Current Milestone: v2.0 — Voice Interface
+## Current Milestone: v2.1 — Messaging / Group Intelligence
 
-**Goal:** Aria becomes voice-driven — a full conversational, talk-to-Aria assistant over the existing briefing / triage / scheduling / ask / drafting surfaces.
+**Goal:** Aria links the user's WhatsApp (QR-linked, like WhatsApp Web) and turns selected group chats into chief-of-staff intelligence — starting with a local-only daily-briefing digest of tracked groups.
 
-**Target features:**
-- **Hybrid audio (local-first default, cloud opt-in):** on-device STT (Whisper large-v3-turbo, MIT) + on-device TTS (Kokoro-82M / Chatterbox-Turbo) by default; consent-gated cloud opt-in for max quality. Mirrors the existing hybrid-LLM-routing pattern.
-- **Full conversational duplex** via a local cascading pipeline (STT → LLM → TTS) with turn-taking + barge-in.
-- **Both activations:** push-to-talk + opt-in always-listening wake-word.
-- **Voice drives real work:** spoken briefing/answer playback + voice-driven triage/scheduling/ask/drafting; approval-gated actions get a voice-confirm flow (the `assertApproved` chokepoint still holds).
-- **Consent & disclosure UX** before any audio leaves the machine on the cloud opt-in path.
+**Target features (this milestone):**
+- **Link WhatsApp via Baileys QR**, with explicit ban-risk consent at link time (unofficial WhatsApp Web protocol; the user's own number is on the line).
+- **Group selection** — the user picks which groups Aria tracks; this toggle is the privacy boundary (untracked-group and 1:1 content is never persisted).
+- **Local message ingestion** — tracked-group messages stored on-device (text-only, no media blobs, 30-day rolling retention).
+- **Daily-briefing digest** — per-tracked-group rollup (summary, decisions, open questions) summarized **local-only** via Ollama; third-party group content never leaves the machine.
 
-**Deferred to v2.1+:** multi-party meeting coordination · advanced reports + predictive analytics · extensibility/plugins. (Phase numbering continues from 14.)
+**Architecture (locked in brainstorm 2026-06-09):** Hybrid — a `provider_account` row (`provider_key='whatsapp'`) reuses the existing account-management UI/disconnect cascade, while a dedicated `WhatsAppSessionManager` owns the Baileys socket lifecycle (NOT routed through `sync-orchestrator`, since WhatsApp is push not poll-delta). Creds stored in the SQLCipher-encrypted DB (migration 138; new tables `whatsapp_auth_state` / `whatsapp_group` / `whatsapp_message` / `whatsapp_group_digest`).
 
-**Progress:** Phase 14 (Voice Safety / Confirm Contract — VOICE-10) ✅ complete 2026-06-03. The voice-to-approval safety contract is in place before any fluency work: `approval_path='voice-explicit'` value + the named `voice-forbidden-forced` hard gate (voice can never authorize forced/high-severity actions), a dormant headless `voiceConfirm()` seam routing through the same `assertApproved` chokepoint, and two static ratchets fencing the write-module chokepoints. (Post-merge integration also surfaced and fixed a latent Phase-6 DB bug — dangling `approval_old` FKs from migration 124 — via migration 135.) Next: Phase 15 (Audio I/O + Model Runtime).
+**Deferred to a later v2.1 phase:** action-item extraction → `task_batch` approval · meeting-proposal detection → `calendar_change` approval · project-feedback RAG capture. (All three reuse existing pipelines; layered on top of stored messages.)
 
-**Model research (2026):** STT — Whisper large-v3-turbo (MIT, on-device via whisper.cpp) is the local default; NVIDIA Canary/Parakeet are faster/heavier (GPU). TTS — Kokoro-82M (#1 TTS Arena, permissive, tiny) + Chatterbox-Turbo (beat ElevenLabs 65% in blind tests, sub-200ms); avoid XTTS-v2 (CPML non-commercial). True single-model duplex (Moshi) needs A100-class GPU → use a local cascading pipeline instead.
+**v2.0 (Voice Interface) — ⏸ PARKED, not discarded:** phases 14–17 are code-complete and their directories are preserved; Phase 17 is paused at a live-acoustic human-verify checkpoint; 18–19 unstarted. Full paused state recorded in [MILESTONES.md](./MILESTONES.md). Resume after v2.1, or interleave. (Phase numbering continues from 20.)
 
 ## Requirements
 
@@ -126,6 +125,9 @@ A trustworthy daily briefing + insights layer is the wedge; chief-of-staff actio
 | User-in-the-loop for every send and material calendar change | Trust beats automation. One surprising send destroys the product reputation | Pending |
 | No named design partner at start | Acceptable risk; user will dogfood and recruit during development | Revisit - recruit a real SMB-exec user before Phase 3 |
 | v2.0 voice audio = hybrid (local-first default + consent-gated cloud opt-in) | 2026 research: local models (Whisper large-v3-turbo MIT; Kokoro-82M / Chatterbox-Turbo) now match cloud quality, so local-first is preserved as default rather than pivoting to cloud. Cloud opt-in mirrors existing hybrid-LLM routing. | v2.0 |
+| v2.1 WhatsApp via Baileys (unofficial WhatsApp Web), QR-linked | No sanctioned API reads a personal account's group messages; Baileys (pure WebSocket) fits local-first + the "reject bundling bloat" stack rule over whatsapp-web.js (bundles Chromium). Ban-risk accepted + surfaced to user at link time. | v2.1 |
+| v2.1 WhatsApp group content summarized local-only | Group chats are third-party PII the user never authored; routing them to a frontier model violates the local-first PII posture. Local Ollama summarization keeps group content on-device. | v2.1 |
+| v2.0 parked (not completed) to open v2.1 | WhatsApp is a non-voice capability; user chose a distinct milestone over appending to the Voice milestone. Parked non-destructively (phase dirs preserved) rather than running the standard milestone reset. | v2.1 |
 
 ## Evolution
 
@@ -145,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state.
 
 ---
-*Last updated: 2026-06-03 — Phase 14 (Voice Safety / Confirm Contract) complete*
+*Last updated: 2026-06-09 — Milestone v2.1 (Messaging / Group Intelligence) started; v2.0 (Voice) parked*

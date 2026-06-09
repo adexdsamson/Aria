@@ -1,5 +1,24 @@
 # Aria — Milestones
 
+## v2.0 — ⏸ PARKED (in progress) 2026-06-09
+
+**Phases:** 14–19 (numbering) · **Status:** parked to open v2.1 (WhatsApp); voice work intentionally preserved, **not** discarded. Resume later via the phase directories below — none were cleared.
+
+### Completed (code-complete, phase dirs intact)
+- **Phase 14 — Voice Safety / Confirm Contract** ✅ (2026-06-03): `approval_path='voice-explicit'`, `voice-forbidden-forced` hard gate, dormant `voiceConfirm()` seam through `assertApproved`, 2 static ratchets. (Also fixed latent Phase-6 dangling `approval_old` FKs via migration 135.)
+- **Phase 15 — Audio I/O + Model Runtime** ✅ (2026-06-04)
+- **Phase 16 — Streaming Cascade + Barge-in (read-only)** ✅ (2026-06-07)
+- **Phase 17 — Voice-Confirm + Writes Through the Gate** ✅ code-complete (2026-06-09): VoiceIntentRouter → stage 'ready' → resolved-entity read-back → confirm-classifier → voiceConfirm→transitionTo→assertApproved (stamps 'voice-explicit'); cancel→'cancelled' (migration 137); cloud STT + answer behind consent (sensitive→local fail-safe); VoiceSection settings; ApprovalCard voice-confirm + Cancel.
+
+### Paused checkpoint (resume here)
+- **Phase 17 Plan 07** at `checkpoint:human-verify` — live acoustic SC1–SC5 (run `pnpm dev` + mic/speakers): SC1 voice /ask · SC2 schedule/draft read-back→"yes"→write · SC3 cancel mid-read-back→'cancelled' · SC4 cloud consent + sensitive-stays-local · SC5 speed/cloud per-turn · D-07 forced→explicit-required chip. Commits d84579a + 9915b2d. Verifier 5/5 automated must-haves, 101 tests green, typecheck flat 84 baseline.
+
+### Not started
+- **Phase 18 — Opt-in Wake-Word + Privacy Isolation** (gated on commercial wake-word licensing decision: Picovoice vs custom openWakeWord vs defer)
+- **Phase 19 — Cloud Opt-in Polish + Performance** (optimization, not net-new capability)
+
+**Roadmap:** lives in [ROADMAP.md](./ROADMAP.md) until v2.0 is formally completed/archived.
+
 ## v1.0 — ✅ SHIPPED 2026-06-02
 
 **Phases:** 1–13 (incl. inserted 08.1) · **Span:** 2026-05-14 → 2026-06-02 (~19 days) · **Commits:** ~416

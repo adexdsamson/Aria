@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Voice Interface
-status: completed
-last_updated: "2026-06-09T16:39:54.339Z"
+milestone: v2.1
+milestone_name: Messaging / Group Intelligence
+status: planning
+last_updated: "2026-06-09T19:05:06.762Z"
 last_activity: 2026-06-09
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 25
-  completed_plans: 25
-  percent: 67
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -23,38 +23,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 17 (voice-confirm-writes-through-the-gate) — CODE-COMPLETE (live acoustic smoke deferred)
-Plan: 7 of 7 complete (sequential/no-worktree; node_modules intact throughout)
-**Status:** Phase 17 code-complete. Voice is now WRITE-CAPABLE: VoiceIntentRouter (keyword→per-domain, dispatches same in-process services) → stage 'ready' → resolved-entity read-back → confirm-classifier → voiceConfirm→transitionTo→assertApproved (stamps 'voice-explicit'); cancel→'cancelled' (migration 137); cloud STT + non-streaming answer behind consent (sensitive→local fail-safe); VoiceSection settings; ApprovalCard voice-confirm + Cancel + forced-suppression.
-**Verifier:** 5/5 automated must-haves, 101 tests green / 9 specs, NO code gaps. No-bypass guarantee proven twice (D-17 ratchet 0 offenders + voice-write-path integration: forced→voice-forbidden-forced, cancel blocks write). Typecheck flat 84 baseline, 0 new across all 7 plans.
-**Open Phase-17 human-verify (run `pnpm dev` + mic/speakers):** SC1 voice /ask · SC2 schedule/draft read-back→"yes"→write · SC3 cancel mid-read-back→'cancelled' · SC4 cloud consent + sensitive-stays-local · SC5 speed/cloud per-turn · D-07 forced→explicit-required chip
-**Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02). 4/6 phases code-complete (14,15,16,17).
-**Phase:** 17
-**Plan 01:** Complete. Migration 137 ('cancelled' state CHECK + PRAGMA legacy_alter_table=ON table-rebuild); state.ts + isTerminal + DEFAULT_LIST_STATES updated; 4 new IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) stub-registered; voice/prefs.ts extended for speed/voiceId/useCloud. Handler-count invariant green. Typecheck flat at 84 baseline.
-**Plan 02:** Complete. performAsk() extracted from ipc/ask.ts to rag/ask-service.ts (D-02); ipc/ask.ts is thin wrapper (entitlement gate + performAsk call); ask.spec.ts UNCHANGED 5/5; ask-service.spec.ts 12/12. [Rule 1] gate.ts entitlementTableExists try/catch for pre-existing Phase 08.1 mock DB incompatibility. Typecheck flat 84 baseline.
-**Plan 03:** Complete. VoiceIntentRouter (D-01 keyword pre-filter → per-domain dispatch → insertApproval(ready)) + buildReadBackText() (D-05 pure template from resolved ApprovalRow fields). [Rule 1] hasWord() word-boundary fix (ask substring in task) + ask-domain-first ordering fix. 34 tests green; typecheck flat 84 baseline.
-**Plan 04:** Complete. cloud-stt.ts (cloudTranscribe() D-13 whisper-1 wrapper + shouldUseCloud() D-15 fail-safe local gate); real VOICE_GET/SET_PREFS handlers replacing Plan-01 stubs (D-16); D-14 consent in settings KV only (action_audit_log is a VIEW). 9 cloud-stt.spec.ts tests green; handler-count 4/4; typecheck flat 84 baseline.
-**Plan 05:** Complete. VOICE_CONFIRM/CANCEL_APPROVAL stubs → real handlers; confirm-classifier (generateObject+Zod {confirm|cancel|ambiguous}); voiceConfirm seam wired live; pendingApprovalId in useVoiceSession; bargeIn-to-cancel (D-10); useVoiceConfirm.ts hook created (triggerReadBack/cancel). 10 integration tests green; renderer voice 22/22; ratchet PASS; typecheck flat 84 baseline.
-**Plan 06:** Complete. VoiceSection.tsx (D-16/VOICE-08): speed/voiceId/useCloud controls + D-14 cloud consent modal (OpenAI Whisper disclosure; pendingCloudEnableRef defers IPC write until user clicks "I Understand, Enable") + D-15 sensitivity-guarantee info line. Wired into SettingsScreen Behaviour NavSection (route='voice'). ApprovalCard: VoiceConfirmButton disabled when forceExplicit (D-07) + always-visible Cancel button for ready rows calling voiceCancelApproval (D-09/D-12). isTerminal already included 'cancelled' from Plan 01. Typecheck flat 84 baseline.
-**Plan 07 (partial):** Autonomous tasks complete. D-17 ratchet updated (voiceConfirm removed from WRITE_CHOKEPOINTS; raw chokepoints still banned). voice-write-path.spec.ts (5 tests, SC2 no-bypass proof) + voice-confirm.spec.ts extended (17 tests, SC3/D-11 + migration 137 FK check). Commits d84579a + 9915b2d. PAUSED at human-verify checkpoint (checkpoint:human-verify SC1–SC5 live acoustic).
-**Status:** PAUSED — Plan 07 at human-verify checkpoint (SC1–SC5 live acoustic + visual)
-**Last activity:** 2026-06-09 - Completed quick task 260609-qqb: fix voice no-audio (wire embedClient/vectorStore + non-fatal retrieval degrade + diag logs); live audio UAT pending
-
-**Open verification debts (Phase 15):**
-
-- macOS whisper-cli binary: CI cmake -DWHISPER_METAL=ON + notarization; see build/whisper/README.md §Option A
-- Packaged-launch SC2 (no ABI crash) + SC3 (laptop-speaker half-duplex) + SC5 (device hot-swap) + RAM ceiling: requires packaged build on 16 GB machine; see tests/e2e/packaged-launch.spec.ts + .planning/phases/15-audio-i-o-model-runtime/15-RAM-CEILING.md
-
-**v2.0 phases (14–19), dependency-ordered:**
-
-- [ ] **Phase 14: Voice Safety / Confirm Contract** — VOICE-10. The confirm contract + HARD GATE (voice blocked from forced/high-severity) + STATIC RATCHET on voice write-paths. Build this BEFORE fluency.
-- [ ] **Phase 15: Audio I/O + Model Runtime** — VOICE-01/04/07. Renderer mic/VAD/playback + STT sidecar; prove AEC (#47043) + ABI + RAM + device handling on the packaged app. _(Research flag: highest uncertainty.)_
-- [ ] **Phase 16: Streaming Cascade + Barge-in (read-only)** — VOICE-02/03/06. Streaming STT→LLM→TTS + barge-in (one AbortController) + spoken briefing/answer playback. Zero write risk.
-- [ ] **Phase 17: Voice-Confirm + Writes Through the Gate** — VOICE-05/08/09/11. Voice-driven triage/scheduling/drafting via confirm → assertApproved; mishear recovery; cloud opt-in consent + voice settings.
-- [ ] **Phase 18: Opt-in Wake-Word + Privacy Isolation** — VOICE-12. Privacy-isolated, provably-killable KWS process, OFF by default. _(Research flag: licensing decision required first.)_
-- [ ] **Phase 19: Cloud Opt-in Polish + Performance** — no net-new req. GPU whisper, MessagePort PCM, voice-priority queue, idle unload, a11y polish.
-
-**Locked v2.0 decisions:** hybrid local-first audio (Whisper large-v3-turbo + Kokoro-82M/Chatterbox-Turbo local default; cloud opt-in) · PTT-first, wake-word last · voice-confirm routes THROUGH assertApproved (never around) · STT in a sidecar/worker (Ollama pattern, dodges Electron-41 ABI trap) · half-duplex mic-gating (Chromium AEC no-ops in Electron #47043).
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-09 — Milestone v2.1 started
 
 ## Decisions (Phase 15)
 
