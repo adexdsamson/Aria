@@ -26,6 +26,25 @@ export interface KnowledgeFolderIpcDeps {
   db: Database.Database;
 }
 
+/**
+ * Canonical list of every invoke channel registerKnowledgeFolderIpc() registers.
+ * SINGLE SOURCE OF TRUTH: registerHandlers (ipc/index.ts) registers no-op stubs for
+ * these pre-unlock, and the post-unlock bootPoll in src/main/index.ts re-registers
+ * the real handlers. ipcMain.handle THROWS on a 2nd registration (it does not
+ * override), so bootPoll MUST removeHandler each of these first. If you add or
+ * remove an `ipcMain.handle(CHANNELS.KNOWLEDGE_*, …)` below, update this array.
+ */
+export const KNOWLEDGE_FOLDER_CHANNELS = [
+  CHANNELS.KNOWLEDGE_PICK_FOLDER,
+  CHANNELS.KNOWLEDGE_PRESCAN_FOLDER,
+  CHANNELS.KNOWLEDGE_ADD_FOLDER,
+  CHANNELS.KNOWLEDGE_LIST_FOLDERS,
+  CHANNELS.KNOWLEDGE_REMOVE_FOLDER,
+  CHANNELS.KNOWLEDGE_FOLDER_STATS,
+  CHANNELS.KNOWLEDGE_REINDEX,
+  CHANNELS.KNOWLEDGE_SET_SENSITIVITY,
+] as const;
+
 export function registerKnowledgeFolderIpc(deps: KnowledgeFolderIpcDeps): void {
   const { ipcMain, registry, ingestionService, dialog, logger, db } = deps;
 

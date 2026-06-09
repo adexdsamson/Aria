@@ -76,7 +76,7 @@ import {
   makeRendererEmitter,
   ENTITLEMENT_HANDLER_CHANNELS,
 } from './ipc/entitlement';
-import { registerKnowledgeFolderIpc } from './ipc/knowledge-folders';
+import { registerKnowledgeFolderIpc, KNOWLEDGE_FOLDER_CHANNELS } from './ipc/knowledge-folders';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
@@ -524,8 +524,14 @@ async function bootstrap(): Promise<void> {
           parsers: PARSERS,
           strategy: strategyC,
         });
-        // registerHandlers() ran pre-unlock so the knowledge IPC block was
-        // skipped (db was null). Wire the handlers now that db is live.
+        // registerHandlers() ran pre-unlock and registered no-op 'db-locked'
+        // STUBS for the knowledge channels (NOT skipped — the else-branch in
+        // ipc/index.ts registers stubs so the handler-count test passes). Remove
+        // those stubs before wiring the real handlers — ipcMain.handle throws on a
+        // 2nd registration. KNOWLEDGE_FOLDER_CHANNELS is the single source of truth.
+        for (const ch of KNOWLEDGE_FOLDER_CHANNELS) {
+          ipcMain.removeHandler(ch);
+        }
         const { dialog } = require('electron') as { dialog: import('electron').Dialog };
         registerKnowledgeFolderIpc({
           ipcMain,
