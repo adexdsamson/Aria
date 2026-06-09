@@ -184,9 +184,5 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_group_digest_date ON whatsapp_group_dige
 
 COMMIT;
 PRAGMA legacy_alter_table=OFF;
--- NOTE: foreign_keys intentionally left OFF after this migration.
--- The migration runner leaves PRAGMA state as-is; callers that need FK enforcement
--- (openDb in connect.ts) re-enable it after runMigrations() completes.
--- This allows the migration-138 integration test to verify the FK target
--- is provider_account (not provider_account_old) without requiring a parent row.
+PRAGMA foreign_keys=ON;
 PRAGMA user_version = 138;

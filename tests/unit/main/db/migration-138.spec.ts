@@ -48,13 +48,23 @@ describe('migration 138 — WhatsApp schema + provider_account CHECK rebuild', (
     expect(db.pragma('user_version', { simple: true })).toBe(138);
   });
 
-  it('INSERT into provider_sync_state succeeds (no dangling provider_account_old FK)', () => {
-    expect(() =>
-      db.prepare(
-        `INSERT INTO provider_sync_state (provider_key, account_id, resource, cursor)
-         VALUES ('whatsapp', '+1234567890@s.whatsapp.net', 'session', 'cursor-wa-1')`,
-      ).run(),
-    ).not.toThrow();
+  it('no dangling FK references after migration 138 (foreign_key_check is empty)', () => {
+    // With foreign_keys=ON restored by migration 138, this confirms no orphaned
+    // child rows exist and that all FK declarations resolve to live tables
+    // (i.e. provider_sync_state's FK points to provider_account, not provider_account_old).
+    const violations = db.pragma('foreign_key_check') as unknown[];
+    expect(violations).toEqual([]);
+  });
+
+  it('provider_sync_state FK target is provider_account (not provider_account_old)', () => {
+    // Confirms the migration-135 regression is not present: PRAGMA legacy_alter_table=ON
+    // prevented SQLite from silently repointing the child-table FK at provider_account_old.
+    type FkRow = { table: string; from: string; to: string | null };
+    const fkList = db.pragma("foreign_key_list('provider_sync_state')") as FkRow[];
+    expect(fkList.length).toBeGreaterThan(0);
+    const tables = fkList.map((r) => r.table);
+    expect(tables).toContain('provider_account');
+    expect(tables).not.toContain('provider_account_old');
   });
 
   it('provider_account CHECK admits provider_key="whatsapp"', () => {

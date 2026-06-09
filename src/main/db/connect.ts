@@ -80,12 +80,6 @@ export function openDb(opts: OpenDbOptions): Db {
     // and never re-enters the runner during recovery.
     if (runMigrationsOnOpen === true) {
       runMigrations(db);
-      // Re-enable foreign keys after migrations: some migrations (e.g. 138)
-      // leave PRAGMA foreign_keys=OFF so their integration tests can INSERT
-      // into child tables without needing parent rows pre-seeded. Migrations
-      // handle FK integrity via legacy_alter_table=ON during the RENAME+rebuild;
-      // production code must always run with FK enforcement active.
-      db.pragma(`foreign_keys=ON`);
     }
     return db;
   } catch (err) {
