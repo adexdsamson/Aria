@@ -156,5 +156,40 @@ Test results:
 - provider_account accepts 'whatsapp' rows; Plan 20-04/05 can insert the row after QR link
 
 ---
+
+## Correction: FK-restore moved into migration 138 (commit 87045e0)
+
+**Filed:** 2026-06-10 (post-plan correctness fix)
+
+**Problem found:** The original implementation left `PRAGMA foreign_keys=OFF` at the end of
+migration 138 and relied on a re-enable in `connect.ts` after `runMigrations()`. That re-enable
+only executes inside the `runMigrationsOnOpen === true` branch. Production boot uses
+`runMigrationsOnOpen: 'deferred'` (onboarding.ts) followed by `runMigrationsWithBackup()`, which
+calls `runMigrations()` on the same DB handle and returns **without reopening** on success. The
+`runMigrationsOnOpen === true` branch is never reached in the deferred-boot path, so during the
+session where the DB upgrades to v138 the live handle ran the entire session with
+`foreign_keys=OFF`. The `ON DELETE CASCADE` chains on `whatsapp_message` and
+`whatsapp_group_digest` → `whatsapp_group`, and `provider_sync_state` → `provider_account`,
+would have been silently unenforced — a privacy regression for the Plan 20-06 disconnect path.
+
+**Fix applied:**
+- `138_whatsapp.sql`: removed the trailing `NOTE` comment and `PRAGMA foreign_keys=OFF`; added
+  `PRAGMA foreign_keys=ON` as the final statement after `COMMIT` (mirrors the
+  `012a_idempotency_key.sql` convention — each migration that disables FK enforcement restores it
+  before returning control to the runner).
+- `connect.ts`: reverted to `if (runMigrationsOnOpen === true) { runMigrations(db); }` —
+  the post-migration `db.pragma('foreign_keys=ON')` and its comment removed; migration now
+  self-contained.
+- `migration-138.spec.ts`: replaced the FK=OFF-dependent bare INSERT into `provider_sync_state`
+  (which required no parent row and therefore only worked with FK enforcement off) with two
+  FK-integrity assertions:
+  1. `db.pragma('foreign_key_check')` returns `[]` — no dangling references anywhere in the schema.
+  2. `db.pragma("foreign_key_list('provider_sync_state')")` shows `table: provider_account`
+     (not `provider_account_old`) — the migration-135 regression guard confirmed while FK is ON.
+
+**All 4 affected specs remain GREEN** (13/13 migration-138, 5/5 auth-state, 8/8 passive-posture
+ratchet, 4/4 no-frontier ratchet). No new typecheck errors in touched files.
+
+---
 *Phase: 20-foundation*
 *Completed: 2026-06-10*
