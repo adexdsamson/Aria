@@ -19,8 +19,9 @@
  * No new npm dependencies — @ai-sdk/openai and ai are already installed.
  */
 import { experimental_transcribe as transcribe } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { classify } from '../llm/sensitivityClassifier';
+import { getFrontierKey } from '../secrets/safeStorage';
 
 /**
  * Minimal subset of p-queue's interface required by shouldUseCloud.
@@ -37,15 +38,23 @@ export type PQueueLike = {
  *
  * @param audioBuffer - WAV/PCM audio bytes (Buffer from the local STT sidecar pipeline).
  * @param signal      - AbortSignal to cancel in-flight requests on barge-in.
+ * @param getKey      - Optional injectable key getter (defaults to safeStorage OpenAI key).
+ *                      Inject a stub in unit tests to bypass Electron safeStorage.
  * @returns { text } on success, { error } on API failure — never throws.
  */
 export async function cloudTranscribe(
   audioBuffer: Buffer,
   signal: AbortSignal,
+  getKey: () => Promise<string | null> = () => getFrontierKey({ provider: 'openai' }),
 ): Promise<{ text: string } | { error: string }> {
+  const key = await getKey();
+  if (!key) {
+    return { error: 'no OpenAI frontier key configured' };
+  }
   try {
+    const client = createOpenAI({ apiKey: key });
     const result = await transcribe({
-      model: openai.transcription('whisper-1'),
+      model: client.transcription('whisper-1'),
       audio: audioBuffer,
       abortSignal: signal,
     });

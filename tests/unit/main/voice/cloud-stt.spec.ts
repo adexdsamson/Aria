@@ -28,10 +28,10 @@ vi.mock('ai', () => ({
   experimental_transcribe: mockTranscribe,
 }));
 
+const mockTranscription = vi.fn((_model: string) => ({ modelId: _model }));
+const mockCreateOpenAI = vi.fn(() => ({ transcription: mockTranscription }));
 vi.mock('@ai-sdk/openai', () => ({
-  openai: {
-    transcription: vi.fn((_model: string) => ({ modelId: _model })),
-  },
+  createOpenAI: mockCreateOpenAI,
 }));
 
 // Lazy import after mocks are set up
@@ -133,17 +133,36 @@ describe('cloudTranscribe', () => {
     vi.clearAllMocks();
   });
 
+  it('returns { error: "no OpenAI frontier key configured" } when key getter resolves null', async () => {
+    const { cloudTranscribe } = await getModule();
+    const result = await cloudTranscribe(
+      Buffer.from([1, 2, 3]),
+      new AbortController().signal,
+      () => Promise.resolve(null),
+    );
+    expect(result).toEqual({ error: 'no OpenAI frontier key configured' });
+    expect(mockTranscribe).not.toHaveBeenCalled();
+  });
+
   it('returns { text } on successful transcription', async () => {
     mockTranscribe.mockResolvedValue({ text: 'hello world' });
     const { cloudTranscribe } = await getModule();
-    const result = await cloudTranscribe(Buffer.from([1, 2, 3]), new AbortController().signal);
+    const result = await cloudTranscribe(
+      Buffer.from([1, 2, 3]),
+      new AbortController().signal,
+      () => Promise.resolve('sk-test'),
+    );
     expect(result).toEqual({ text: 'hello world' });
   });
 
   it('returns { error } when experimental_transcribe throws (never re-throws)', async () => {
     mockTranscribe.mockRejectedValue(new Error('OpenAI API error'));
     const { cloudTranscribe } = await getModule();
-    const result = await cloudTranscribe(Buffer.from([1, 2, 3]), new AbortController().signal);
+    const result = await cloudTranscribe(
+      Buffer.from([1, 2, 3]),
+      new AbortController().signal,
+      () => Promise.resolve('sk-test'),
+    );
     expect(result).toEqual({ error: 'OpenAI API error' });
   });
 
@@ -152,7 +171,11 @@ describe('cloudTranscribe', () => {
     const { cloudTranscribe } = await getModule();
     // Should not throw
     await expect(
-      cloudTranscribe(Buffer.from([]), new AbortController().signal),
+      cloudTranscribe(
+        Buffer.from([]),
+        new AbortController().signal,
+        () => Promise.resolve('sk-test'),
+      ),
     ).resolves.toHaveProperty('error');
   });
 });

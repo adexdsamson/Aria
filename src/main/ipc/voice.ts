@@ -357,6 +357,7 @@ export function registerVoiceHandlers(
         prefs.useCloud === true &&
         cloudSttResolved != null &&
         wavUtilsResolved != null;
+      logger.info({ route: useCloudPath ? 'cloud' : 'local' }, 'voice.stt route');
 
       let delta: import('../../shared/voice-types').TranscriptDelta;
 
@@ -381,7 +382,7 @@ export function registerVoiceHandlers(
           const errMsg = cloudResult != null && 'error' in cloudResult ? cloudResult.error : 'unknown';
           logger.warn(
             { scope: 'voice.feedAudio', err: errMsg },
-            'cloudTranscribe failed, falling back to local sidecar',
+            'voice.stt cloud failed — falling back to local',
           );
           delta = await sttSidecar.transcribe(pcm);
         }
