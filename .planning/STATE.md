@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-06-09T19:05:06.762Z"
 last_activity: 2026-06-09
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,16 +17,36 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-02)
+See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Aria tells the exec what matters today and handles the rest under user oversight (local-first, hybrid LLM, approval-gated).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 20 — Foundation
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-09 — Milestone v2.1 started
+Status: Not started
+Last activity: 2026-06-09 — Milestone v2.1 roadmap created; Phase 20 is next
+
+**Progress bar:** Phase 0/3 complete · 0% · [ · · · ]
+
+## Milestone v2.1 Locked Decisions
+
+- Baileys `@whiskeysockets/baileys@6.7.23` exact-pinned (not `latest` which resolves to v7 RC)
+- Passive posture hard invariant: `markOnlineOnConnect:false` + `sendPresenceUpdate('unavailable')` + `emitOwnEvents:false`
+- WhatsApp is a degradable capability — socket failure never blocks app boot or the briefing
+- Group content local-only: `getLocalModel()` unconditionally in digest cron; no frontier routing, no cloud opt-in
+- Hybrid `provider_account` row + dedicated `WhatsAppSessionManager` singleton (NOT via SyncOrchestrator)
+- Migration 138 uses `PRAGMA legacy_alter_table=ON` around `provider_account` CHECK-constraint rebuild
+- IPC registrar exports `WHATSAPP_CHANNELS` const array for `removeHandler` loop (pattern from reference_electron_ipc_double_register)
+- `syncFullHistory:false` set explicitly in `makeWASocket` config (not left undefined)
+- Auth state in SQLCipher `whatsapp_auth_state` table; never flat JSON files (`useMultiFileAuthState` is demo-only)
+- Every `authState.keys.set()` wrapped in `db.transaction()` for atomicity
+- Static ratchets written before first socket connect: no-send ratchet + frontier-prohibition ratchet
+
+## Next Action
+
+**`/gsd-plan-phase 20`** — Foundation: socket + auth state + QR link flow + group selection + ingestion + IPC/UI + migration 138. All integration points verified against live source at HEAD. No pre-planning research needed.
 
 ## Decisions (Phase 15)
 
@@ -141,19 +161,6 @@ Last activity: 2026-06-09 — Milestone v2.1 started
 - Cancel button in ApprovalCard calls voiceCancelApproval directly rather than importing useVoiceConfirm hook — simpler for static "always-visible escape hatch" requirement (D-09/D-12)
 - VoiceConfirmButton disabled + opacity:0.35 when forceExplicit=true; Phase-14 HARD GATE (assertApproved voice-forbidden-forced) is the backstop (D-07/T-17-17)
 - isTerminal already included 'cancelled' from Plan 17-01 — no change needed in ApprovalCard Task 2
-
-## Next Action
-
-**Phase 17 CODE-COMPLETE (2026-06-09)** — 7/7 plans, verifier 5/5 (no code gaps), no-bypass proven. Two next options:
-
-1. **Run the live SC1–SC6 acoustic smoke** (`pnpm dev` + mic/speakers) to close Phase 17's deferred human-verify (see Current Position list).
-2. **`/gsd-plan-phase 18`** — Opt-in Wake-Word + Privacy Isolation (VOICE-12). ⚠️ GATED on the commercial wake-word LICENSING decision (openWakeWord pretrained = CC-BY-NC non-commercial; Porcupine free tier caps 3 MAU) — resolve that first. Phase 18 also inherits the deferred StreamingRehydrator (frontier voice streaming) as its first task.
-
-Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead of origin (Phases 16+17 planning+execution).
-
-**Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user. **Phase 15** packaged-verify debts open (macOS binary + 16 GB packaged launch/RAM).
-
-**Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
 ---
 

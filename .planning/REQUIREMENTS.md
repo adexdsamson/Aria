@@ -54,6 +54,20 @@ These layer onto the `whatsapp_message` rows the foundation already stores; **ze
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(filled by roadmap)_ | | |
+| WA-01 | Phase 20 — Foundation | Pending |
+| WA-02 | Phase 20 — Foundation | Pending |
+| WA-03 | Phase 20 — Foundation | Pending |
+| WA-04 | Phase 20 — Foundation | Pending |
+| WA-05 | Phase 20 — Foundation | Pending |
+| WA-06 | Phase 20 — Foundation | Pending |
+| WA-07 | Phase 20 — Foundation | Pending |
+| WA-08 | Phase 21 — Digest + Briefing Integration | Pending |
+| WA-09 | Phase 21 — Digest + Briefing Integration | Pending |
+| WA-10 | Phase 21 — Digest + Briefing Integration | Pending |
+| WA-11 | Phase 20 — Foundation | Pending |
+| WA-12 | Phase 20 — Foundation | Pending |
+| WA-F1 | Phase 22 — Extraction Consumers (deferred) | Deferred |
+| WA-F2 | Phase 22 — Extraction Consumers (deferred) | Deferred |
+| WA-F3 | Phase 22 — Extraction Consumers (deferred) | Deferred |
 
-**Coverage:** to be validated by the roadmapper (every WA-* active requirement maps to exactly one phase).
+**Coverage:** 12/12 active WA-* requirements mapped (100%) · 3/3 future WA-F* requirements mapped to Phase 22 (deferred) · No orphans.

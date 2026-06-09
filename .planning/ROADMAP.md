@@ -8,7 +8,9 @@
 
 ---
 
-## Current Milestone: v2.0 — Voice Interface
+## Milestone v2.0 — Voice Interface ⏸ PARKED
+
+> **Status: PARKED as of 2026-06-09.** v2.0 phases (14–19) are preserved intact — no phase directories were cleared. Phases 14–17 are code-complete; Phase 17 is paused at a live-acoustic human-verify checkpoint. Phases 18–19 are unstarted. Resume after v2.1, or interleave. Phase numbering for v2.1 continues from Phase 20.
 
 **Goal:** Aria becomes voice-driven — a full conversational, talk-to-Aria assistant layered over the existing briefing / triage / scheduling / ask / drafting surfaces. Voice is a new input/output **modality**, not a rebuild: every outbound action still routes through the existing `assertApproved` chokepoint.
 
@@ -21,7 +23,7 @@
 
 **Phase numbering continues from v1.0** (which ended at Phase 13). v2.0 = Phases 14–19.
 
-### Phases
+### Phases (v2.0)
 
 - [x] **Phase 14: Voice Safety / Confirm Contract** - Design the voice-confirm contract, the HARD GATE blocking voice from forced/high-severity, and the STATIC RATCHET on voice write-paths — before any fluency work. (completed 2026-06-03)
 - [x] **Phase 15: Audio I/O + Model Runtime** - Renderer mic/VAD/playback + STT sidecar that survives packaging; prove AEC + ABI + RAM + device handling on the packaged app. (completed 2026-06-04)
@@ -30,7 +32,7 @@
 - [ ] **Phase 18: Opt-in Wake-Word + Privacy Isolation** - "Hey Aria" in a privacy-isolated, provably-killable process, OFF by default — gated on the commercial wake-word licensing decision.
 - [ ] **Phase 19: Cloud Opt-in Polish + Performance** - GPU whisper, MessagePort PCM, voice-priority p-queue lane, idle model unload, accessibility polish. (Optimization, not net-new capability.)
 
-## Phase Details
+## Phase Details (v2.0)
 
 ### Phase 14: Voice Safety / Confirm Contract
 **Goal**: The voice-to-approval safety contract exists and is enforced before any conversational fluency is built — voice can stage but never auto-execute, and high-stakes actions can never be authorized by voice alone.
@@ -132,7 +134,7 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
-## Progress
+## Progress (v2.0)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -143,10 +145,84 @@ Plans:
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |
 
-### Research Flags
+### Research Flags (v2.0)
 
 Phases likely needing deeper `/gsd-research-phase` during planning:
 - **Phase 15** — highest uncertainty: whisper.cpp binding under Electron 41 (sidecar vs addon, empirical build); Chromium AEC no-op (#47043) verified on Win + macOS; RAM ceiling of STT+TTS+LLM on 16 GB no-GPU; Kokoro WASM vs WebGPU perf.
 - **Phase 18** — the wake-word licensing/cost decision (pay Picovoice / train custom openWakeWord / defer to v2.1) must be resolved before any dependency is added.
 
 Lighter research (standard patterns extending existing Aria source): Phase 14 (assertApproved / static ratchet / approval transitions), Phase 16 (AI SDK streamText + sentence-split + streaming TTS).
+
+---
+
+## Milestone v2.1 — Messaging / Group Intelligence
+
+**Goal:** Aria links the user's WhatsApp (QR-linked, like WhatsApp Web) and turns selected group chats into chief-of-staff intelligence — starting with a local-only daily-briefing digest of tracked groups. Group content (third-party PII) is summarized **local-only** via Ollama and never leaves the machine. Read-only / passive posture throughout — Aria observes, never sends.
+
+**Locked decisions (carry into every phase's context):**
+- **Baileys `@whiskeysockets/baileys@6.7.23` exact-pinned.** `latest` resolves to v7 RC (breaking API + WASM dep + p-queue v9 conflict). Pin must appear in `package.json` and `pnpm-lock.yaml` committed.
+- **Passive posture is a hard invariant.** `markOnlineOnConnect:false`, `sendPresenceUpdate('unavailable')` on connect, `emitOwnEvents:false`. No send path exists — ever.
+- **WhatsApp is a degradable capability.** A dropped session surfaces as a visible status badge and leaves all other Aria surfaces fully functional. The briefing generates without WhatsApp.
+- **Group content is local-only.** `getLocalModel()` unconditionally in digest cron — no routing step, no frontier model, no cloud opt-in for WhatsApp content.
+- **Hybrid `provider_account` + dedicated `WhatsAppSessionManager`.** Reuses existing account-management UI and disconnect cascade; does NOT participate in `scheduleAccount` / `tickAccount` / `provider_sync_state`.
+- **Migration 138 uses `PRAGMA legacy_alter_table=ON`** around the `provider_account` CHECK-constraint rebuild — same pattern as migration 135 (avoids dangling FK rewrite to `provider_account_old`).
+
+**Phase numbering continues from v2.0** (parked at Phase 19). v2.1 = Phases 20–22.
+
+### Phases (v2.1)
+
+- [ ] **Phase 20: Foundation** - WhatsApp link/QR flow with ban-risk consent + auth state in SQLCipher + group selection + message ingestion + IPC/UI + all load-bearing safety guards (migration 138).
+- [ ] **Phase 21: Digest + Briefing Integration** - Local Ollama digest cron (05:00) per tracked group + WhatsApp section in daily briefing + graceful Ollama-unavailable degradation + frontier-prohibition static ratchet.
+- [ ] **Phase 22: Extraction Consumers** *(deferred — post-Phase 21 validation)* - Action-item extraction (WA-F1), meeting-proposal detection (WA-F2), and project-feedback RAG capture (WA-F3) layered onto stored messages with zero schema additions.
+
+## Phase Details (v2.1)
+
+### Phase 20: Foundation
+**Goal**: The user can link their WhatsApp account to Aria, select which groups to track, and have those groups' text messages silently ingested to the local encrypted database — with every load-bearing safety guard in place before the first message is stored.
+**Depends on**: Nothing in v2.1 (extends existing `provider_account`, `ipc/index.ts` onDbReady pattern, `sweep-cron`, and SQLCipher DB from v1.0)
+**Requirements**: WA-01, WA-02, WA-03, WA-04, WA-05, WA-06, WA-07, WA-11, WA-12
+**Success Criteria** (what must be TRUE):
+  1. User sees an explicit ban-risk disclosure (with secondary-number recommendation) before any QR code is shown, and must acknowledge it — the QR does not render until acknowledgement.
+  2. User can scan the QR in Aria, complete linking, see the WhatsApp AccountRow show "connected" with their phone number, and see a one-sentence "no history before this moment" notice.
+  3. After linking, the user can open a group-picker panel at any time, toggle groups tracked/untracked, and confirm that messages from untracked groups and 1:1 DMs are never written to the database.
+  4. User can disconnect WhatsApp from the AccountRow; doing so tears down the Baileys socket and deletes all WhatsApp rows (auth state, groups, messages, digests) via the ON DELETE CASCADE disconnect cascade.
+  5. The connection status badge (linked / reconnecting / needs-relink / disconnected) updates visibly on session events, and a degraded WhatsApp connection leaves the Briefing, Email, Calendar, and Tasks screens fully functional.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 21: Digest + Briefing Integration
+**Goal**: Each morning, before the daily briefing runs, Aria summarizes the activity in every tracked WhatsApp group using the local model only and inserts a WhatsApp section into that day's briefing — degrading gracefully if Ollama is unavailable, and never touching a frontier API.
+**Depends on**: Phase 20 (tracked groups must exist; `whatsapp_message` rows must be present)
+**Requirements**: WA-08, WA-09, WA-10
+**Success Criteria** (what must be TRUE):
+  1. The daily briefing contains a WhatsApp section with one named sub-section per tracked group, exec-framed: key points, decisions, open questions, and mentions of the user — visible from the first morning after at least one tracked-group message was received.
+  2. The digest cron runs at 05:00 (before the briefing at 07:00), uses only `getLocalModel()` with no routing step, and the `UNIQUE(jid, date)` constraint makes re-runs idempotent.
+  3. A static ratchet (grep test in CI) fails if any file under `src/main/whatsapp/` imports `getFrontierModel` or any frontier provider — enforcing that group content never reaches a cloud API.
+  4. When Ollama is down or the local model is unavailable, the briefing still generates and the WhatsApp section shows a clear "WhatsApp digest unavailable — local model offline" note rather than failing or silently omitting the section.
+**Plans**: TBD
+
+### Phase 22: Extraction Consumers *(Deferred)*
+**Goal**: The stored `whatsapp_message` rows from Phase 20 are fed through three additional extraction passes — action items, meeting proposals, and project-feedback RAG — each routing through the existing `assertApproved` chokepoint and established pipelines. Zero schema additions required.
+**Depends on**: Phase 21 (digest quality validated in UAT before extraction consumers are trusted)
+**Requirements**: WA-F1, WA-F2, WA-F3
+**Success Criteria** (what must be TRUE):
+  1. Action items detected in tracked groups appear as `task_batch` approval rows in the Approvals queue, with the source group and message context cited — pushable to Todoist after user approval.
+  2. Meeting proposals detected in tracked groups appear as `calendar_change` approval rows for the user to accept or dismiss.
+  3. Project-feedback and sentiment content from tracked groups is indexed in the RAG corpus (`source_kind='whatsapp'`) and returns cited answers via the `/ask` interface.
+**Plans**: TBD
+
+> **Note on Phase 22 deferral:** This phase is intentionally the last phase of this milestone and is blocked on Phase 21 UAT. The three consumers reuse existing pipelines (`task_batch`, `calendar_change`, `assertApproved`, RAG chunker) with zero schema additions. They are deferred because (a) the digest quality must be validated before extracted items would be trusted, and (b) keeping Phase 20 and 21 clean avoids scope creep that could delay the foundation. A brief research pass on `assertApproved` integration schema for action-item output format is recommended before planning Phase 22.
+
+## Progress (v2.1)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 20. Foundation | 0/0 | Not started | - |
+| 21. Digest + Briefing Integration | 0/0 | Not started | - |
+| 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
+
+### Research Flags (v2.1)
+
+- **Phase 20:** No additional research needed. All integration points (Baileys socket, migration 138, IPC patterns, `provider_account` disconnect cascade, `sweep-cron`) verified against live Aria source at HEAD (2026-06-09). Follow SUMMARY.md build order exactly.
+- **Phase 21:** Digest prompt text is the highest-uncertainty deliverable. Structure (exec framing: decisions / open questions / @mentions / waiting-on) is locked; actual system/user prompt content needs drafting in the plan phase and iteration in UAT.
+- **Phase 22:** Brief research needed on `assertApproved` integration schema for action-item output format and whether the RAG corpus filter needs changes to accept `source_kind='whatsapp'`. Expected low-effort — all pipelines exist.
