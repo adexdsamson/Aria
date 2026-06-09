@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
-status: executing
-last_updated: "2026-06-09T07:31:09.482Z"
+status: completed
+last_updated: "2026-06-09T16:39:54.339Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 25
-  completed_plans: 24
-  percent: 50
+  completed_plans: 25
+  percent: 67
 ---
 
 # State
@@ -173,8 +173,10 @@ Plan: 7 of 7 complete (sequential/no-worktree; node_modules intact throughout)
 ## Next Action
 
 **Phase 17 CODE-COMPLETE (2026-06-09)** — 7/7 plans, verifier 5/5 (no code gaps), no-bypass proven. Two next options:
+
 1. **Run the live SC1–SC6 acoustic smoke** (`pnpm dev` + mic/speakers) to close Phase 17's deferred human-verify (see Current Position list).
 2. **`/gsd-plan-phase 18`** — Opt-in Wake-Word + Privacy Isolation (VOICE-12). ⚠️ GATED on the commercial wake-word LICENSING decision (openWakeWord pretrained = CC-BY-NC non-commercial; Porcupine free tier caps 3 MAU) — resolve that first. Phase 18 also inherits the deferred StreamingRehydrator (frontier voice streaming) as its first task.
+
 Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead of origin (Phases 16+17 planning+execution).
 
 **Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user. **Phase 15** packaged-verify debts open (macOS binary + 16 GB packaged launch/RAM).
@@ -254,6 +256,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-khr | Fix cloudTranscribe auth: bare `openai` provider read OPENAI_API_KEY env (unset) → 401 → silent local fallback; now createOpenAI({apiKey:getFrontierKey('openai')}) + route=cloud\|local log | 2026-06-09 | 75231e7 |
 | 260609-lq3 | THE capstone — wire orphaned mic-capture→STT feed (missing 15-05): new useVoiceCapture hook (start-on-listening→buffer PCM→voiceFeedAudio on turn-end) mounted in App.tsx. Verifier 6/6; live acoustic = Needs Review | 2026-06-09 | 0b89ac1 |
 | 260609-fast | (gsd-fast) Fix p-queue default-import interop in folder-watcher.ts — `new PQueue()` threw "PQueueImport is not a constructor", knowledge-lifecycle failed every boot; mirrored scheduler.ts .default normalization | 2026-06-09 | c12d188 |
+| 260609-o8e | Wire normal voice turn transcript→answer: setTranscript else-branch now calls voiceFeedAnswer({sessionId,question}) → startAnswer→streamVoiceAnswer→TTS (was a no-op stub). Verifier 4/5; live round-trip = Needs Review. KNOWN GAP: VoiceIntentRouter still orphaned (multi-intent triage/schedule/draft unwired) | 2026-06-09 | 751d40a |
 
 ## Workflow Config
 
