@@ -418,7 +418,20 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     },
 
     subscribeToIpc(aria: AriaApi): () => void {
-      return actions.subscribeToIpc(aria);
+      // Ref-count guard: install real listeners once on 0→1, tear down only on N→0.
+      // Prevents N mounted consumers from registering N onVoiceTranscript listeners
+      // (which would fire N voiceFeedAnswer sends per transcript — Bug 2).
+      _ipcSubscriberCount++;
+      if (_ipcSubscriberCount === 1) {
+        _ipcUnsub = actions.subscribeToIpc(aria); // install real listeners once, on 0→1
+      }
+      return () => {
+        _ipcSubscriberCount--;
+        if (_ipcSubscriberCount === 0 && _ipcUnsub) {
+          _ipcUnsub();   // tear down only when the LAST consumer unmounts
+          _ipcUnsub = null;
+        }
+      };
     },
   };
 }
@@ -427,6 +440,26 @@ export function createVoiceSessionStore(): VoiceSessionStore {
 
 /** Singleton store shared across components. Reset via createVoiceSessionStore() in tests. */
 let _singleton: VoiceSessionStore | null = null;
+
+/**
+ * Ref-count guard for the singleton IPC subscription (quick 260609-poa / Bug 2 fix).
+ *
+ * Problem: useVoiceSession() is consumed by 5 components simultaneously (App.tsx,
+ * Topbar.tsx, VoicePTTButton.tsx, VoiceHUDBand.tsx, BriefingScreen.tsx). The old
+ * per-instance subscribedRef only let the FIRST mounter install real listeners;
+ * when that component unmounts (e.g. navigating away from BriefingScreen), the
+ * real unsubscriber tears down all IPC channels for ALL remaining consumers.
+ *
+ * Fix: module-level ref-count so real listeners are installed exactly once (0→1)
+ * and torn down only when the last consumer unmounts (N→0). Every consumer gets
+ * a meaningful decrementing unsubscriber.
+ *
+ * These variables are module-scoped so they are shared across all consumers of
+ * the singleton. The createVoiceSessionStore() factory itself is not modified —
+ * tests that call the factory directly bypass these variables entirely.
+ */
+let _ipcSubscriberCount = 0;
+let _ipcUnsub: (() => void) | null = null;
 
 function getSessionStore(): VoiceSessionStore {
   if (!_singleton) {
