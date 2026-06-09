@@ -11,15 +11,15 @@ WhatsApp group-tracking layered onto Aria's shipped surfaces (daily briefing, ap
 ### WhatsApp Linking & Session (WA-LINK)
 
 - [x] **WA-01** — User can link their WhatsApp account by scanning a QR code shown in Aria (WhatsApp Web style).
-- [ ] **WA-02** — Before linking, user sees an explicit ban-risk disclosure (unofficial protocol; recommends using a secondary number) and must acknowledge it before the QR appears.
+- [x] **WA-02** — Before linking, user sees an explicit ban-risk disclosure (unofficial protocol; recommends using a secondary number) and must acknowledge it before the QR appears.
 - [x] **WA-03** — User can see WhatsApp connection status (linked / needs-relink / disconnected) and re-link when the session expires.
 - [x] **WA-04** — User can disconnect WhatsApp; doing so tears down the session and deletes all stored WhatsApp data (creds, groups, messages, digests).
 
 ### Group Selection & Ingestion (WA-GROUP)
 
 - [x] **WA-05** — After linking, user can see their WhatsApp groups and toggle which ones Aria tracks (reachable any time, not only at link).
-- [ ] **WA-06** — Aria stores messages only from tracked groups; untracked groups and 1:1 direct messages are never persisted (the track toggle is the privacy boundary).
-- [ ] **WA-07** — Stored WhatsApp messages are text-only (media shown as placeholders) and retained on a rolling 30-day window.
+- [x] **WA-06** — Aria stores messages only from tracked groups; untracked groups and 1:1 direct messages are never persisted (the track toggle is the privacy boundary).
+- [x] **WA-07** — Stored WhatsApp messages are text-only (media shown as placeholders) and retained on a rolling 30-day window.
 
 ### Daily Group Digest (WA-DIGEST)
 
@@ -55,12 +55,12 @@ These layer onto the `whatsapp_message` rows the foundation already stores; **ze
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | WA-01 | Phase 20 — Foundation | Complete |
-| WA-02 | Phase 20 — Foundation | Pending |
+| WA-02 | Phase 20 — Foundation | Complete |
 | WA-03 | Phase 20 — Foundation | Complete |
 | WA-04 | Phase 20 — Foundation | Complete |
 | WA-05 | Phase 20 — Foundation | Complete |
-| WA-06 | Phase 20 — Foundation | Pending |
-| WA-07 | Phase 20 — Foundation | Pending |
+| WA-06 | Phase 20 — Foundation | Complete |
+| WA-07 | Phase 20 — Foundation | Complete |
 | WA-08 | Phase 21 — Digest + Briefing Integration | Pending |
 | WA-09 | Phase 21 — Digest + Briefing Integration | Pending |
 | WA-10 | Phase 21 — Digest + Briefing Integration | Pending |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-09T22:49:53.321Z"
+last_updated: "2026-06-09T23:05:44.788Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 8
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 20 (foundation) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
-Last activity: 2026-06-09
+Last activity: 2026-06-10
 
 **Progress bar:** Phase 0/3 complete · 0% · [ · · · ]
 
@@ -46,7 +46,14 @@ Last activity: 2026-06-09
 
 ## Next Action
 
-**`/gsd-execute-phase 20`** — Continue with Plan 20-02 (migration 138 + auth-state).
+**`/gsd-execute-phase 20`** — Continue with Plan 20-03 (migration 138 + auth-state).
+
+## Decisions (Phase 20, Plan 02)
+
+- whatsapp-consent renamed .ts→.tsx — JSX content in renderer specs requires tsx extension for esbuild compilation
+- 2 static ratchets (passive-posture + no-frontier) seeded before any whatsapp source; W-1 existsSync guard keeps them GREEN until directory appears
+- ingest-privacy.spec.ts encodes 3-line filter order (type!=='notify'/!@g.us/!isTracked) + no-log-of-body gate verbatim from VALIDATION.md R-WA06
+- AccountRow.spec.tsx RED-fails on existing component — whatsapp IPC wiring + Manage-groups link not yet added (Plan 20-07 adds them)
 
 ## Decisions (Phase 20, Plan 01)
 

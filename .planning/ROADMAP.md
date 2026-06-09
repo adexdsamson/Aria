@@ -190,7 +190,7 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
 **Plans**: 8 plans (7 waves)
 Plans:
 - [x] 20-01-PLAN.md — Wave 1: pin baileys@6.7.23 + qrcode@1.5.4 + lockfile (gate 10) + main.plugins externalize exclude (gate 11) + ProviderKey/7 WHATSAPP_* channels + DTOs
-- [ ] 20-02-PLAN.md — Wave 1: Wave 0 test infra — 2 green-before-dir static ratchets (passive-posture, no-frontier) + 7 spec scaffolds (ingest-privacy CRITICAL, auth-state, reconnect, recycle, retention, migration-138, consent)
+- [x] 20-02-PLAN.md — Wave 1: Wave 0 test infra — 2 green-before-dir static ratchets (passive-posture, no-frontier) + 7 spec scaffolds (ingest-privacy CRITICAL, auth-state, reconnect, recycle, retention, migration-138, consent)
 - [ ] 20-03-PLAN.md — Wave 2: migration 138 (4 tables + provider_account CHECK rebuild w/ legacy_alter_table=ON, gate 12) + auth-state.ts (transactional keys.set, gate 4)
 - [ ] 20-04-PLAN.md — Wave 3: session-manager.ts — passive socket (gates 1/2) + QR push + reconnect classify (gate 5) + recycle cron (gate 6) + boot-safe degrade
 - [ ] 20-05-PLAN.md — Wave 4: group-sync (untracked-default) + ingest (3-line privacy filter + p-queue batch flush, gates 7/8/9, WA-06) + retention 03:30 sweep
@@ -226,7 +226,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Foundation | 1/8 | In Progress|  |
+| 20. Foundation | 2/8 | In Progress|  |
 | 21. Digest + Briefing Integration | 0/0 | Not started | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
