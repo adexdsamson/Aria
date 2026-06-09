@@ -27,6 +27,22 @@ export interface EntitlementHandlersDeps {
   emitToRenderer?: (channel: string, payload?: unknown) => void;
 }
 
+/**
+ * Canonical list of every invoke channel registerEntitlementHandlers() registers.
+ * SINGLE SOURCE OF TRUTH: the lazy post-unlock bootstrap in src/main/index.ts
+ * removeHandler()s each of these (to clear the pre-unlock stubs registerHandlers
+ * wired) BEFORE re-registering with the live service — ipcMain.handle THROWS on a
+ * 2nd registration for the same channel (it does not override). If you add or
+ * remove an `ipcMain.handle(CHANNELS.ENTITLEMENT_*, …)` below, update this array.
+ */
+export const ENTITLEMENT_HANDLER_CHANNELS = [
+  CHANNELS.ENTITLEMENT_GET_STATE,
+  CHANNELS.ENTITLEMENT_ACTIVATE,
+  CHANNELS.ENTITLEMENT_OPEN_CHECKOUT,
+  CHANNELS.ENTITLEMENT_OPEN_PORTAL,
+  CHANNELS.ENTITLEMENT_REFRESH_NOW,
+] as const;
+
 export function registerEntitlementHandlers(
   ipcMain: IpcMain,
   deps: EntitlementHandlersDeps,

@@ -216,6 +216,34 @@ export interface VoiceHandlersDeps {
   };
 }
 
+/**
+ * Canonical list of every invoke channel registerVoiceHandlers() registers below.
+ * SINGLE SOURCE OF TRUTH: the bootstrap in src/main/index.ts removeHandler()s each
+ * of these to clear the stubs registerHandlers wired for the handler-count test,
+ * BEFORE calling registerVoiceHandlers — ipcMain.handle THROWS on a 2nd registration
+ * for the same channel (it does not override). If you add or remove an
+ * `ipcMain.handle(CHANNELS.VOICE_*, …)` below, you MUST update this array too,
+ * or bootstrap will crash with "Attempted to register a second handler".
+ */
+export const VOICE_HANDLER_CHANNELS = [
+  // Phase 15
+  CHANNELS.VOICE_FEED_AUDIO,
+  CHANNELS.VOICE_GET_MODEL_STATUS,
+  CHANNELS.VOICE_DOWNLOAD_MODEL,
+  CHANNELS.VOICE_CANCEL_TTS,
+  // Phase 16
+  CHANNELS.VOICE_TTS_CHUNK,
+  CHANNELS.VOICE_ABORT,
+  CHANNELS.DIAGNOSTICS_VOICE_LATENCY,
+  CHANNELS.VOICE_FEED_ANSWER,
+  CHANNELS.VOICE_LATENCY_MARK,
+  // Phase 17
+  CHANNELS.VOICE_CONFIRM_APPROVAL,
+  CHANNELS.VOICE_CANCEL_APPROVAL,
+  CHANNELS.VOICE_GET_PREFS,
+  CHANNELS.VOICE_SET_PREFS,
+] as const;
+
 export function registerVoiceHandlers(
   ipcMain: IpcMain,
   deps: VoiceHandlersDeps,

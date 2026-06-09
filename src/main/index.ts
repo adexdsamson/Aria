@@ -71,7 +71,11 @@ import { redactObject } from './log/redact';
 import { registerPowerHooks } from './lifecycle/powerMonitor';
 import { registerScheduler } from './lifecycle/scheduler';
 import { registerHandlers } from './ipc';
-import { registerEntitlementHandlers, makeRendererEmitter } from './ipc/entitlement';
+import {
+  registerEntitlementHandlers,
+  makeRendererEmitter,
+  ENTITLEMENT_HANDLER_CHANNELS,
+} from './ipc/entitlement';
 import { registerKnowledgeFolderIpc } from './ipc/knowledge-folders';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
@@ -109,7 +113,7 @@ import {
 } from './background/prefs';
 import { registerBackgroundHandlers } from './ipc/background';
 import { maybeShowFirstCloseToast } from './tray/notify';
-import { registerVoiceHandlers } from './ipc/voice';
+import { registerVoiceHandlers, VOICE_HANDLER_CHANNELS } from './ipc/voice';
 import { SttSidecarManager } from './voice/stt/sidecar-manager';
 import { createModelDownload } from './voice/download/model-download';
 import { registerLifecycleCallbacks } from './lifecycle/powerMonitor';
@@ -409,13 +413,10 @@ async function bootstrap(): Promise<void> {
   });
 
   // Remove the lightweight stubs registered by registerHandlers, then wire real handlers.
-  const VOICE_INVOKE_CHANNELS = [
-    CHANNELS.VOICE_FEED_AUDIO,
-    CHANNELS.VOICE_GET_MODEL_STATUS,
-    CHANNELS.VOICE_DOWNLOAD_MODEL,
-    CHANNELS.VOICE_CANCEL_TTS,
-  ];
-  for (const ch of VOICE_INVOKE_CHANNELS) {
+  // VOICE_HANDLER_CHANNELS is the single source of truth (exported from ipc/voice.ts)
+  // covering EVERY invoke channel registerVoiceHandlers registers across phases 15-17.
+  // Hardcoding a subset here is how the tts-chunk double-registration crash slipped in.
+  for (const ch of VOICE_HANDLER_CHANNELS) {
     ipcMain.removeHandler(ch);
   }
   // Also remove the push-event stubs (no-ops registered by registerHandlers).
@@ -466,8 +467,14 @@ async function bootstrap(): Promise<void> {
       // the entitlement block there is skipped (no service yet). Without
       // this call the renderer hits "No handler registered for
       // 'aria:entitlement:get-state'" the moment EntitlementProvider mounts.
-      // Remove the pre-unlock stub before re-registering with the real service.
-      ipcMain.removeHandler(CHANNELS.ENTITLEMENT_GET_STATE);
+      // Remove ALL pre-unlock stubs before re-registering with the real service.
+      // ENTITLEMENT_HANDLER_CHANNELS (exported from ipc/entitlement.ts) is the single
+      // source of truth — registerHandlers stubs all 5, and ipcMain.handle throws on a
+      // 2nd registration, so every one must be removed (removing only GET_STATE crashed
+      // on ACTIVATE the moment the vault unlocked).
+      for (const ch of ENTITLEMENT_HANDLER_CHANNELS) {
+        ipcMain.removeHandler(ch);
+      }
       const emitToRenderer = makeRendererEmitter(
         BrowserWindow.getAllWindows()[0] ?? null,
       );
