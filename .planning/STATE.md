@@ -252,6 +252,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-j2b | Make VoicePTTButton lazy-download gate cloud-aware — skip local 574MB model modal when cloud audio enabled (fails closed) | 2026-06-09 | 8b253f3 |
 | 260609-jn0 | Fix STT-audio cloud gate: shouldUseCloud('') always failed to local (classify empty→conf<0.6); now consent-gated (prefs.useCloud). Follow-up to htx | 2026-06-09 | 3f80e08 |
 | 260609-khr | Fix cloudTranscribe auth: bare `openai` provider read OPENAI_API_KEY env (unset) → 401 → silent local fallback; now createOpenAI({apiKey:getFrontierKey('openai')}) + route=cloud\|local log | 2026-06-09 | 75231e7 |
+| 260609-lq3 | THE capstone — wire orphaned mic-capture→STT feed (missing 15-05): new useVoiceCapture hook (start-on-listening→buffer PCM→voiceFeedAudio on turn-end) mounted in App.tsx. Verifier 6/6; live acoustic = Needs Review | 2026-06-09 | 0b89ac1 |
 
 ## Workflow Config
 
