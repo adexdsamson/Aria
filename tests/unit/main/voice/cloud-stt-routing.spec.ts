@@ -1,14 +1,18 @@
 /**
- * Quick 260609-htx — Cloud STT routing tests for VOICE_FEED_AUDIO.
+ * Quick 260609-jn0 — Cloud STT routing tests for VOICE_FEED_AUDIO.
  *
  * Three branches:
- *   A. shouldUseCloud → true  + cloudTranscribe succeeds → cloud delta emitted
- *   B. shouldUseCloud → false → local sidecar called, cloud NOT called
- *   C. shouldUseCloud → true  + cloudTranscribe returns { error } → sidecar fallback
+ *   A. useCloud=true  + cloudTranscribe succeeds → cloud delta emitted; sidecar NOT called
+ *   B. useCloud=false → local sidecar called; cloudTranscribe NOT called
+ *   C. useCloud=true  + cloudTranscribe returns { error } → sidecar fallback; turn NOT dropped
  *
- * Injection strategy: registerVoiceHandlers accepts cloudStt / writePcm / llmQueue
- * optional deps, so we inject mocks without touching the real cloud-stt / wav modules.
+ * Injection strategy: registerVoiceHandlers accepts cloudStt / writePcm optional deps,
+ * so we inject mocks without touching the real cloud-stt / wav modules.
  * ipcMain.handle is captured via a mock so we can invoke the handler directly.
+ *
+ * The STT-audio routing gate is CONSENT-based (prefs.useCloud pref only).
+ * shouldUseCloud() is NOT called in the VOICE_FEED_AUDIO handler; it applies to the
+ * LLM-answer leg only (audio precedes transcript — nothing to classify at this point).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -27,6 +31,7 @@ vi.mock('node:fs', () => ({
 }));
 
 // Mock getVoicePrefs so we can control useCloud per test.
+// Default: useCloud=true (tests A and C inherit this without extra setup).
 vi.mock('../../../../src/main/voice/prefs', () => ({
   getVoicePrefs: vi.fn(() => ({ useCloud: true, speed: 1.0, voiceId: '' })),
   getVoiceModelStatus: vi.fn(() => ({ ready: false, path: null, state: 0 })),
@@ -85,6 +90,7 @@ vi.mock('zod', async (importOriginal) => {
 
 import { CHANNELS } from '../../../../src/shared/ipc-contract';
 import type { VoiceHandlersDeps } from '../../../../src/main/ipc/voice';
+import { getVoicePrefs } from '../../../../src/main/voice/prefs';
 
 /** Minimal fake ipcMain that captures the last registered VOICE_FEED_AUDIO handler. */
 function makeIpcMainMock() {
@@ -102,9 +108,6 @@ function makeIpcMainMock() {
     },
   };
 }
-
-/** Minimal PQueueLike stub that runs fns synchronously. */
-const makeQueue = () => ({ add: async <T>(fn: () => Promise<T>): Promise<T> => fn() });
 
 /** Build a minimal deps object for registerVoiceHandlers, with all injectables as mocks. */
 function makeDeps(overrides: Partial<VoiceHandlersDeps> = {}): VoiceHandlersDeps {
@@ -132,7 +135,6 @@ function makeDeps(overrides: Partial<VoiceHandlersDeps> = {}): VoiceHandlersDeps
     sttSidecar: mockSttSidecar as never,
     downloadController: mockDownloadController as never,
     emitToRenderer: vi.fn(),
-    llmQueue: makeQueue(),
     ...overrides,
   };
 }
@@ -155,9 +157,10 @@ describe('VOICE_FEED_AUDIO cloud STT routing', () => {
     vi.clearAllMocks();
   });
 
-  it('A: shouldUseCloud → true — routes to cloudTranscribe; sidecar NOT called', async () => {
+  it('useCloud=true — routes to cloudTranscribe; sidecar NOT called', async () => {
+    // Default mock returns useCloud=true — no extra setup needed for test A.
     const mockCloudStt = {
-      shouldUseCloud: vi.fn().mockResolvedValue(true),
+      shouldUseCloud: vi.fn(), // present on the interface but NOT called in the audio leg
       cloudTranscribe: vi.fn().mockResolvedValue({ text: 'cloud result' }),
     };
     const mockWavUtils = {
@@ -176,11 +179,13 @@ describe('VOICE_FEED_AUDIO cloud STT routing', () => {
     await ipcMain._invoke(CHANNELS.VOICE_FEED_AUDIO, fakePcmPayload());
 
     // Cloud path taken
-    expect(mockCloudStt.shouldUseCloud).toHaveBeenCalledOnce();
     expect(mockCloudStt.cloudTranscribe).toHaveBeenCalledOnce();
 
     // Local sidecar NOT called
     expect(deps.sttSidecar.transcribe).not.toHaveBeenCalled();
+
+    // shouldUseCloud is NOT called in the STT-audio leg
+    expect(mockCloudStt.shouldUseCloud).not.toHaveBeenCalled();
 
     // VOICE_TRANSCRIPT_DELTA emitted with cloud delta
     expect(emitToRenderer).toHaveBeenCalledWith(
@@ -189,9 +194,12 @@ describe('VOICE_FEED_AUDIO cloud STT routing', () => {
     );
   });
 
-  it('B: shouldUseCloud → false — sidecar called; cloudTranscribe NOT called', async () => {
+  it('useCloud=false — sidecar called; cloudTranscribe NOT called', async () => {
+    // Override the mock to return useCloud=false for this test only.
+    vi.mocked(getVoicePrefs).mockReturnValueOnce({ useCloud: false, speed: 1.0, voiceId: '' });
+
     const mockCloudStt = {
-      shouldUseCloud: vi.fn().mockResolvedValue(false),
+      shouldUseCloud: vi.fn(),
       cloudTranscribe: vi.fn(),
     };
     const mockWavUtils = {
@@ -222,9 +230,10 @@ describe('VOICE_FEED_AUDIO cloud STT routing', () => {
     );
   });
 
-  it('C: cloudTranscribe returns { error } — falls back to sidecar; turn NOT dropped', async () => {
+  it('cloudTranscribe returns { error } — falls back to sidecar; turn NOT dropped', async () => {
+    // Default mock returns useCloud=true — cloud path is attempted, then falls back.
     const mockCloudStt = {
-      shouldUseCloud: vi.fn().mockResolvedValue(true),
+      shouldUseCloud: vi.fn(), // NOT called in the audio leg
       cloudTranscribe: vi.fn().mockResolvedValue({ error: 'API down' }),
     };
     const mockWavUtils = {

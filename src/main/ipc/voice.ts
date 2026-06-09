@@ -40,7 +40,6 @@ import type { DbHolder } from './onboarding';
 import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
 import { getVoiceModelStatus, getVoicePrefs, writeVoicePref, readVoicePref } from '../voice/prefs';
-import type { PQueueLike } from '../voice/cloud-stt';
 import type { cloudTranscribe as CloudTranscribeFn, shouldUseCloud as ShouldUseCloudFn } from '../voice/cloud-stt';
 import type { writePcmToWav as WritePcmToWavFn, tempWavPath as TempWavPathFn } from '../voice/stt/wav';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
@@ -234,11 +233,6 @@ export interface VoiceHandlersDeps {
     writePcmToWav: typeof WritePcmToWavFn;
     tempWavPath: typeof TempWavPathFn;
   };
-  /**
-   * p-queue instance for LLM call serialisation in shouldUseCloud (D-13/D-15).
-   * Injected by index.ts as scheduler.queue; defaults to a passthrough stub.
-   */
-  llmQueue?: PQueueLike;
 }
 
 /**
@@ -284,7 +278,6 @@ export function registerVoiceHandlers(
   // These vars are captured by the handler closure below.
   let cloudSttResolved: VoiceHandlersDeps['cloudStt'] = deps.cloudStt;
   let wavUtilsResolved: VoiceHandlersDeps['writePcm'] = deps.writePcm;
-  const llmQueue: PQueueLike = deps.llmQueue ?? { add: async (fn) => fn() };
 
   // Kick off dynamic imports in parallel; handlers reference the resolved values
   // via the closures above. In practice the imports complete well before any
@@ -354,16 +347,16 @@ export function registerVoiceHandlers(
       deps.emitToRenderer?.(CHANNELS.VOICE_STATE_CHANGED, { state: 'processing' });
 
       // ─── Cloud STT routing (D-13/D-15) ────────────────────────────────────
-      //
-      // shouldUseCloud() is the SOLE gate for cloud routing (D-15 fail-safe).
-      // Sensitivity-flagged or low-confidence turns are forced local regardless
-      // of the useCloud pref.  We pass '' as context because at this point no
-      // transcript exists for the current turn yet.
       const prefs = getVoicePrefs(deps.dbHolder.db);
+      // STT-audio cloud routing is CONSENT-gated (useCloud pref implies prior consent
+      // via the VoiceSection disclosure modal, D-14). Per-utterance content-sensitivity
+      // cannot gate the audio leg because audio precedes the transcript — there is no
+      // text to classify at this point (documented limitation, quick 260609-htx).
+      // The content-sensitivity gate (shouldUseCloud) applies to the LLM-ANSWER leg only.
       const useCloudPath =
-        cloudSttResolved != null && wavUtilsResolved != null
-          ? await cloudSttResolved.shouldUseCloud('', llmQueue, prefs.useCloud)
-          : false;
+        prefs.useCloud === true &&
+        cloudSttResolved != null &&
+        wavUtilsResolved != null;
 
       let delta: import('../../shared/voice-types').TranscriptDelta;
 
