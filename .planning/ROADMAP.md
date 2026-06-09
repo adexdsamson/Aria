@@ -187,7 +187,16 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
   3. After linking, the user can open a group-picker panel at any time, toggle groups tracked/untracked, and confirm that messages from untracked groups and 1:1 DMs are never written to the database.
   4. User can disconnect WhatsApp from the AccountRow; doing so tears down the Baileys socket and deletes all WhatsApp rows (auth state, groups, messages, digests) via the ON DELETE CASCADE disconnect cascade.
   5. The connection status badge (linked / reconnecting / needs-relink / disconnected) updates visibly on session events, and a degraded WhatsApp connection leaves the Briefing, Email, Calendar, and Tasks screens fully functional.
-**Plans**: TBD
+**Plans**: 8 plans (7 waves)
+Plans:
+- [ ] 20-01-PLAN.md — Wave 1: pin baileys@6.7.23 + qrcode@1.5.4 + lockfile (gate 10) + main.plugins externalize exclude (gate 11) + ProviderKey/7 WHATSAPP_* channels + DTOs
+- [ ] 20-02-PLAN.md — Wave 1: Wave 0 test infra — 2 green-before-dir static ratchets (passive-posture, no-frontier) + 7 spec scaffolds (ingest-privacy CRITICAL, auth-state, reconnect, recycle, retention, migration-138, consent)
+- [ ] 20-03-PLAN.md — Wave 2: migration 138 (4 tables + provider_account CHECK rebuild w/ legacy_alter_table=ON, gate 12) + auth-state.ts (transactional keys.set, gate 4)
+- [ ] 20-04-PLAN.md — Wave 3: session-manager.ts — passive socket (gates 1/2) + QR push + reconnect classify (gate 5) + recycle cron (gate 6) + boot-safe degrade
+- [ ] 20-05-PLAN.md — Wave 4: group-sync (untracked-default) + ingest (3-line privacy filter + p-queue batch flush, gates 7/8/9, WA-06) + retention 03:30 sweep
+- [ ] 20-06-PLAN.md — Wave 5: ipc/whatsapp.ts (WHATSAPP_CHANNELS) + ipc/index.ts stubs + main/index.ts bootPoll wiring (removeHandler loop) + provider-accounts disconnect cascade (WA-04) + handler-count
+- [ ] 20-07-PLAN.md — Wave 6: renderer — consent ack-gate modal (SC-1) + QR modal + AccountRow chip/Reconnect/Manage-groups + group-picker (search+toggle) + IntegrationsSection + preload
+- [ ] 20-08-PLAN.md — Wave 7: WA-12 degradable integration test + live-QR/consent UAT checkpoint (human-verify)
 **UI hint**: yes
 
 ### Phase 21: Digest + Briefing Integration
@@ -217,7 +226,7 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Foundation | 0/0 | Not started | - |
+| 20. Foundation | 0/8 | Planned | - |
 | 21. Digest + Briefing Integration | 0/0 | Not started | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
