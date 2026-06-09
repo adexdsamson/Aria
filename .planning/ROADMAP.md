@@ -104,7 +104,7 @@ Plans:
 - [x] 17-03-PLAN.md — Wave 2: VoiceIntentRouter (D-01/D-03) + read-back template builder (D-05)
 - [x] 17-04-PLAN.md — Wave 2: cloud-stt.ts (D-13) + shouldUseCloud() sensitivity gate (D-15) + real VOICE_GET/SET_PREFS handlers (D-16)
 - [x] 17-05-PLAN.md — Wave 3: voiceConfirm wired live via VOICE_CONFIRM_APPROVAL handler + confirm-classifier (D-06) + useVoiceSession pendingApprovalId + useVoiceConfirm hook (D-04/D-09/D-10)
-- [ ] 17-06-PLAN.md — Wave 3: VoiceSection.tsx settings UI (D-16/VOICE-08) + ApprovalCard forceExplicit suppression + Cancel button (D-07/D-09/D-11/D-12)
+- [x] 17-06-PLAN.md — Wave 3: VoiceSection.tsx settings UI (D-16/VOICE-08) + ApprovalCard forceExplicit suppression + Cancel button (D-07/D-09/D-11/D-12)
 - [ ] 17-07-PLAN.md — Wave 4: D-17 ratchet update + voice-write-path integration test (SC2) + voice-confirm cancel path test (SC3) + human-verify checkpoint
 **UI hint**: yes
 
@@ -139,7 +139,7 @@ Plans:
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
 | 16. Streaming Cascade + Barge-in | 6/6 | Complete   | 2026-06-07 |
-| 17. Voice-Confirm + Writes Through the Gate | 5/7 | In Progress|  |
+| 17. Voice-Confirm + Writes Through the Gate | 6/7 | In Progress|  |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |
 
