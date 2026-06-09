@@ -15,6 +15,7 @@ import { TrialBanner } from '../features/entitlement/TrialBanner';
 import { AppLogo } from '../components/editorial/Logo';
 import { VoiceHUDBand } from '../features/voice/VoiceHUDBand';
 import { useVoiceSession } from '../features/voice/useVoiceSession';
+import { useVoiceCapture } from '../features/voice/useVoiceCapture';
 import { useKokoroPlayer } from '../features/voice/tts/useKokoroPlayer';
 
 type GateState = 'loading' | 'onboarding' | 'locked' | 'unlocked';
@@ -246,8 +247,9 @@ function shellStyle(): React.CSSProperties {
 // Skip control must NOT appear on the shell HUD.
 // ---------------------------------------------------------------------------
 function VoiceHUDBandConnected(): JSX.Element {
-  const { voiceState, liveTranscript } = useVoiceSession();
+  const session = useVoiceSession();
+  useVoiceCapture(session);
   const player = useKokoroPlayer();
-  return <VoiceHUDBand state={voiceState} transcript={liveTranscript} player={player} />;
+  return <VoiceHUDBand state={session.voiceState} transcript={session.liveTranscript} player={player} />;
 }
 
