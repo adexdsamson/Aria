@@ -358,6 +358,8 @@ export function registerVoiceHandlers(
         cloudSttResolved != null &&
         wavUtilsResolved != null;
       logger.info({ route: useCloudPath ? 'cloud' : 'local' }, 'voice.stt route');
+      // [diag 260609] confirm mic actually captured audio (silent/empty → empty transcript)
+      logger.info({ pcmBytes: pcm.byteLength, pcmSamples: pcm.length }, 'voice.feedAudio received');
 
       let delta: import('../../shared/voice-types').TranscriptDelta;
 
@@ -373,6 +375,19 @@ export function registerVoiceHandlers(
         } finally {
           try { fs.unlinkSync(wavPath); } catch { /* ignore — temp file cleanup */ }
         }
+
+        // [diag 260609] did cloud return text (and how long) vs an error?
+        logger.info(
+          {
+            textLen: cloudResult != null && 'text' in cloudResult ? cloudResult.text.length : -1,
+            hasError: cloudResult != null && 'error' in cloudResult,
+            errPreview:
+              cloudResult != null && 'error' in cloudResult
+                ? String(cloudResult.error).slice(0, 120)
+                : undefined,
+          },
+          'voice.stt cloud result',
+        );
 
         if (cloudResult != null && 'text' in cloudResult) {
           // Cloud succeeded — wrap into TranscriptDelta shape
@@ -512,6 +527,11 @@ export function registerVoiceHandlers(
   // Stub returns { ok: true } until 16-04a wires the real VoiceSessionManager.
   ipcMain.handle(CHANNELS.VOICE_FEED_ANSWER, async (_e, payload: unknown) => {
     const req = (payload ?? {}) as { sessionId?: string; question?: string };
+    // [diag 260609] did the renderer reach the answer path, and is the manager wired?
+    logger.info(
+      { qLen: req.question?.length ?? -1, hasSession: !!req.sessionId, hasManager: !!deps.voiceSessionManager },
+      'voice.feedAnswer startAnswer',
+    );
     if (req.sessionId && req.question && deps.voiceSessionManager) {
       await deps.voiceSessionManager.startAnswer({
         sessionId: req.sessionId,
