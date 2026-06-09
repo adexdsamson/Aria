@@ -1,65 +1,59 @@
-# Aria — Requirements (Milestone v2.0: Voice Interface)
+# Aria — Requirements (Milestone v2.1: Messaging / Group Intelligence)
 
-**Milestone:** v2.0 — Voice Interface
-**Defined:** 2026-06-02
-**Prior milestone:** v1.0 SHIPPED (requirements archived in `milestones/v1.0-REQUIREMENTS.md`)
+**Milestone:** v2.1 — Messaging / Group Intelligence
+**Defined:** 2026-06-09
+**Prior milestone:** v2.0 Voice Interface — ⏸ PARKED (requirements snapshot in `milestones/v2.0-REQUIREMENTS.md`; phases 14–17 code-complete, 18–19 unstarted)
 
-Voice is a **modality layered over Aria's existing shipped surfaces** (briefing, triage, scheduling, ask, drafting) — not a rebuild. Every outbound action still routes through the existing `assertApproved` chokepoint. Hybrid audio: **local-first default, consent-gated cloud opt-in** (mirrors the existing hybrid-LLM routing).
+WhatsApp group-tracking layered onto Aria's shipped surfaces (daily briefing, approval gating). Connection via **Baileys** (`@whiskeysockets/baileys@6.7.23` — pinned, NOT v7 RC), the unofficial WhatsApp Web multi-device protocol, QR-linked. **Read-only / passive posture** — Aria observes, never sends. Group content (third-party PII) is summarized **local-only** via Ollama and never leaves the machine. MVP = foundation (link → select → ingest) + a local daily-briefing digest; three extraction consumers are deferred.
 
-## v2.0 Requirements
+## v2.1 Requirements (this milestone)
 
-### Core Voice I/O & Pipeline
+### WhatsApp Linking & Session (WA-LINK)
 
-- [x] **VOICE-01** — User can talk to Aria via push-to-talk (hold hotkey / click) with live transcription shown.
-- [x] **VOICE-02** — Aria reads the daily briefing aloud (TTS) with pause / skip / speed controls.
-- [x] **VOICE-03** — Aria speaks `/ask` answers aloud.
-- [x] **VOICE-04** — Voice runs on-device by default (local STT + local TTS); no audio leaves the machine unless the user explicitly opts in.
-- [x] **VOICE-05** — User can opt into cloud STT/TTS for higher quality via an explicit consent gate + data-handling disclosure; sensitivity-flagged turns stay on-device regardless of the opt-in.
-- [x] **VOICE-06** — Conversational multi-turn loop: Aria maintains context across turns and supports barge-in (user interrupt → Aria stops promptly via a single AbortController across LLM + TTS + audio).
-- [x] **VOICE-07** — Mic state is always visible (listening / processing / speaking); the mic is gated during playback (half-duplex) so Aria never transcribes its own TTS (Electron AEC is unreliable — #47043).
-- [x] **VOICE-08** — User can set voice/output preferences (voice, speed, local vs cloud) in Settings.
+- [ ] **WA-01** — User can link their WhatsApp account by scanning a QR code shown in Aria (WhatsApp Web style).
+- [ ] **WA-02** — Before linking, user sees an explicit ban-risk disclosure (unofficial protocol; recommends using a secondary number) and must acknowledge it before the QR appears.
+- [ ] **WA-03** — User can see WhatsApp connection status (linked / needs-relink / disconnected) and re-link when the session expires.
+- [ ] **WA-04** — User can disconnect WhatsApp; doing so tears down the session and deletes all stored WhatsApp data (creds, groups, messages, digests).
 
-### Voice-Driven Work (over existing surfaces, gated)
+### Group Selection & Ingestion (WA-GROUP)
 
-- [x] **VOICE-09** — User can drive triage / scheduling / `/ask` / drafting by voice; voice intents call the same in-process services the existing IPC handlers use (never re-cross the preload bridge).
-- [x] **VOICE-10** — Approval-gated actions (email send, calendar change, task push) require the voice-confirm contract: stage → read-back of resolved entities → explicit dual-channel confirm → existing `assertApproved`. Voice can never auto-execute, and is blocked from satisfying the forced-explicit / high-severity / financial-legal-hr override (those force the on-screen click). Extends the existing single-send-site static ratchet to voice write-paths.
-- [x] **VOICE-11** — Mishear recovery: user can correct or cancel a mis-recognized command before it acts.
+- [ ] **WA-05** — After linking, user can see their WhatsApp groups and toggle which ones Aria tracks (reachable any time, not only at link).
+- [ ] **WA-06** — Aria stores messages only from tracked groups; untracked groups and 1:1 direct messages are never persisted (the track toggle is the privacy boundary).
+- [ ] **WA-07** — Stored WhatsApp messages are text-only (media shown as placeholders) and retained on a rolling 30-day window.
 
-### Wake-Word (opt-in, licensing-gated)
+### Daily Group Digest (WA-DIGEST)
 
-- [ ] **VOICE-12** — Optional always-listening wake-word, OFF by default, opt-in, privacy-isolated (separate process, trigger-only). Gated on a commercial wake-word license/build decision (openWakeWord pretrained = non-commercial; Porcupine free tier caps at 3 MAU). Push-to-talk ships first; this is the last phase.
+- [ ] **WA-08** — The daily briefing includes a WhatsApp section summarizing each tracked group's activity since the last digest, exec-framed: key points, decisions, open questions, and mentions of the user.
+- [ ] **WA-09** — WhatsApp group content is summarized using the local model only and is never sent to a frontier API (enforced by a static ratchet, not convention).
+- [ ] **WA-10** — If the local model is unavailable, the briefing still generates and the WhatsApp section degrades gracefully (clear "unavailable" note) rather than failing the whole briefing.
 
-## Future Requirements (v2.1+)
+### Safety, Privacy & Resilience (WA-SAFE)
 
-- Multi-party meeting coordination — external scheduling negotiation (availability links, back-and-forth, auto-booking).
-- Advanced executive reports + predictive analytics — monthly/quarterly reports, KPI dashboards, forward-looking trends/forecasts.
-- Extensibility — Asana/Jira/CRM adapters + a plugin/SDK layer over the provider abstraction.
+- [ ] **WA-11** — Aria observes WhatsApp passively (read-only): it never sends messages, read receipts, or presence, and never auto-acts; a static guard prevents any outbound WhatsApp send call.
+- [ ] **WA-12** — WhatsApp is a degradable capability — a dropped connection or upstream protocol break surfaces as a visible degraded status and leaves the rest of Aria (briefing, email, calendar, tasks) fully functional.
 
-## Out of Scope (anti-features — explicitly not building)
+## Future Requirements (deferred — later v2.1 phase, "Extraction Consumers")
 
-- Open-mic always-listening as the default (privacy) — wake-word is opt-in only.
-- Voice-only confirmation for sends/irreversible actions — read-back + explicit dual-channel confirm required; high-severity forces the screen.
-- Autonomous auto-send / auto-execute from voice — the approval chokepoint always holds.
-- Cloud-default audio — local-first is the default; cloud is explicit opt-in.
-- Reading sensitive content aloud unprompted.
-- Voice biometric authentication.
-- True single-model full-duplex (Moshi-class) — needs A100-class GPU; use the local cascading pipeline instead.
+These layer onto the `whatsapp_message` rows the foundation already stores; **zero schema additions** expected. Each routes through Aria's existing approval chokepoint.
+
+- **WA-F1** — Extract action items / commitments from tracked groups into `task_batch` approvals (pushable to Todoist), reusing the meeting-capture extraction pipeline.
+- **WA-F2** — Detect meeting proposals in tracked groups and surface them as `calendar_change` approvals.
+- **WA-F3** — Capture project feedback/sentiment from tracked groups, queryable via RAG and surfaced in insights.
+
+## Out of Scope (anti-features — explicitly not building in v2.1)
+
+- **Sending / replying to WhatsApp from Aria** — read-only posture is a safety invariant; any send would sharply raise ban risk.
+- **Media / attachment ingestion** — text + captions only; media stored as `[image]` / `[document: name]` placeholders.
+- **Routing group content to frontier APIs** — third-party PII stays local; cloud opt-in (as in voice) is explicitly NOT offered for WhatsApp content in v2.1.
+- **Historical backfill before link time** — the WhatsApp Web multi-device protocol does not reliably deliver history; the digest starts "from today."
+- **1:1 direct-message tracking** — groups only; DMs are excluded at ingestion.
+- **Multiple linked WhatsApp accounts** — single linked account in v2.1 (the `provider_account` model supports more later).
+- **Official WhatsApp Business Cloud API path** — cannot read a personal account's existing groups; rejected during brainstorm.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOICE-01 | Phase 15 | Complete |
-| VOICE-02 | Phase 16 | Complete |
-| VOICE-03 | Phase 16 | Complete |
-| VOICE-04 | Phase 15 | Complete |
-| VOICE-05 | Phase 17 | Complete |
-| VOICE-06 | Phase 16 | Complete |
-| VOICE-07 | Phase 15 | Complete |
-| VOICE-08 | Phase 17 | Complete |
-| VOICE-09 | Phase 17 | Complete |
-| VOICE-10 | Phase 14 | Complete |
-| VOICE-11 | Phase 17 | Complete |
-| VOICE-12 | Phase 18 | Pending |
+| _(filled by roadmap)_ | | |
 
-**Coverage:** 12/12 VOICE-* requirements mapped ✓ (no orphans, no duplicates). Phase 19 is a pure performance/quality-polish phase tuning capabilities delivered in 14–18; it carries no net-new requirement.
+**Coverage:** to be validated by the roadmapper (every WA-* active requirement maps to exactly one phase).
