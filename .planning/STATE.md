@@ -246,6 +246,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-bgh | Fix duplicate IPC handler crash (BG prefs stub-vs-real registration) | 2026-06-09 | 5e7b5f9 |
 | 260609-vte | Fix voice (tts-chunk) + entitlement (activate) double-registration crashes; canonical channel lists | 2026-06-09 | 442bd05 |
 | 260609-kfp | Fix knowledge (pick-folder) double-registration crash on login; 4th/final IPC re-register site (audit complete) | 2026-06-09 | 6c05b8e |
+| 260609-vms | Fix voice model size guard (601882624→574041195; 574 MiB vs MB unit bug) rejecting valid download | 2026-06-09 | 245e30b |
 
 ## Workflow Config
 
