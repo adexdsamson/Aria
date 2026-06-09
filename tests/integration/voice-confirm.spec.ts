@@ -65,6 +65,7 @@ vi.mock('ai', async (importActual) => {
 // transitionTo directly, plus a thin integration wrapper for the classifier path.
 
 import { handleVoiceConfirmApproval, handleVoiceCancelApproval } from '../../src/main/ipc/voice';
+import { assertTransition } from '../../src/main/approvals/state';
 
 // ─── Shared setup ─────────────────────────────────────────────────────────────
 
@@ -275,6 +276,64 @@ describe('voice-confirm integration (Plan 17-05)', () => {
 
       expect(caughtError).toBeInstanceOf(ApprovalGateError);
       expect((caughtError as ApprovalGateError).code).toBe('not-approved');
+    });
+  });
+
+  // ─── 4. Migration 137 FK check (Plan 17-07 mandate) ──────────────────────────
+
+  describe('migration 137 FK check (Plan 17-07)', () => {
+    it('PRAGMA foreign_key_check returns empty after running all migrations including 137', () => {
+      // Run PRAGMA foreign_key_check — must return empty array (no dangling FKs)
+      // after the table-rebuild in migration 137 (which used PRAGMA legacy_alter_table=ON
+      // to avoid FK rewrite on RENAME, preventing dangling references at DROP).
+      const result = db.pragma('foreign_key_check') as unknown[];
+      expect(result).toHaveLength(0);
+    });
+
+    it('user_version is at least 137 after migrations', () => {
+      const version = db.pragma('user_version', { simple: true }) as number;
+      expect(version).toBeGreaterThanOrEqual(137);
+    });
+  });
+
+  // ─── 5. 'cancelled' CHECK constraint accepted by migration 137 ───────────────
+
+  describe("'cancelled' CHECK constraint (migration 137)", () => {
+    it("INSERT with state='cancelled' is accepted by the CHECK constraint", () => {
+      // Migration 137 adds 'cancelled' to the state CHECK. Verify a raw
+      // INSERT with state='cancelled' succeeds (not rejected by CHECK constraint).
+      const id = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+      expect(() => {
+        db.prepare(
+          `INSERT INTO approval (id, kind, state, created_at, updated_at, idempotency_key)
+           VALUES (?, 'email_send', 'cancelled', datetime('now'), datetime('now'), ?)`,
+        ).run(id, `idem-cancelled-check-${id.slice(0, 8)}`);
+      }).not.toThrow();
+
+      const row = db.prepare('SELECT state FROM approval WHERE id = ?').get(id) as
+        | { state: string }
+        | undefined;
+      expect(row?.state).toBe('cancelled');
+    });
+  });
+
+  // ─── 6. State machine transitions: assertTransition (Plan 17-07) ─────────────
+
+  describe('assertTransition state machine (Plan 17-07)', () => {
+    it("assertTransition('ready', 'cancelled') does NOT throw", () => {
+      expect(() => assertTransition('ready', 'cancelled')).not.toThrow();
+    });
+
+    it("assertTransition('cancelled', 'approved') THROWS invalid-transition", () => {
+      expect(() => assertTransition('cancelled', 'approved')).toThrow(/invalid-transition/);
+    });
+
+    it("assertTransition('cancelled', 'ready') THROWS invalid-transition (cancelled is terminal)", () => {
+      expect(() => assertTransition('cancelled', 'ready')).toThrow(/invalid-transition/);
+    });
+
+    it("assertTransition('ready', 'approved') still works (existing path unaffected)", () => {
+      expect(() => assertTransition('ready', 'approved')).not.toThrow();
     });
   });
 });
