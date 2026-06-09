@@ -248,6 +248,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-kfp | Fix knowledge (pick-folder) double-registration crash on login; 4th/final IPC re-register site (audit complete) | 2026-06-09 | 6c05b8e |
 | 260609-vms | Fix voice model size guard (601882624→574041195; 574 MiB vs MB unit bug) rejecting valid download | 2026-06-09 | 245e30b |
 | 260609-vmd | Voice model: pre-download disk check (skip 574MB re-download) + on-disk 'end' guard (fs.statSync, injectable) | 2026-06-09 | 5e88cae |
+| 260609-htx | Wire cloud STT into live VOICE_FEED_AUDIO (shouldUseCloud→cloudTranscribe whisper-1; local fallback on error) — local whisper too slow for smoke | 2026-06-09 | 934f3f7 |
 
 ## Workflow Config
 
