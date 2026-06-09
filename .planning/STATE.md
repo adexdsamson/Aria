@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
-status: planning
-last_updated: "2026-06-09T19:05:06.762Z"
-last_activity: 2026-06-09
+status: Not started
+last_updated: "2026-06-09T21:15:11.347Z"
+last_activity: 2026-06-09 — Milestone v2.1 roadmap created; Phase 20 is next
 progress:
   total_phases: 3
   completed_phases: 0
