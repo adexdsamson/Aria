@@ -24,6 +24,7 @@ import { KnowledgeFoldersSection } from './KnowledgeFoldersSection';
 import { RagIndexSection } from './RagIndexSection';
 import { SchedulingRulesSection } from './SchedulingRulesSection';
 import { StatusPanel } from './StatusPanel';
+import { VoiceSection } from './VoiceSection';
 import { SubscriptionSection } from './sections/SubscriptionSection';
 import { RestoreLicenseSection } from '../entitlement/RestoreLicenseSection';
 import { UpdatesSection } from './UpdatesSection';
@@ -69,6 +70,7 @@ const SECTIONS: ReadonlyArray<NavSection> = [
       { to: 'scheduling-rules', label: 'Scheduling rules' },
       { to: 'insights', label: 'Insights' },
       { to: 'learned-preferences', label: 'Learned preferences' },
+      { to: 'voice', label: 'Voice' },
     ],
   },
   {
@@ -164,6 +166,7 @@ export function SettingsScreen(): JSX.Element {
           <Route path="background-activity" element={<BehaviourSection />} />
           <Route path="insights" element={<InsightsSection />} />
           <Route path="learned-preferences" element={<LearnedPreferencesSection />} />
+          <Route path="voice" element={<VoiceSection />} />
           <Route path="subscription" element={<SubscriptionSection />} />
           <Route path="restore-license" element={<RestoreLicenseSection />} />
           <Route path="onboarding" element={<BackupRestoreSection />} />
