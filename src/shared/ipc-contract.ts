@@ -202,6 +202,16 @@ export const CHANNELS = {
   VOICE_CANCEL_APPROVAL: 'aria:voice:cancel-approval',     // D-09/D-11: ready→cancelled
   VOICE_GET_PREFS: 'aria:voice:get-prefs',                 // D-16: read voice prefs
   VOICE_SET_PREFS: 'aria:voice:set-prefs',                 // D-16: write voice prefs
+  // Phase 20 — WhatsApp group-tracking (20-01)
+  // Invoke channels (renderer → main):
+  WHATSAPP_LINK: 'aria:whatsapp:link',                     // WA-01: start QR flow (after consent ack, D-07)
+  WHATSAPP_DISCONNECT: 'aria:whatsapp:disconnect',          // WA-04: stop session + cascade delete
+  WHATSAPP_LIST_GROUPS: 'aria:whatsapp:list-groups',        // WA-05: return tracked/untracked group list
+  WHATSAPP_SET_TRACKED: 'aria:whatsapp:set-tracked',        // WA-05: toggle whatsapp_group.tracked
+  WHATSAPP_STATUS: 'aria:whatsapp:status',                  // WA-03: return WhatsAppStatusDto
+  // Push channels (main → renderer via ipcRenderer.on):
+  WHATSAPP_QR_UPDATE: 'aria:whatsapp:qr-update',            // WA-01: QR data-URL + expiry countdown
+  WHATSAPP_STATE_CHANGED: 'aria:whatsapp:state-changed',    // WA-03: connection state transitions
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -426,7 +436,7 @@ export interface TodoistIntegrationStatus {
 }
 
 export interface ProviderAccountDto {
-  providerKey: 'google' | 'microsoft' | 'todoist';
+  providerKey: 'google' | 'microsoft' | 'todoist' | 'whatsapp';
   accountId: string;
   displayEmail: string;
   displayLabel?: string | null;
@@ -835,13 +845,13 @@ export interface AriaApi {
   microsoftForceSync(): Promise<{ ok: boolean; error?: string } | IpcError>;
   providerAccountsList(): Promise<{ rows: ProviderAccountDto[] } | IpcError>;
   providerAccountUpdate(req: {
-    providerKey: 'google' | 'microsoft' | 'todoist';
+    providerKey: 'google' | 'microsoft' | 'todoist' | 'whatsapp';
     accountId: string;
     displayLabel?: string | null;
     displayColor?: string | null;
   }): Promise<{ ok: true } | IpcError>;
   providerAccountDisconnect(req: {
-    providerKey: 'google' | 'microsoft' | 'todoist';
+    providerKey: 'google' | 'microsoft' | 'todoist' | 'whatsapp';
     accountId: string;
   }): Promise<{ ok: true } | IpcError>;
 
@@ -1103,6 +1113,28 @@ export interface AriaApi {
   voiceCancelApproval(req: { approvalId: string }): Promise<{ ok: true } | { error: string }>;
   voiceGetPrefs(): Promise<VoicePrefsDto>;
   voiceSetPrefs(patch: Partial<VoicePrefsPatchDto>): Promise<VoicePrefsDto | { error: string }>;
+
+  // Phase 20 — WhatsApp group-tracking (20-01)
+  // 5 invoke channels (renderer → main via ipcRenderer.invoke):
+  /** WA-01: Start QR linking flow (after consent ack). Caller renders WHATSAPP_QR_UPDATE pushes. */
+  whatsappLink(): Promise<{ ok: true } | IpcError>;
+  /** WA-04: Stop session + cascade-delete all WhatsApp data for this account. */
+  whatsappDisconnect(): Promise<{ ok: true } | IpcError>;
+  /** WA-05: Return all known groups with their tracking state. */
+  whatsappListGroups(): Promise<{ groups: WhatsAppGroupDto[] } | IpcError>;
+  /** WA-05: Toggle tracked flag for a single group JID. */
+  whatsappSetTracked(req: WhatsAppSetTrackedReq): Promise<{ ok: true } | IpcError>;
+  /** WA-03: Return current connection status + account identity. */
+  whatsappStatus(): Promise<WhatsAppStatusDto | IpcError>;
+
+  /**
+   * Phase 20 push subscriptions (ipcRenderer.on, not invoke).
+   * Each returns an unsubscribe function.
+   */
+  /** WA-01: Fired when a new QR is available or refreshed. */
+  onWhatsappQrUpdate?: (cb: (dto: WhatsAppQrUpdateDto) => void) => () => void;
+  /** WA-03: Fired on every session state transition. */
+  onWhatsappStateChanged?: (cb: (dto: WhatsAppStateChangedDto) => void) => () => void;
 }
 
 // Phase 16 / Plan 16-01 — Voice Latency Log DTO (D-06) ---------------------
@@ -1547,6 +1579,16 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   VOICE_CANCEL_APPROVAL: 'voiceCancelApproval',
   VOICE_GET_PREFS: 'voiceGetPrefs',
   VOICE_SET_PREFS: 'voiceSetPrefs',
+  // Phase 20 — WhatsApp group-tracking (20-01)
+  // 5 invoke channels auto-mapped by buildApi(); 2 push channels overridden
+  // in preload with real ipcRenderer.on listeners (like ENTITLEMENT_STATE_CHANGED).
+  WHATSAPP_LINK: 'whatsappLink',
+  WHATSAPP_DISCONNECT: 'whatsappDisconnect',
+  WHATSAPP_LIST_GROUPS: 'whatsappListGroups',
+  WHATSAPP_SET_TRACKED: 'whatsappSetTracked',
+  WHATSAPP_STATUS: 'whatsappStatus',
+  WHATSAPP_QR_UPDATE: 'onWhatsappQrUpdate',
+  WHATSAPP_STATE_CHANGED: 'onWhatsappStateChanged',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1674,3 +1716,65 @@ export interface BackgroundPrefsPatchDto {
   closeToTray?: boolean;
   notificationsEnabled?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 20 — WhatsApp group-tracking DTOs (20-01)
+// ---------------------------------------------------------------------------
+
+import { z as _z_wa } from 'zod';
+
+/**
+ * A WhatsApp group as returned by WHATSAPP_LIST_GROUPS.
+ * `tracked` = true means messages from this group are persisted.
+ */
+export const WhatsAppGroupDto = _z_wa.object({
+  jid: _z_wa.string(),
+  displayName: _z_wa.string(),
+  tracked: _z_wa.boolean(),
+  memberCount: _z_wa.number().nullable(),
+});
+export type WhatsAppGroupDto = _z_wa.infer<typeof WhatsAppGroupDto>;
+
+/**
+ * Session/connection status returned by WHATSAPP_STATUS.
+ * `accountId` is the JID from `creds.me.id` once linked (D-11); null before link.
+ * `displayNumber` is the human-readable phone number extracted from the JID.
+ */
+export const WhatsAppStatusDto = _z_wa.object({
+  status: _z_wa.enum(['ok', 'degraded', 'needs-auth', 'disconnected']),
+  accountId: _z_wa.string().nullable(),
+  displayNumber: _z_wa.string().nullable(),
+});
+export type WhatsAppStatusDto = _z_wa.infer<typeof WhatsAppStatusDto>;
+
+/**
+ * QR code update pushed from main via WHATSAPP_QR_UPDATE.
+ * `dataUrl` is the base64 data-URL from qrcode.toDataURL().
+ * `expiresAt` is an ISO-8601 string for the renderer countdown timer (or null
+ * if not available).
+ */
+export const WhatsAppQrUpdateDto = _z_wa.object({
+  dataUrl: _z_wa.string(),
+  expiresAt: _z_wa.string().nullable(),
+});
+export type WhatsAppQrUpdateDto = _z_wa.infer<typeof WhatsAppQrUpdateDto>;
+
+/**
+ * Request payload for WHATSAPP_SET_TRACKED.
+ * Setting `tracked` to false immediately stops ingestion for the group.
+ */
+export const WhatsAppSetTrackedReq = _z_wa.object({
+  jid: _z_wa.string(),
+  tracked: _z_wa.boolean(),
+});
+export type WhatsAppSetTrackedReq = _z_wa.infer<typeof WhatsAppSetTrackedReq>;
+
+/**
+ * State-change payload pushed from main via WHATSAPP_STATE_CHANGED.
+ * Mirrors WhatsAppStatusDto but is emitted on every transition.
+ */
+export const WhatsAppStateChangedDto = _z_wa.object({
+  status: _z_wa.enum(['ok', 'degraded', 'needs-auth', 'disconnected']),
+  accountId: _z_wa.string().nullable(),
+});
+export type WhatsAppStateChangedDto = _z_wa.infer<typeof WhatsAppStateChangedDto>;

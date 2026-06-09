@@ -1,4 +1,4 @@
-export type ProviderKey = 'google' | 'microsoft' | 'todoist';
+export type ProviderKey = 'google' | 'microsoft' | 'todoist' | 'whatsapp';
 
 export interface DeltaResult<T> {
   items: T[];

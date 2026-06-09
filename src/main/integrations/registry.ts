@@ -37,6 +37,9 @@ export class ProviderRegistry {
     if (providerKey === 'todoist') {
       throw new ProviderNotFoundError('todoist-provider-is-task-only');
     }
+    if (providerKey === 'whatsapp') {
+      throw new ProviderNotFoundError('whatsapp-uses-session-manager');
+    }
     const key = providerKey + ':' + accountId;
     const cached = this.providers.get(key);
     if (cached) {

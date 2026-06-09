@@ -139,7 +139,7 @@ export function listProviderAccounts(
 
 export function getProviderAccount(
   db: Db,
-  providerKey: 'google' | 'microsoft',
+  providerKey: 'google' | 'microsoft' | 'todoist' | 'whatsapp',
   accountId: string,
 ): ProviderAccountRow | null {
   const row = db

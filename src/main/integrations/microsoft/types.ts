@@ -27,7 +27,7 @@ export interface MicrosoftSelfIdentity {
 }
 
 export interface ProviderAccountInput {
-  providerKey: 'google' | 'microsoft' | 'todoist';
+  providerKey: 'google' | 'microsoft' | 'todoist' | 'whatsapp';
   accountId: string;
   displayEmail: string;
   displayLabel?: string | null;
