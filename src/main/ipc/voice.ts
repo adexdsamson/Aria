@@ -32,6 +32,7 @@
  * This file NEVER reaches the write-path chokepoints directly from voice modules.
  * VOICE_CONFIRM_APPROVAL calls voiceConfirm which routes through assertApproved.
  */
+import * as fs from 'node:fs';
 import type { IpcMain } from 'electron';
 import type { Logger } from 'pino';
 import { CHANNELS } from '../../shared/ipc-contract';
@@ -39,6 +40,9 @@ import type { DbHolder } from './onboarding';
 import type { SttSidecarManager } from '../voice/stt/sidecar-manager';
 import type { ModelDownloadController } from '../voice/download/model-download';
 import { getVoiceModelStatus, getVoicePrefs, writeVoicePref, readVoicePref } from '../voice/prefs';
+import type { PQueueLike } from '../voice/cloud-stt';
+import type { cloudTranscribe as CloudTranscribeFn, shouldUseCloud as ShouldUseCloudFn } from '../voice/cloud-stt';
+import type { writePcmToWav as WritePcmToWavFn, tempWavPath as TempWavPathFn } from '../voice/stt/wav';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 import { createVoiceSessionManager } from '../voice/voice-session-manager';
 import { z } from 'zod';
@@ -214,6 +218,27 @@ export interface VoiceHandlersDeps {
       t: number;
     }): void;
   };
+  /**
+   * Cloud STT gate + transcription functions (D-13/D-15).
+   * Injected for testability; defaults to real cloud-stt.ts at runtime.
+   */
+  cloudStt?: {
+    shouldUseCloud: typeof ShouldUseCloudFn;
+    cloudTranscribe: typeof CloudTranscribeFn;
+  };
+  /**
+   * WAV temp-file utilities (injected for testability).
+   * Defaults to real wav.ts at runtime.
+   */
+  writePcm?: {
+    writePcmToWav: typeof WritePcmToWavFn;
+    tempWavPath: typeof TempWavPathFn;
+  };
+  /**
+   * p-queue instance for LLM call serialisation in shouldUseCloud (D-13/D-15).
+   * Injected by index.ts as scheduler.queue; defaults to a passthrough stub.
+   */
+  llmQueue?: PQueueLike;
 }
 
 /**
@@ -249,6 +274,31 @@ export function registerVoiceHandlers(
   deps: VoiceHandlersDeps,
 ): void {
   const { logger, sttSidecar, downloadController } = deps;
+
+  // Resolve injectable deps — real implementations are imported lazily so that
+  // test harnesses can inject mocks without pulling in the cloud/wav modules.
+  // The `let` bindings are reassigned asynchronously once the dynamic imports
+  // resolve; the VOICE_FEED_AUDIO handler awaits cloudSttRef/wavUtilsRef
+  // using resolved local captures set before any handler fires.
+  //
+  // These vars are captured by the handler closure below.
+  let cloudSttResolved: VoiceHandlersDeps['cloudStt'] = deps.cloudStt;
+  let wavUtilsResolved: VoiceHandlersDeps['writePcm'] = deps.writePcm;
+  const llmQueue: PQueueLike = deps.llmQueue ?? { add: async (fn) => fn() };
+
+  // Kick off dynamic imports in parallel; handlers reference the resolved values
+  // via the closures above. In practice the imports complete well before any
+  // VOICE_FEED_AUDIO arrives (app startup takes longer than module resolution).
+  if (!cloudSttResolved) {
+    void import('../voice/cloud-stt').then((m) => {
+      cloudSttResolved = m;
+    });
+  }
+  if (!wavUtilsResolved) {
+    void import('../voice/stt/wav').then((m) => {
+      wavUtilsResolved = m;
+    });
+  }
 
   // Phase 16 / Plan 16-04a: Wire the real VoiceSessionManager if not already provided.
   // Creates the manager from available deps (db, emitToRenderer, sessionAbortControllers)
@@ -303,8 +353,49 @@ export function registerVoiceHandlers(
       deps.emitToRenderer?.(CHANNELS.VOICE_STATE_CHANGED, { state: 'listening' });
       deps.emitToRenderer?.(CHANNELS.VOICE_STATE_CHANGED, { state: 'processing' });
 
-      // Forward to sidecar — T-15-14: payload is raw PCM bytes only
-      const delta = await sttSidecar.transcribe(pcm);
+      // ─── Cloud STT routing (D-13/D-15) ────────────────────────────────────
+      //
+      // shouldUseCloud() is the SOLE gate for cloud routing (D-15 fail-safe).
+      // Sensitivity-flagged or low-confidence turns are forced local regardless
+      // of the useCloud pref.  We pass '' as context because at this point no
+      // transcript exists for the current turn yet.
+      const prefs = getVoicePrefs(deps.dbHolder.db);
+      const useCloudPath =
+        cloudSttResolved != null && wavUtilsResolved != null
+          ? await cloudSttResolved.shouldUseCloud('', llmQueue, prefs.useCloud)
+          : false;
+
+      let delta: import('../../shared/voice-types').TranscriptDelta;
+
+      if (useCloudPath && cloudSttResolved != null && wavUtilsResolved != null) {
+        // Cloud path: PCM → temp WAV → cloudTranscribe → delta
+        const wavPath = wavUtilsResolved.tempWavPath();
+        let cloudResult: { text: string } | { error: string } | null = null;
+        try {
+          wavUtilsResolved.writePcmToWav(pcm, 16000, wavPath);
+          const audioBuffer = fs.readFileSync(wavPath);
+          const abortCtrl = new AbortController();
+          cloudResult = await cloudSttResolved.cloudTranscribe(audioBuffer, abortCtrl.signal);
+        } finally {
+          try { fs.unlinkSync(wavPath); } catch { /* ignore — temp file cleanup */ }
+        }
+
+        if (cloudResult != null && 'text' in cloudResult) {
+          // Cloud succeeded — wrap into TranscriptDelta shape
+          delta = { text: cloudResult.text, final: true };
+        } else {
+          // Cloud returned { error } — fall back to local sidecar (T-htx-02)
+          const errMsg = cloudResult != null && 'error' in cloudResult ? cloudResult.error : 'unknown';
+          logger.warn(
+            { scope: 'voice.feedAudio', err: errMsg },
+            'cloudTranscribe failed, falling back to local sidecar',
+          );
+          delta = await sttSidecar.transcribe(pcm);
+        }
+      } else {
+        // Local path (default) — T-15-14: payload is raw PCM bytes only
+        delta = await sttSidecar.transcribe(pcm);
+      }
 
       // Push transcript back to renderer
       deps.emitToRenderer?.(CHANNELS.VOICE_TRANSCRIPT_DELTA, delta);

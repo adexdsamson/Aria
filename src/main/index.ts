@@ -433,6 +433,7 @@ async function bootstrap(): Promise<void> {
     sttSidecar,
     downloadController,
     emitToRenderer: (channel, payload) => voiceEmitter?.(channel, payload),
+    llmQueue: scheduler.queue,
   });
 
   // Register powerMonitor lifecycle for sidecar + download (D-03/D-09).
