@@ -147,6 +147,7 @@ export function createVoiceSessionManager(
       db,
       embedClient: deps.embedClient as EmbedClient,
       vectorStore: deps.vectorStore as VectorStore,
+      logger: deps.logger,
     };
 
     await streamVoiceAnswer(streamDeps, {

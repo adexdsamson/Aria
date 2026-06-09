@@ -516,10 +516,10 @@ export interface StreamVoiceAnswerArgs {
  * NOT added to the AnswerService interface (standalone module-level export).
  */
 export async function streamVoiceAnswer(
-  deps: Pick<AnswerServiceDeps, 'db' | 'embedClient' | 'vectorStore'>,
+  deps: Pick<AnswerServiceDeps, 'db' | 'embedClient' | 'vectorStore'> & { logger?: Logger },
   args: StreamVoiceAnswerArgs,
 ): Promise<void> {
-  const { db, embedClient, vectorStore } = deps;
+  const { db, embedClient, vectorStore, logger } = deps;
   const { question, threadId, signal, onChunk, onDone } = args;
 
   // ASVS V5: 4096-char question cap — mirrors ask()
@@ -539,16 +539,16 @@ export async function streamVoiceAnswer(
       question,
       { topK: 10 },
     );
-  } catch {
-    // Retrieval failure — stream empty response and persist an assistant turn
-    onDone('');
-    appendTurn(db, {
-      threadId,
-      role: 'assistant',
-      text: '',
-      routing: { route: 'LOCAL', reason: 'voice-answer:retrieve-failed', sensitivity: 'none' },
-    });
-    return;
+  } catch (retrieveErr: unknown) {
+    // [voice.answer] Retrieval failed — degrading to no-context answer.
+    // nomic-embed-text may not be installed; llama3.1:8b still answers from
+    // question alone. Do NOT bail here (would produce zero audio).
+    logger?.warn(
+      { scope: 'voice.answer', err: (retrieveErr as Error)?.message ?? String(retrieveErr) },
+      'voice.answer: retrieval failed, degrading to empty context',
+    );
+    retrieved = [];
+    // Do NOT return — fall through to streamText below.
   }
 
   // Load thread history for context (D-11: lastN=6 matches ask() pattern)
@@ -580,7 +580,10 @@ export async function streamVoiceAnswer(
       // D-03: fast abort (<~500ms) redirects here instead of onAbort per AI SDK
       // #8088. spokenSoFar is safe in the accumulator above regardless of which
       // error path fires.
-      void error;
+      logger?.warn(
+        { scope: 'voice.answer', err: (error as Error)?.message ?? String(error) },
+        'voice.answer: streamText error',
+      );
     },
   });
 
@@ -599,4 +602,9 @@ export async function streamVoiceAnswer(
 
   // Notify caller with full accumulated text (for D-12 barge-in context)
   onDone(spokenSoFar);
+  // [voice.answer] onDone fired — log text length so empty answers are visible.
+  logger?.debug(
+    { scope: 'voice.answer', textLen: spokenSoFar.length },
+    'voice.answer: onDone',
+  );
 }
