@@ -1,21 +1,23 @@
 /**
- * D-13 read-only guard — extends the Phase-14 voice-routes-through-staging
- * ratchet to cover Phase 16 streaming modules (src/main/voice/ + src/renderer/features/voice/).
+ * D-13/D-17 write-path guard — extends the Phase-14 voice-routes-through-staging
+ * ratchet to cover Phase 16 streaming modules and Phase 17 write-capable modules
+ * (src/main/voice/ + src/renderer/features/voice/).
  *
- * Proves the Phase 16 conversational streaming loop (the new surface area)
- * cannot accidentally reach write paths. The voice streaming modules must
- * never import or call write chokepoints:
- *   - assertApproved
- *   - voiceConfirm
- *   - sendApprovedEmail
- *   - applyCalendarChange
- *   - pushApprovedMeetingActions
+ * Phase 16 proved the streaming loop cannot accidentally reach write paths.
+ * Phase 17 makes voice write-capable: voice intent is routed through voiceConfirm
+ * (the allowed seam, called from ipc/voice.ts which is OUTSIDE the scan scope).
+ * Voice modules themselves must still never import raw write chokepoints.
+ *
+ * D-17 boundary: voiceConfirm is intentionally NOT banned here (Phase 17 D-17):
+ * it is the approved voice seam, called from ipc/voice.ts which is OUTSIDE the
+ * scan scope (src/main/voice/**). The raw write chokepoints below remain banned
+ * from all voice modules.
  *
  * W-1 MISSING-DIR GUARD: src/main/voice/ and src/renderer/features/voice/
  * may not exist in all CI contexts. Each walk() call guards with
  * fs.existsSync(dir) and returns [] if the directory is absent, so the
  * spec stays green even if either dir is absent — and fails the moment
- * a future voice file violates the read-only rule.
+ * a future voice file violates the no-raw-write-chokepoint rule.
  *
  * Structural template: tests/static/voice-routes-through-staging.spec.ts
  * (walk + stripComments + identifier-boundary RE pattern — copied verbatim
@@ -54,19 +56,22 @@ function stripComments(src: string): string {
 }
 
 /**
- * D-13: Phase 16 extends the Phase-14 chokepoint set with assertApproved
- * and voiceConfirm. Voice streaming modules must call none of these.
+ * D-13/D-17: Voice modules stage approvals via voiceConfirm (allowed, called from
+ * ipc/voice.ts outside scan scope) but must never directly call raw write
+ * chokepoints. voiceConfirm is intentionally NOT in this list (D-17).
  */
 const WRITE_CHOKEPOINTS = [
   'sendApprovedEmail',
   'applyCalendarChange',
   'pushApprovedMeetingActions',
   'assertApproved',
-  'voiceConfirm',
+  // 'voiceConfirm' intentionally omitted — Phase 17 D-17: voiceConfirm is the
+  // approved voice seam. It is called from ipc/voice.ts (outside scan scope),
+  // so voice modules may route THROUGH it but must not import raw chokepoints.
 ] as const;
 
-describe('Phase 16 voice streaming modules are read-only (D-13)', () => {
-  it('no file under src/main/voice/** or src/renderer/features/voice/** directly calls or imports a write chokepoint', () => {
+describe('Phase 17 voice modules stage approvals via voiceConfirm (allowed) but must never directly call raw write chokepoints', () => {
+  it('no file under src/main/voice/** or src/renderer/features/voice/** directly calls or imports a raw write chokepoint', () => {
     const mainFiles = walk(MAIN_VOICE_ROOT);
     const rendererFiles = walk(RENDERER_VOICE_ROOT);
     const allFiles = [...mainFiles, ...rendererFiles];
