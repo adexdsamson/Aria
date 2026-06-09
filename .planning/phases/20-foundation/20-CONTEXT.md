@@ -37,7 +37,8 @@ Link a WhatsApp **personal** account to Aria via QR scan, let the user pick whic
 - **D-11:** `account_id` = the **phone JID** from `creds.me.id` after link, so AccountRow displays the number with no separate lookup.
 - **D-12:** Ship **QR only** in v2.1. Pairing-code linking is a future enhancement, explicitly not in this phase.
 - **D-13:** Set **`syncFullHistory:false` explicitly** in `makeWASocket` config (document intent; prevent an accidental first-link write storm) — not left as default-undefined.
-- **D-14:** Place the **30-day rolling retention sweep in the existing `sweep-cron`** (recommended by ARCHITECTURE.md), timed to avoid overlap with the 03:00 nightly socket recycle and the 05:00 digest cron.
+- **D-14:** Place the **30-day rolling retention sweep in a dedicated WhatsApp retention cron**, timed to avoid overlap with the nightly socket recycle and the 05:00 digest cron.
+  - **Addendum (2026-06-09, post-research reconciliation):** Phase research found the existing `sweep-cron.ts` is knowledge-folder-specific **and already runs at 03:00**, which collides with the planned 03:00 socket recycle. Reconciled per D-14's intent (a 30-day retention sweep), not its literal wording: implement a **sibling `src/main/whatsapp/retention.ts` cron at 03:30** rather than extending the knowledge-folder sweep-cron. Honors the "avoid overlap" constraint.
 
 ### Claude's Discretion
 - Exact bullet wording of the consent-modal risk copy and the "no history before link" one-sentence notice (within the research-locked structure).
