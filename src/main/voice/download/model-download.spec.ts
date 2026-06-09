@@ -185,6 +185,9 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
       helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
+      // Pre-download path (no '/models/') is absent → 0; the file the 'end' event
+      // reports ('/fake/userData/models/...') reads at full size → guard passes.
+      fileSize: (p) => (p.includes('models') ? DISCLOSED_MODEL_SIZE_BYTES : 0),
     });
 
     await ctrl.start();
@@ -197,6 +200,36 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
     expect(status.ready).toBe(true);
     expect(status.state).toBe(1);
     expect(status.path).toBeTruthy();
+  });
+
+  it('start() skips the network download and flips readiness when the model is already on disk at full size', async () => {
+    const emitToRenderer = vi.fn();
+    const fakeNdh = makeFakeNdh();
+
+    const ctrl = createModelDownload({
+      db,
+      emitToRenderer,
+      helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
+      destDirResolver: () => '/fake/userData',
+      registerLifecycle: () => () => {},
+      // Model already present on disk at full size → no re-download.
+      fileSize: () => DISCLOSED_MODEL_SIZE_BYTES,
+    });
+
+    await ctrl.start();
+    await new Promise((r) => setImmediate(r));
+
+    // No network download should have started.
+    expect(fakeNdh.start).not.toHaveBeenCalled();
+
+    // Readiness flipped and a done progress event emitted.
+    const status = getVoiceModelStatus(db);
+    expect(status.ready).toBe(true);
+    expect(status.state).toBe(1);
+    const doneCall = emitToRenderer.mock.calls.find(
+      ([ch, p]) => ch === 'aria:voice:model-progress' && (p as { done?: boolean })?.done === true,
+    );
+    expect(doneCall).toBeTruthy();
   });
 
   it('end event with size mismatch → readiness NOT flipped (T-15-08 supply-chain guard)', async () => {
@@ -213,6 +246,8 @@ describe('model-download manager (Whisper model — unit, no network)', () => {
       helperFactory: () => fakeNdh as unknown as import('node-downloader-helper').DownloaderHelper,
       destDirResolver: () => '/fake/userData',
       registerLifecycle: () => () => {},
+      // On-disk file reads at the WRONG size → T-15-08 guard must reject it.
+      fileSize: (p) => (p.includes('models') ? DISCLOSED_MODEL_SIZE_BYTES + 1234 : 0),
     });
 
     await ctrl.start();

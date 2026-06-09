@@ -22,6 +22,7 @@
  * The HF model URL is a bare HTTPS GET for a binary file — NOT a cloud
  * STT/TTS endpoint — so the VOICE-04 no-cloud-audio ratchet does not trigger.
  */
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
 import { DownloaderHelper } from 'node-downloader-helper';
@@ -97,6 +98,12 @@ export interface ModelDownloadDeps {
    * Defaults to registerLifecycleCallbacks from src/main/lifecycle/powerMonitor.ts.
    */
   registerLifecycle?: (cbs: LifecycleCallbacks) => () => void;
+  /**
+   * Reads the on-disk byte size of a file, or 0 if it does not exist / errors.
+   * Injectable so unit tests can simulate a present/complete model without
+   * writing a 574 MB fixture. Defaults to a real fs.statSync read.
+   */
+  fileSize?: (filePath: string) => number;
 }
 
 /** Public controller returned by createModelDownload. */
@@ -127,6 +134,7 @@ export function createModelDownload(deps: ModelDownloadDeps): ModelDownloadContr
     emitToRenderer,
     helperFactory = defaultHelperFactory,
     destDirResolver = defaultDestDirResolver,
+    fileSize = defaultFileSize,
     registerLifecycle = registerLifecycleCallbacks,
   } = deps;
 
@@ -167,17 +175,21 @@ export function createModelDownload(deps: ModelDownloadDeps): ModelDownloadContr
 
     helper.on('end', (info: unknown) => {
       try {
-        const i = info as { filePath?: string; totalSize?: number };
+        const i = info as { filePath?: string };
         const filePath = i?.filePath ?? path.join(destDirResolver(), MODEL_FILENAME);
-        const reportedSize = i?.totalSize ?? 0;
 
-        // T-15-08 supply-chain guard: validate final file size
-        if (reportedSize !== DISCLOSED_MODEL_SIZE_BYTES) {
+        // T-15-08 supply-chain guard: validate the ACTUAL on-disk file size, not
+        // node-downloader-helper's self-reported total (NDH under-reports — often
+        // 0 — when resuming an already-complete file). Reading from disk also
+        // validates the exact artifact the sidecar will load.
+        const actualSize = fileSize(filePath);
+
+        if (actualSize !== DISCLOSED_MODEL_SIZE_BYTES) {
           emitToRenderer?.(CHANNELS.VOICE_MODEL_PROGRESS, {
-            receivedBytes: reportedSize,
+            receivedBytes: actualSize,
             totalBytes: DISCLOSED_MODEL_SIZE_BYTES,
             error: true,
-            errorMessage: `Size mismatch: expected ${DISCLOSED_MODEL_SIZE_BYTES}, got ${reportedSize}`,
+            errorMessage: `Size mismatch: expected ${DISCLOSED_MODEL_SIZE_BYTES}, got ${actualSize}`,
           } satisfies ModelDownloadProgress);
           return; // do NOT flip readiness
         }
@@ -190,7 +202,7 @@ export function createModelDownload(deps: ModelDownloadDeps): ModelDownloadContr
         }
 
         emitToRenderer?.(CHANNELS.VOICE_MODEL_PROGRESS, {
-          receivedBytes: reportedSize,
+          receivedBytes: actualSize,
           totalBytes: DISCLOSED_MODEL_SIZE_BYTES,
           done: true,
         } satisfies ModelDownloadProgress);
@@ -221,6 +233,30 @@ export function createModelDownload(deps: ModelDownloadDeps): ModelDownloadContr
     },
 
     async start() {
+      // Fast path: if the model is already on disk at full size, validate and
+      // flip readiness WITHOUT re-downloading 574 MB. Covers a prior download
+      // that completed but never flipped readiness (e.g. the old size-guard bug),
+      // and the case where node-downloader-helper would otherwise restart from 0%
+      // instead of recognising the complete file.
+      const existingPath = path.join(destDirResolver(), MODEL_FILENAME);
+      try {
+        if (fileSize(existingPath) === DISCLOSED_MODEL_SIZE_BYTES) {
+          try {
+            if (db) setVoiceModelReady(db, existingPath);
+          } catch {
+            // non-fatal — DB may not be open
+          }
+          emitToRenderer?.(CHANNELS.VOICE_MODEL_PROGRESS, {
+            receivedBytes: DISCLOSED_MODEL_SIZE_BYTES,
+            totalBytes: DISCLOSED_MODEL_SIZE_BYTES,
+            done: true,
+          } satisfies ModelDownloadProgress);
+          return; // already have the model — no network download
+        }
+      } catch {
+        // stat/exists failed — fall through to a normal download
+      }
+
       const helper = getOrCreateHelper();
 
       // Register powerMonitor pause/resume (D-09)
@@ -260,6 +296,15 @@ export function createModelDownload(deps: ModelDownloadDeps): ModelDownloadContr
 
 function defaultDestDirResolver(): string {
   return app.getPath('userData');
+}
+
+/** Real on-disk size read; 0 when the file is absent or unreadable. */
+function defaultFileSize(filePath: string): number {
+  try {
+    return fs.statSync(filePath).size;
+  } catch {
+    return 0;
+  }
 }
 
 function defaultHelperFactory(url: string, destDir: string): DownloaderHelper {
