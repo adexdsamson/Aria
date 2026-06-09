@@ -250,6 +250,7 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-vmd | Voice model: pre-download disk check (skip 574MB re-download) + on-disk 'end' guard (fs.statSync, injectable) | 2026-06-09 | 5e88cae |
 | 260609-htx | Wire cloud STT into live VOICE_FEED_AUDIO (shouldUseCloud→cloudTranscribe whisper-1; local fallback on error) — local whisper too slow for smoke | 2026-06-09 | 934f3f7 |
 | 260609-j2b | Make VoicePTTButton lazy-download gate cloud-aware — skip local 574MB model modal when cloud audio enabled (fails closed) | 2026-06-09 | 8b253f3 |
+| 260609-jn0 | Fix STT-audio cloud gate: shouldUseCloud('') always failed to local (classify empty→conf<0.6); now consent-gated (prefs.useCloud). Follow-up to htx | 2026-06-09 | 3f80e08 |
 
 ## Workflow Config
 
