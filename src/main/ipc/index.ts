@@ -659,6 +659,26 @@ export function registerHandlers(
     voice17Channels.forEach((c) => skip.add(c));
   }
 
+  // Phase 20 — WhatsApp group-tracking IPC stubs (5 invoke + 2 push).
+  // Pre-unlock stubs so handler-count test passes. Real wiring happens in
+  // main/index.ts bootPoll via removeHandler(WHATSAPP_CHANNELS) + registerWhatsAppHandlers.
+  // Pattern mirrors knowledgeChannels above (RESEARCH.md Pattern 2).
+  const whatsappInvokeChannels = [
+    CHANNELS.WHATSAPP_LINK,
+    CHANNELS.WHATSAPP_DISCONNECT,
+    CHANNELS.WHATSAPP_LIST_GROUPS,
+    CHANNELS.WHATSAPP_SET_TRACKED,
+    CHANNELS.WHATSAPP_STATUS,
+  ];
+  if (!whatsappInvokeChannels.every((c) => skip.has(c))) {
+    for (const c of whatsappInvokeChannels) {
+      if (!skip.has(c)) {
+        ipcMain.handle(c, () => ({ ok: false, error: 'db-locked' }));
+      }
+    }
+    whatsappInvokeChannels.forEach((c) => skip.add(c));
+  }
+
   // Phase 12 / Phase 15 — push-event channel stubs.
   // These channels are MAIN → RENDERER push events (main calls webContents.send).
   // ipcMain.handle registrations are stubs to satisfy the handler-count test;
@@ -670,6 +690,9 @@ export function registerHandlers(
     CHANNELS.VOICE_TRANSCRIPT_DELTA,
     CHANNELS.VOICE_STATE_CHANGED,
     CHANNELS.VOICE_MODEL_PROGRESS,
+    // Phase 20 — WhatsApp push channels (main → renderer via webContents.send)
+    CHANNELS.WHATSAPP_QR_UPDATE,
+    CHANNELS.WHATSAPP_STATE_CHANGED,
   ];
   for (const c of pushOnlyChannels) {
     if (!skip.has(c)) {
