@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Voice Interface
 status: executing
-last_updated: "2026-06-09T06:53:03.317Z"
+last_updated: "2026-06-09T07:31:09.482Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 6
@@ -33,7 +33,8 @@ Plan: 7 of 7 (Plans 01–05 complete)
 **Plan 04:** Complete. cloud-stt.ts (cloudTranscribe() D-13 whisper-1 wrapper + shouldUseCloud() D-15 fail-safe local gate); real VOICE_GET/SET_PREFS handlers replacing Plan-01 stubs (D-16); D-14 consent in settings KV only (action_audit_log is a VIEW). 9 cloud-stt.spec.ts tests green; handler-count 4/4; typecheck flat 84 baseline.
 **Plan 05:** Complete. VOICE_CONFIRM/CANCEL_APPROVAL stubs → real handlers; confirm-classifier (generateObject+Zod {confirm|cancel|ambiguous}); voiceConfirm seam wired live; pendingApprovalId in useVoiceSession; bargeIn-to-cancel (D-10); useVoiceConfirm.ts hook created (triggerReadBack/cancel). 10 integration tests green; renderer voice 22/22; ratchet PASS; typecheck flat 84 baseline.
 **Plan 06:** Complete. VoiceSection.tsx (D-16/VOICE-08): speed/voiceId/useCloud controls + D-14 cloud consent modal (OpenAI Whisper disclosure; pendingCloudEnableRef defers IPC write until user clicks "I Understand, Enable") + D-15 sensitivity-guarantee info line. Wired into SettingsScreen Behaviour NavSection (route='voice'). ApprovalCard: VoiceConfirmButton disabled when forceExplicit (D-07) + always-visible Cancel button for ready rows calling voiceCancelApproval (D-09/D-12). isTerminal already included 'cancelled' from Plan 01. Typecheck flat 84 baseline.
-**Status:** Executing Plan 07 (D-17 ratchet update + integration + human-verify)
+**Plan 07 (partial):** Autonomous tasks complete. D-17 ratchet updated (voiceConfirm removed from WRITE_CHOKEPOINTS; raw chokepoints still banned). voice-write-path.spec.ts (5 tests, SC2 no-bypass proof) + voice-confirm.spec.ts extended (17 tests, SC3/D-11 + migration 137 FK check). Commits d84579a + 9915b2d. PAUSED at human-verify checkpoint (checkpoint:human-verify SC1–SC5 live acoustic).
+**Status:** PAUSED — Plan 07 at human-verify checkpoint (SC1–SC5 live acoustic + visual)
 **Last activity:** 2026-06-09
 
 **Open verification debts (Phase 15):**
