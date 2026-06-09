@@ -38,7 +38,7 @@ Plan: 7 of 7 complete (sequential/no-worktree; node_modules intact throughout)
 **Plan 06:** Complete. VoiceSection.tsx (D-16/VOICE-08): speed/voiceId/useCloud controls + D-14 cloud consent modal (OpenAI Whisper disclosure; pendingCloudEnableRef defers IPC write until user clicks "I Understand, Enable") + D-15 sensitivity-guarantee info line. Wired into SettingsScreen Behaviour NavSection (route='voice'). ApprovalCard: VoiceConfirmButton disabled when forceExplicit (D-07) + always-visible Cancel button for ready rows calling voiceCancelApproval (D-09/D-12). isTerminal already included 'cancelled' from Plan 01. Typecheck flat 84 baseline.
 **Plan 07 (partial):** Autonomous tasks complete. D-17 ratchet updated (voiceConfirm removed from WRITE_CHOKEPOINTS; raw chokepoints still banned). voice-write-path.spec.ts (5 tests, SC2 no-bypass proof) + voice-confirm.spec.ts extended (17 tests, SC3/D-11 + migration 137 FK check). Commits d84579a + 9915b2d. PAUSED at human-verify checkpoint (checkpoint:human-verify SC1–SC5 live acoustic).
 **Status:** PAUSED — Plan 07 at human-verify checkpoint (SC1–SC5 live acoustic + visual)
-**Last activity:** 2026-06-09
+**Last activity:** 2026-06-09 - Completed quick task 260609-poa: fix voice answer output (lazy-init VoiceSessionManager + ref-count IPC subscription)
 
 **Open verification debts (Phase 15):**
 
@@ -236,9 +236,9 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit |
-|---|-------------|------|--------|
-| 260523-a5w | Settings integrations cleanup + calendar fetch fix | 2026-05-23 | a70936f / 968821c / 32e90b2 |
+| # | Description | Date | Commit | Status |
+|---|-------------|------|--------|--------|
+| 260523-a5w | Settings integrations cleanup + calendar fetch fix | 2026-05-23 | a70936f / 968821c / 32e90b2 | |
 | 260523-eaf | Onboarding name personalization (5-step wizard) | 2026-05-23 | 74af0e8 |
 | 260523-f73 | Bake OAuth credentials into production build | 2026-05-23 | 0181d18 |
 | 260601-nxh | Fix production `dbHolder is not defined` crash | 2026-06-01 | da2d936 |
@@ -256,7 +256,8 @@ Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead 
 | 260609-khr | Fix cloudTranscribe auth: bare `openai` provider read OPENAI_API_KEY env (unset) → 401 → silent local fallback; now createOpenAI({apiKey:getFrontierKey('openai')}) + route=cloud\|local log | 2026-06-09 | 75231e7 |
 | 260609-lq3 | THE capstone — wire orphaned mic-capture→STT feed (missing 15-05): new useVoiceCapture hook (start-on-listening→buffer PCM→voiceFeedAudio on turn-end) mounted in App.tsx. Verifier 6/6; live acoustic = Needs Review | 2026-06-09 | 0b89ac1 |
 | 260609-fast | (gsd-fast) Fix p-queue default-import interop in folder-watcher.ts — `new PQueue()` threw "PQueueImport is not a constructor", knowledge-lifecycle failed every boot; mirrored scheduler.ts .default normalization | 2026-06-09 | c12d188 |
-| 260609-o8e | Wire normal voice turn transcript→answer: setTranscript else-branch now calls voiceFeedAnswer({sessionId,question}) → startAnswer→streamVoiceAnswer→TTS (was a no-op stub). Verifier 4/5; live round-trip = Needs Review. KNOWN GAP: VoiceIntentRouter still orphaned (multi-intent triage/schedule/draft unwired) | 2026-06-09 | 751d40a |
+| 260609-o8e | Wire normal voice turn transcript→answer: setTranscript else-branch now calls voiceFeedAnswer({sessionId,question}) → startAnswer→streamVoiceAnswer→TTS (was a no-op stub). Verifier 4/5; live round-trip = Needs Review. KNOWN GAP: VoiceIntentRouter still orphaned (multi-intent triage/schedule/draft unwired) | 2026-06-09 | 751d40a | |
+| 260609-poa | Fix voice answer output: lazy-init VoiceSessionManager (db-null skip trap — created at register-time before unlock → hasManager:false stub forever; now ensureVoiceSessionManager() called from FEED_ANSWER/ABORT/LATENCY_MARK handlers post-unlock) + ref-count IPC subscription (5 useVoiceSession consumers each registered onVoiceTranscript → 5× voiceFeedAnswer per transcript; now 0→1 install / N→0 teardown). Verifier caught ref-count bypass (hook called getState().subscribeToIpc not store.subscribeToIpc); fixed. Verifier 4/4 PASS. Diag logs preserved. FOLLOW-UP: stale JSDoc L183; live round-trip = Needs Review | 2026-06-09 | 1771ce0 / 4aab0b5 / 662045d | Verified |
 
 ## Workflow Config
 
