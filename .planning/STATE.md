@@ -23,9 +23,12 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 17 (voice-confirm-writes-through-the-gate) — EXECUTING
-Plan: 7 of 7 (Plans 01–05 complete)
-**Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02)
+Phase: 17 (voice-confirm-writes-through-the-gate) — CODE-COMPLETE (live acoustic smoke deferred)
+Plan: 7 of 7 complete (sequential/no-worktree; node_modules intact throughout)
+**Status:** Phase 17 code-complete. Voice is now WRITE-CAPABLE: VoiceIntentRouter (keyword→per-domain, dispatches same in-process services) → stage 'ready' → resolved-entity read-back → confirm-classifier → voiceConfirm→transitionTo→assertApproved (stamps 'voice-explicit'); cancel→'cancelled' (migration 137); cloud STT + non-streaming answer behind consent (sensitive→local fail-safe); VoiceSection settings; ApprovalCard voice-confirm + Cancel + forced-suppression.
+**Verifier:** 5/5 automated must-haves, 101 tests green / 9 specs, NO code gaps. No-bypass guarantee proven twice (D-17 ratchet 0 offenders + voice-write-path integration: forced→voice-forbidden-forced, cancel blocks write). Typecheck flat 84 baseline, 0 new across all 7 plans.
+**Open Phase-17 human-verify (run `pnpm dev` + mic/speakers):** SC1 voice /ask · SC2 schedule/draft read-back→"yes"→write · SC3 cancel mid-read-back→'cancelled' · SC4 cloud consent + sensitive-stays-local · SC5 speed/cloud per-turn · D-07 forced→explicit-required chip
+**Milestone:** v2.0 — Voice Interface (roadmapped 2026-06-02). 4/6 phases code-complete (14,15,16,17).
 **Phase:** 17
 **Plan 01:** Complete. Migration 137 ('cancelled' state CHECK + PRAGMA legacy_alter_table=ON table-rebuild); state.ts + isTerminal + DEFAULT_LIST_STATES updated; 4 new IPC channels (VOICE_CONFIRM_APPROVAL, VOICE_CANCEL_APPROVAL, VOICE_GET_PREFS, VOICE_SET_PREFS) stub-registered; voice/prefs.ts extended for speed/voiceId/useCloud. Handler-count invariant green. Typecheck flat at 84 baseline.
 **Plan 02:** Complete. performAsk() extracted from ipc/ask.ts to rag/ask-service.ts (D-02); ipc/ask.ts is thin wrapper (entitlement gate + performAsk call); ask.spec.ts UNCHANGED 5/5; ask-service.spec.ts 12/12. [Rule 1] gate.ts entitlementTableExists try/catch for pre-existing Phase 08.1 mock DB incompatibility. Typecheck flat 84 baseline.
@@ -169,9 +172,12 @@ Plan: 7 of 7 (Plans 01–05 complete)
 
 ## Next Action
 
-`/gsd-execute-phase 17` — **Phase 17 Plan 06 COMPLETE (2026-06-09)**. Next: Plan 07 (D-17 ratchet update + integration test + human-verify checkpoint). Remaining: W4=17-07. No new npm deps. Keep `workflow.use_worktrees=false` (Windows).
+**Phase 17 CODE-COMPLETE (2026-06-09)** — 7/7 plans, verifier 5/5 (no code gaps), no-bypass proven. Two next options:
+1. **Run the live SC1–SC6 acoustic smoke** (`pnpm dev` + mic/speakers) to close Phase 17's deferred human-verify (see Current Position list).
+2. **`/gsd-plan-phase 18`** — Opt-in Wake-Word + Privacy Isolation (VOICE-12). ⚠️ GATED on the commercial wake-word LICENSING decision (openWakeWord pretrained = CC-BY-NC non-commercial; Porcupine free tier caps 3 MAU) — resolve that first. Phase 18 also inherits the deferred StreamingRehydrator (frontier voice streaming) as its first task.
+Keep `workflow.use_worktrees=false` (Windows). NOT pushed — ~69 commits ahead of origin (Phases 16+17 planning+execution).
 
-**Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user (`pnpm dev`). **Phase 15** packaged-verify debts open.
+**Phase 16** code-complete (verifier 13/13); 5-test runtime smoke deferred to user. **Phase 15** packaged-verify debts open (macOS binary + 16 GB packaged launch/RAM).
 
 **Carried v1.0 tech debt (from MILESTONES.md):** Phase 9 design pixel-diff walkthrough (human checkpoint open); Phase 2/8 live/release verification (Ollama smoke, packaged-build E2E, Apple notarization, lived-14d data); macOS tray UAT; dark-mode `--aria-gray-*` gap; `pnpm typecheck` not run on the 2026-06-02 UI WIP batch; migration_014 legacy singleton-cron paths not exhaustively traced.
 
