@@ -1,427 +1,733 @@
-# Architecture Research
+# Architecture Research: Baileys WhatsApp Integration
 
-**Domain:** Duplex voice interface for a local-first Electron desktop AI assistant (Aria v2.0)
-**Researched:** 2026-06-02
-**Confidence:** HIGH on Electron main/preload/renderer boundaries, IPC/streaming transport, and approval-gate integration (verified against real Aria source); MEDIUM-HIGH on local STT/TTS runtime placement (kokoro-js + whisper.cpp Node addon verified current); MEDIUM on wake-word process model and the exact latency split (depends on user hardware).
+**Domain:** Electron main-process push-socket integration layered onto Aria's existing Provider/SyncOrchestrator architecture
+**Researched:** 2026-06-09
+**Confidence:** HIGH (all integration points verified against live source files)
 
-> **Scope note:** Models are already chosen (Whisper large-v3-turbo via whisper.cpp; Kokoro-82M / Chatterbox-Turbo for TTS). This document is about INTEGRATION into the existing Electron architecture — where each stage runs, the renderer↔main streaming flow, the barge-in state machine, how voice intents reach the existing IPC handlers and gate through `assertApproved`, the wake-word process model, the latency budget, and a dependency-ordered build sequence (phases continue from 14).
-
-## How This Grounds Against Real Aria Structure
-
-Verified by reading source, not assumed:
-
-- **IPC is a registry.** `src/shared/ipc-contract.ts` declares `CHANNELS` + `CHANNEL_METHODS`; `src/preload/index.ts` auto-maps every channel to a `window.aria.<method>` `ipcRenderer.invoke` wrapper. Push channels (e.g. `NAVIGATE`, `ENTITLEMENT_STATE_CHANGED`) are hand-overridden in preload with `ipcRenderer.on` returning an unsubscribe fn. **Voice adds new channels to this same registry — no new bridge mechanism needed.**
-- **Handlers register through `registerHandlers(ipcMain, deps, opts)`** in `src/main/ipc/index.ts`, each `register<Feature>Handlers` owning a channel set, gated on `dbHolder.db` for DB-dependent blocks, with `skip`-set poisoning (the IPC-db-null trap from memory). **Voice handlers follow this exact shape: `registerVoiceHandlers(ipcMain, { logger, dbHolder, scheduler, emitToRenderer })`.**
-- **Main→renderer push uses `makeRendererEmitter(win)`** = thin `win.webContents.send(channel, payload)` wrapper, already used by entitlement, transcripts, research. **Partial transcripts and TTS-text/state events ride this exact sink.**
-- **The send chokepoint is `assertApproved(db, approvalId)`** in `src/main/approvals/gate.ts`, called as line 1 of the unified send adapter; a static-grep test forbids any other module reaching a provider's send method. **Voice-confirm does NOT bypass this — it produces an explicit approval transition, then the SAME adapter runs `assertApproved`.**
-- **LLM dispatch is the AI SDK 6 router** (`src/main/llm/router.ts` + `src/main/ipc/ask.ts`): `router.classify({prompt, source})` → `generateText({model, prompt})` with frontier→local fallback. Currently uses `generateText` (non-streaming). **Voice needs `streamText` to feed TTS incrementally — this is the one router-adjacent change.**
-- **Local models already run via Ollama sidecar** (`createOllama({baseURL: '127.0.0.1:11434/api'})`). Whisper/Kokoro are a NEW class of local runtime — they are NOT LLMs and do NOT belong in the Ollama path.
+---
 
 ## Standard Architecture
 
 ### System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ RENDERER (Chromium)  — owns the microphone + speaker; Web Audio only   │
-│  ┌────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │ getUserMedia│→ │ AudioWorklet  │→ │ Silero VAD   │  │ Kokoro TTS  │  │
-│  │  mic capture│  │ (PCM framing) │  │ (onnx, WASM) │  │ (kokoro-js, │  │
-│  └────────────┘  └──────┬───────┘  └──────┬───────┘  │  WebGPU/WASM)│  │
-│                         │ 20ms PCM frames │ speech/   │  + Audioout  │  │
-│                         │ + endpoint flags│ silence   └──────▲──────┘  │
-│  ┌──────────────────────┴─────────────────┴───────────┐     │         │
-│  │ VoiceSession (renderer state machine + Zustand)     │     │         │
-│  │  IDLE→LISTENING→THINKING→SPEAKING + BARGE-IN cancel  │─────┘         │
-│  └──────────────┬───────────────────────────▲──────────┘               │
-└─────────────────┼ window.aria.voice* (IPC)   │ webContents.send push ───┘
-                  │ + MessagePort audio lane    │
-┌─────────────────▼───────────────────────────┴──────────────────────────┐
-│ MAIN (Node)  — owns transcription, intent routing, generation, gate     │
-│  ┌───────────────┐   ┌───────────────────┐   ┌──────────────────────┐   │
-│  │ STT engine    │   │ VoiceOrchestrator │   │ Intent Router        │   │
-│  │ whisper.cpp   │──▶│ turn-taking +     │──▶│ (NL → existing IPC   │   │
-│  │ Node addon /  │   │ barge-in machine  │   │  handler call)       │   │
-│  │ worker_threads│   │ (AbortController) │   └──────────┬───────────┘   │
-│  └───────────────┘   └─────────┬─────────┘              │               │
-│                                │ streamText (AI SDK 6)   ▼               │
-│                      ┌─────────▼─────────┐   ┌──────────────────────┐   │
-│                      │ LLMRouter (exists) │   │ EXISTING handlers:   │   │
-│                      │ local/frontier     │   │ briefing/triage/     │   │
-│                      └────────────────────┘   │ scheduling/ask/      │   │
-│                                                │ drafting             │   │
-│                      ┌────────────────────┐    └──────────┬──────────┘   │
-│                      │ assertApproved gate │◀──────────────┘ (writes)     │
-│                      │ approvals/gate.ts   │   voice-confirm = explicit    │
-│                      └────────────────────┘   approval transition         │
-└──────────────────────────────────────────────────────────────────────────┘
-            (optional) WAKE-WORD: separate utilityProcess, mic-isolated
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Renderer (React)                                                        │
+│  WhatsApp UI: QR modal · group picker · digest in briefing section       │
+└─────────────────────────┬───────────────────────────────────────────────┘
+                          │  IPC (invoke/handle + push webContents.send)
+┌─────────────────────────▼───────────────────────────────────────────────┐
+│  Main Process                                                            │
+│                                                                          │
+│  ipc/index.ts ──── ipc/whatsapp.ts ──── WhatsAppSessionManager          │
+│       │                │                     │                          │
+│       │                │               Baileys makeWASocket             │
+│       │                │               (ONE socket, singleton)          │
+│       │                │                     │ push events              │
+│       │                │               ┌─────▼──────────────────────┐   │
+│       │                │               │ connection.update           │   │
+│       │                │               │ creds.update               │   │
+│       │                │               │ messages.upsert            │   │
+│       │                │               │ groups.upsert              │   │
+│       │                │               │ group-participants.update  │   │
+│       │                │               └─────────────────────────── ┘   │
+│       │                │                                                 │
+│  provider-accounts.ts  │  (disconnect cascade extends here)             │
+│  (existing, modified)  │                                                 │
+│                                                                          │
+│  digest-cron.ts  ──── node-cron '0 5 * * *'  ──── p-queue (shared)     │
+│       │                                                                  │
+│  briefing/generate.ts  (gatherWhatsAppDigests added)                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────────────┐
+│  SQLite (SQLCipher)                                                      │
+│  whatsapp_auth_state · whatsapp_group · whatsapp_message                │
+│  whatsapp_group_digest                                                   │
+│  provider_account (provider_key loosened to include 'whatsapp')         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key placement decisions (the "WHERE")
+### Component Responsibilities
 
-| Stage | Runs in | Why |
-|-------|---------|-----|
-| Mic capture (`getUserMedia`) | **Renderer** | `navigator.mediaDevices` only exists in Chromium. Main has no audio device access. Non-negotiable. |
-| Frame/resample to 16 kHz mono PCM | **Renderer (AudioWorklet)** | Worklet runs on the audio render thread — no main-thread jank, deterministic 20 ms frames. Resampling at the edge keeps the transport small (16 kHz mono ≈ 32 KB/s vs raw 48 kHz stereo). |
-| VAD / endpointing | **Renderer (Silero-VAD onnx, WASM)** | Must run on the mic stream with the lowest possible latency to drive barge-in. Keeping VAD next to capture means a barge-in can be raised in one frame without an IPC round-trip. |
-| STT (Whisper-turbo) | **Main, in a `worker_thread` (or `utilityProcess`)** | whisper.cpp Node addon is a native module that blocks while decoding. It must NOT run on the main event loop (would freeze IPC + the gate). A worker thread keeps it off the loop while staying in the main-process trust boundary. The addon accepts PCM32 chunks + VAD, so it streams. |
-| LLM generation | **Main (existing LLMRouter, switch to `streamText`)** | Reuse the entire hybrid local/frontier routing, redaction, fallback, and routing-log machinery. Zero duplication. |
-| Intent routing → existing handlers | **Main (new `VoiceOrchestrator` + `IntentRouter`)** | Intents must call the same in-process functions the IPC handlers call, behind the same entitlement + approval gates. Routing in renderer would re-cross the bridge and risk bypassing gates. |
-| TTS synthesis | **Renderer (kokoro-js, ONNX via WebGPU/WASM)** — primary; **Main worker** for Chatterbox | kokoro-js is a browser-first library (Transformers.js/ONNX) with `TextSplitterStream` for sentence-chunked streaming and built-in WebGPU acceleration. Synthesizing in the renderer means the produced `AudioBuffer` plays immediately with no audio-transport hop back from main. Chatterbox (if used for max-quality) is heavier → run in a main worker and stream PCM out. |
-| Audio playback | **Renderer (Web Audio `AudioBufferSourceNode`)** | Same reason as capture: only the renderer has a speaker. Playback node is what barge-in `.stop()`s instantly. |
-| Wake-word ("Hey Aria") | **Separate `utilityProcess`** (openWakeWord / Porcupine), opt-in | Privacy isolation: an always-listening process must be a distinct, killable, mic-scoped process that emits ONLY a boolean trigger — never raw audio — to main. (See §Wake-word.) |
+| Component | Responsibility | New vs Modified |
+|-----------|---------------|----------------|
+| `src/main/whatsapp/session-manager.ts` | Owns the single Baileys socket: lifecycle, reconnect backoff, event dispatch to DB | NEW |
+| `src/main/whatsapp/auth-state.ts` | SQLite-backed `AuthenticationState` adapter (replaces `useMultiFileAuthState`) | NEW |
+| `src/main/whatsapp/ingest.ts` | `messages.upsert` handler: privacy filter, normalize, write `whatsapp_message` | NEW |
+| `src/main/whatsapp/group-sync.ts` | `groups.upsert` + `group-participants.update` handler, upsert `whatsapp_group` | NEW |
+| `src/main/whatsapp/digest-cron.ts` | node-cron job: read messages → Ollama generateObject → write `whatsapp_group_digest` | NEW |
+| `src/main/ipc/whatsapp.ts` | IPC registrar for all WhatsApp channels (canonical channel array + removeHandler pattern) | NEW |
+| `src/main/ipc/index.ts` | Register `whatsapp.ts` registrar; add `whatsapp` to `onDbReady` callback | MODIFIED |
+| `src/main/ipc/provider-accounts.ts` | Extend disconnect cascade: stop socket + delete `whatsapp_*` tables on disconnect | MODIFIED |
+| `src/main/briefing/generate.ts` | Add `gatherWhatsAppDigests(db)` gatherer; inject into `runBriefing` Promise.allSettled | MODIFIED |
+| `src/shared/ipc-contract.ts` | Add `WHATSAPP_*` channel constants + DTOs | MODIFIED |
+| `src/shared/provider.ts` | Add `'whatsapp'` to `ProviderKey` union (type only — NO interface additions) | MODIFIED |
+| `src/main/db/migrations/138_whatsapp.sql` | 4 new tables + provider_key CHECK constraint rebuild | NEW |
 
-**Rule of thumb that falls out of this:** *audio bytes stay in the renderer; only PCM-going-to-STT crosses to main, and only text/control crosses back.* The one exception is Chatterbox PCM-out from a main worker, which is why Kokoro-in-renderer is the default.
+---
 
-## Recommended Project Structure
+## Session Manager: Lifecycle and State Machine
 
-```
-src/
-├── main/
-│   ├── voice/                      # NEW — main-side voice subsystem
-│   │   ├── orchestrator.ts         # VoiceOrchestrator: turn-taking + barge-in state machine
-│   │   ├── stt/
-│   │   │   ├── whisper-worker.ts    # worker_thread entry: whisper.cpp addon, PCM in → partials/final out
-│   │   │   ├── stt-engine.ts        # spawns/owns worker, exposes feed(pcm)/flush()/abort()
-│   │   │   └── cloud-stt.ts         # consent-gated cloud STT adapter (opt-in path)
-│   │   ├── intent/
-│   │   │   ├── intent-router.ts     # NL utterance → {surface, action, args}; dispatch to existing services
-│   │   │   ├── intent-schema.ts     # Zod schema for generateObject intent classification
-│   │   │   └── surfaces.ts          # registry: maps intent → existing in-process service call
-│   │   ├── tts/
-│   │   │   └── chatterbox-worker.ts # OPTIONAL main-worker TTS (PCM-out) for max-quality path
-│   │   ├── confirm.ts              # voice-confirm flow → explicit approval transition (NOT a new gate)
-│   │   └── session-registry.ts     # tracks active VoiceSession per webContents
-│   └── ipc/
-│       └── voice.ts                # NEW — registerVoiceHandlers (start/stop/feedAudio/cancel/setMode)
-├── preload/
-│   └── index.ts                    # MODIFY — add voice push-channel overrides (onPartialTranscript, etc.)
-├── shared/
-│   ├── ipc-contract.ts             # MODIFY — add VOICE_* channels + methods + VoiceSession DTOs
-│   └── voice-types.ts              # NEW — shared VoiceState, IntentResult, TranscriptDelta types
-└── renderer/
-    ├── features/voice/             # NEW — renderer voice UI + capture/playback
-    │   ├── VoiceSession.ts         # renderer state machine (mirror of orchestrator states)
-    │   ├── useVoiceSession.ts      # Zustand store + IPC wiring + push subscriptions
-    │   ├── capture/
-    │   │   ├── mic-worklet.ts      # AudioWorklet processor: 48k→16k mono PCM framing
-    │   │   └── vad.ts              # Silero-VAD onnx wrapper (speech/silence + endpoint)
-    │   ├── tts/
-    │   │   └── kokoro-player.ts     # kokoro-js TextSplitterStream → AudioBufferSourceNode playback
-    │   ├── VoiceOrb.tsx            # the talk-button / push-to-talk + state visualization
-    │   └── VoiceConfirmDialog.tsx  # spoken-action confirm surface (reads existing approval DTO)
-    └── hooks/
-        └── useWakeWord.ts          # opt-in wake-word toggle + status (drives main utilityProcess)
-```
+### Singleton vs Registry
 
-### Structure Rationale
+Use a **singleton** `WhatsAppSessionManager`. Rationale: WhatsApp's linked-device model allows only one active WebSocket connection per linked device. Multiple sockets to the same account will conflict. The `provider_account` row exists for identity/UI/disconnect reuse, not to imply multiple concurrent sockets.
 
-- **`src/main/voice/` mirrors the existing feature-folder convention** (`briefing/`, `triage/`, `rag/`). The orchestrator is the brain; `stt/`, `intent/`, `tts/`, `confirm/` are its limbs. Keeps the worker-thread native-module blast radius inside one folder.
-- **`intent/surfaces.ts` is the single integration seam.** It imports the SAME service functions the existing IPC handlers call (e.g. `generateBriefing`, `proposeSchedule`, `draftReply`, `AnswerService`) — it does NOT re-invoke IPC. One file to audit for "does every voice action route through the same gates as the UI."
-- **`confirm.ts` is deliberately NOT a gate.** It is a thin helper that turns a spoken "yes, send it" into the `approval` row transition (`state→approved`, `approval_path='voice-explicit'`). The `'voice-explicit'` value is distinguishable from `'explicit'` so `assertApproved` can reject it for forced/high-severity (financial/legal/HR) actions. The real enforcement stays in `assertApproved`. This is the load-bearing trust decision.
-- **Renderer `features/voice/` owns all audio I/O.** Capture worklet + VAD + Kokoro playback live together because they share the Web Audio `AudioContext` and the barge-in `.stop()` path.
+The manager holds no `accountId` registry — it manages exactly one socket keyed on the single `whatsapp` provider_account row (PK: `provider_key='whatsapp'`, `account_id` = the user's phone JID or a stable `'primary'` sentinel set at link time).
 
-## Architectural Patterns
+### Construction and Teardown
 
-### Pattern 1: Dual-lane transport — control over IPC, audio over MessagePort
+**Post-unlock pattern** — identical to how `startSyncOrchestrator` is constructed in `src/main/ipc/index.ts`:
 
-**What:** Control/text (start, partial transcripts, intent results, state changes) uses the existing `ipcRenderer.invoke` / `webContents.send` registry. Raw PCM frames (renderer→main, ~50 frames/s) use a dedicated `MessageChannelMain` port handed to the renderer once at session start.
-
-**When to use:** Always, for the live duplex session. The default IPC channel serializes through the main event loop and is fine for sparse control messages but wrong for a 50 Hz binary firehose.
-
-**Trade-offs:** MessagePort adds one setup handshake and a second mental model. But it (a) keeps high-rate audio off the structured-clone IPC path, (b) lets you transfer `ArrayBuffer` ownership (zero-copy), and (c) decouples audio backpressure from control latency. For the first voice phase you *can* ship everything over `ipcRenderer` `Float32Array` payloads and migrate to MessagePort if profiling shows IPC saturation — flag this as a perf milestone, not a launch blocker.
-
-**Example:**
 ```typescript
-// main: registerVoiceHandlers — hand the renderer a port at session start
-ipcMain.handle(CHANNELS.VOICE_START, (event) => {
-  const { port1, port2 } = new MessageChannelMain();
-  sttEngine.attachAudioPort(port1);            // main reads PCM frames here
-  event.sender.postMessage(CHANNELS.VOICE_AUDIO_PORT, null, [port2]); // renderer writes here
-  return { ok: true, sessionId };
+// In registerOnboardingHandlers onDbReady callback (ipc/index.ts):
+onDbReady: (db) => {
+  stopSyncOrchestrator(syncOrchestrator);
+  syncOrchestrator = startSyncOrchestrator({ db, scheduler: getScheduler(), logger });
+
+  // NEW: construct WhatsApp manager post-unlock
+  stopWhatsAppSessionManager(whatsAppManager);
+  whatsAppManager = createWhatsAppSessionManager({ db, scheduler: getScheduler(), logger });
+  whatsAppManager.start();   // starts socket only if provider_account row exists
+}
+```
+
+**Teardown:** `whatsAppManager.stop()` closes the socket and cancels reconnect timers. Called on app quit (`app.on('before-quit')`) and when the vault is re-locked (same `onDbReady` path resets it).
+
+**Power suspend/resume:** Register `registerLifecycleCallbacks` (same as `ipc/gmail.ts`) to call socket close on suspend and `reconnect()` on resume. Do NOT keep a socket alive during machine sleep — WhatsApp Web drops connections within seconds; a reconnect storm on resume can trigger rate-limits.
+
+### State Machine
+
+States map to `provider_account.status` values (the shared enum). WhatsApp adds one ephemeral state (`qr-pending`) that is NOT persisted to `provider_account` — it exists only in memory on the manager instance.
+
+```
+              [manager created]
+              no row → idle (start() is a no-op)
+                    │
+                    │ IPC: WHATSAPP_LINK
+                    ▼
+┌──────────────────────────────────────────────────────────────┐
+│  LINKING (socket created, connection='connecting')           │
+│  provider_account: status='needs-auth'                       │
+│  manager internal: qrString = null                           │
+└──────────────┬───────────────────────────────────────────────┘
+               │ connection.update: qr present
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│  QR_PENDING (waiting for phone scan)                         │
+│  provider_account: status='needs-auth'                       │
+│  manager internal: qrString = <base64>                       │
+│  IPC push: WHATSAPP_QR_UPDATE → renderer shows QR            │
+└──────────────┬───────────────────────────────────────────────┘
+               │ connection.update: connection='open'
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│  CONNECTED (operational)                                     │
+│  provider_account: status='ok'                               │
+│  manager internal: socket alive, events flowing              │
+└──────────────┬───────────────────────────────────────────────┘
+               │ connection.update: connection='close'
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│  DISCONNECTED (evaluate lastDisconnect.error.output.status)  │
+└──────┬────────────────┬──────────────────────┬───────────────┘
+       │ restartRequired│ connectionLost/       │ loggedOut/forbidden/
+       │ (515)          │ timedOut/closed (408) │ connectionReplaced/badSession
+       ▼                ▼                       ▼
+ RECONNECTING      RECONNECTING           LOGGED_OUT
+ immediate         exp backoff            provider_account: status='needs-auth'
+ (max 1 attempt)   1s/2s/4s/8s/30s cap   qrString=null, socket destroyed
+                   after 10 fails →       IPC push: WHATSAPP_STATE_CHANGED
+                   status='degraded'      requires re-link (WHATSAPP_LINK)
+```
+
+### DisconnectReason Mapping
+
+| `statusCode` | Baileys constant | Action | `provider_account.status` |
+|---|---|---|---|
+| 515 | `restartRequired` | Reconnect immediately (server is requesting restart) | `'degraded'` during, `'ok'` on reconnect |
+| 408 | `connectionLost` / `timedOut` / `connectionClosed` | Exponential backoff 1s/2s/4s/8s/30s cap; max 10 attempts then stay degraded | `'degraded'` after exhausting |
+| 440 | `connectionReplaced` | Soft-close, do NOT reconnect; another device took the connection | `'needs-auth'` |
+| 401 | `loggedOut` | Destroy socket, clear `whatsapp_auth_state`, set needs-auth; user must re-link | `'needs-auth'` |
+| 403 | `forbidden` | Same as loggedOut; indicates potential ban | `'needs-auth'` |
+| 500 | `badSession` | Clear auth state entirely, treat as loggedOut | `'needs-auth'` |
+
+**Code pattern for the close handler:**
+
+```typescript
+sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+  if (qr) { pushQrToRenderer(qr); return; }
+  if (connection === 'open') { onConnected(); return; }
+  if (connection === 'close') {
+    const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
+    const shouldDestroy =
+      code === DisconnectReason.loggedOut ||
+      code === DisconnectReason.forbidden ||
+      code === DisconnectReason.badSession ||
+      code === DisconnectReason.connectionReplaced;
+    if (shouldDestroy) {
+      onLoggedOut(code);      // sets status='needs-auth', clears qrString
+    } else {
+      scheduleReconnect();    // exponential backoff
+    }
+  }
 });
-
-// renderer: worklet → transfer PCM frame, zero-copy
-audioPort.postMessage(pcmFrame.buffer, [pcmFrame.buffer]);
 ```
 
-### Pattern 2: Streaming the cascade — first sentence wins
+---
 
-**What:** Switch the generation step from `generateText` to `streamText` (AI SDK 6). The orchestrator buffers the token stream into a sentence-boundary splitter; the FIRST complete sentence is pushed to TTS immediately while the LLM is still generating sentence two. TTS likewise streams audio chunks to playback.
+## Auth State: SQLite Adapter
 
-**When to use:** Every spoken response. This is the single biggest perceived-latency win (40–60% per the kokoro-js streaming guidance) because the user hears speech start while the model is still thinking.
+Baileys' default `useMultiFileAuthState` writes JSON files to disk. For Aria this is wrong: auth material must live inside the SQLCipher-encrypted DB, not as plaintext files in the data directory.
 
-**Trade-offs:** You lose the ability to post-process the full text before speaking (e.g. a final safety pass over the whole answer). Mitigation: voice responses are read-only narration; anything that *acts* (send/schedule) goes through the confirm→approval→gate path BEFORE TTS ever speaks a confirmation. So streaming narration is safe; streaming an action is not — and the architecture already separates them.
+**Implement `useSQLiteAuthState(db)`** returning `{ state: AuthenticationState, saveCreds: () => void }`.
 
-**Example:**
+The `AuthenticationState` has two parts:
+- `creds: AuthenticationCreds` — a single JSON blob, stored as one row in `whatsapp_auth_state WHERE key='creds'`
+- `keys: SignalKeyStore` — key/value store for pre-keys, sessions, sender-keys, etc.; stored as rows in `whatsapp_auth_state WHERE key LIKE 'keys:<type>:<id>'`
+
+`saveCreds()` serializes current `state.creds` and upserts into `whatsapp_auth_state`. The `SignalKeyStore.set()` method upserts key rows; `get()` reads and deserializes; `clear()` deletes.
+
+All reads and writes are synchronous (`better-sqlite3` API), which is correct for Electron's main-process single-writer model. No async needed here.
+
+---
+
+## Message Ingestion: Privacy Filter Placement
+
+The privacy filter MUST be the first operation inside `messages.upsert` — before any DB write, before any logging, before any other processing. Untracked-group and 1:1 content must never touch SQLite.
+
 ```typescript
-const { textStream } = streamText({ model, prompt });   // reuse LLMRouter-chosen model
-const splitter = new SentenceSplitter();
-for await (const delta of textStream) {
-  emitToRenderer(CHANNELS.VOICE_ASSISTANT_DELTA, { text: delta }); // live caption
-  for (const sentence of splitter.push(delta)) {
-    if (orchestrator.aborted) break;                    // barge-in check each sentence
-    ttsQueue.enqueue(sentence);                          // renderer Kokoro picks up
+sock.ev.on('messages.upsert', ({ messages, type }) => {
+  if (type !== 'notify') return;   // 'append' = history-sync batch; skip
+
+  for (const msg of messages) {
+    const jid = msg.key.remoteJid ?? '';
+
+    // ── PRIVACY FILTER (must be first) ─────────────────────────────────
+    if (!jid.endsWith('@g.us')) continue;           // not a group: drop silently
+    const trackedRow = db.prepare(
+      'SELECT 1 FROM whatsapp_group WHERE jid = ? AND tracked = 1'
+    ).get(jid);
+    if (!trackedRow) continue;                      // untracked group: drop silently
+    // ── END PRIVACY FILTER ─────────────────────────────────────────────
+
+    if (msg.message?.protocolMessage) continue;     // control/ephemeral: skip
+    if (!msg.message) continue;
+
+    const bodyText = extractText(msg);              // text-only; null for media
+    if (!bodyText) continue;                        // skip images/audio/video
+
+    db.prepare(`
+      INSERT OR IGNORE INTO whatsapp_message
+        (jid, sender_jid, wa_id, sent_at, body_text, ingested_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).run(jid, msg.key.participant ?? '', msg.key.id ?? '', msgTimestamp(msg), bodyText);
+  }
+});
+```
+
+**`extractText(msg)`** covers: `conversation`, `extendedTextMessage.text`, `buttonsResponseMessage.selectedDisplayText`. Returns `null` for image/video/audio/document/sticker — those are never stored.
+
+The `type === 'notify'` guard is critical: `type='append'` fires on reconnect for the full history buffer (potentially thousands of messages). The `UNIQUE(jid, wa_id)` constraint would prevent true duplication but the loop would still run and lock the main process.
+
+---
+
+## Data Model
+
+### New Tables (migration 138)
+
+**`whatsapp_auth_state`** — encrypted creds blob + signal keys
+
+```sql
+CREATE TABLE whatsapp_auth_state (
+  key   TEXT NOT NULL PRIMARY KEY,   -- 'creds' | 'keys:<type>:<id>'
+  value TEXT NOT NULL                -- JSON-serialized
+);
+```
+
+**`whatsapp_group`** — user's group list + privacy toggles
+
+```sql
+CREATE TABLE whatsapp_group (
+  jid          TEXT NOT NULL PRIMARY KEY,   -- e.g. 123456789-group@g.us
+  display_name TEXT NOT NULL,
+  description  TEXT,
+  tracked      INTEGER NOT NULL DEFAULT 0 CHECK (tracked IN (0,1)),
+  member_count INTEGER,
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_whatsapp_group_tracked ON whatsapp_group(tracked);
+```
+
+**`whatsapp_message`** — 30-day rolling retention, text only
+
+```sql
+CREATE TABLE whatsapp_message (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  jid         TEXT NOT NULL,              -- group JID (FK whatsapp_group)
+  sender_jid  TEXT NOT NULL,              -- participant JID
+  wa_id       TEXT NOT NULL,              -- WhatsApp message ID
+  sent_at     TEXT NOT NULL,              -- ISO-8601 from msg timestamp
+  body_text   TEXT NOT NULL,
+  ingested_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (jid, wa_id),                    -- idempotent on re-ingest
+  FOREIGN KEY (jid) REFERENCES whatsapp_group(jid) ON DELETE CASCADE
+);
+CREATE INDEX idx_whatsapp_message_jid_sent ON whatsapp_message(jid, sent_at DESC);
+CREATE INDEX idx_whatsapp_message_sent     ON whatsapp_message(sent_at DESC);
+```
+
+**`whatsapp_group_digest`** — daily LLM output per tracked group
+
+```sql
+CREATE TABLE whatsapp_group_digest (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  jid          TEXT NOT NULL,
+  date         TEXT NOT NULL,              -- YYYY-MM-DD
+  summary      TEXT NOT NULL,
+  decisions    TEXT,                       -- JSON array of strings
+  open_qx      TEXT,                       -- JSON array of open questions
+  model_id     TEXT NOT NULL,              -- Ollama model that produced this
+  generated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (jid, date),                      -- idempotent re-runs
+  FOREIGN KEY (jid) REFERENCES whatsapp_group(jid) ON DELETE CASCADE
+);
+CREATE INDEX idx_whatsapp_group_digest_date ON whatsapp_group_digest(date DESC);
+```
+
+### Migration 138: provider_key CHECK Constraint Rebuild
+
+The `provider_account` table (migration 011) has `CHECK (provider_key IN ('google','microsoft'))`. Adding `'whatsapp'` requires a table rebuild. Because `provider_sync_state` has a FK pointing at `provider_account(provider_key, account_id)`, the RENAME inside the rebuild **must** be wrapped in `PRAGMA legacy_alter_table=ON` to prevent SQLite from silently rewriting that FK to point at `provider_account_old` — which would then be dropped, leaving a dangling reference. This is the exact pitfall documented in migration 135.
+
+The full migration wrapper:
+
+```sql
+PRAGMA foreign_keys=OFF;
+PRAGMA legacy_alter_table=ON;
+BEGIN;
+
+CREATE TABLE provider_account_new (
+  account_id        TEXT NOT NULL,
+  provider_key      TEXT NOT NULL CHECK (provider_key IN ('google','microsoft','todoist','whatsapp')),
+  -- ... all other columns verbatim from 011 ...
+  PRIMARY KEY (provider_key, account_id)
+);
+INSERT INTO provider_account_new SELECT * FROM provider_account;
+DROP TABLE provider_account;
+ALTER TABLE provider_account_new RENAME TO provider_account;
+CREATE INDEX IF NOT EXISTS idx_provider_account_status ON provider_account(status);
+
+-- ... 4 new whatsapp tables here ...
+
+COMMIT;
+PRAGMA legacy_alter_table=OFF;
+PRAGMA foreign_keys=ON;
+PRAGMA user_version = 138;
+```
+
+**Note:** `todoist` must also appear in the new CHECK because it was added by a later migration without a table rebuild (it used `INSERT OR REPLACE` in practice). The `provider_account_new` DDL must match the full live schema column-for-column.
+
+### Disconnect Cascade Additions
+
+In `src/main/ipc/provider-accounts.ts`, the `PROVIDER_ACCOUNT_DISCONNECT` handler adds a `'whatsapp'` branch:
+
+```typescript
+if (r.providerKey === 'whatsapp') {
+  whatsAppManager?.stop();  // close socket immediately (injected via deps)
+}
+const tx = db.transaction(() => {
+  // ... existing provider_sync_state + gmail_message + calendar_event + approval deletes ...
+  if (r.providerKey === 'whatsapp') {
+    db.prepare('DELETE FROM whatsapp_auth_state').run();
+    db.prepare('DELETE FROM whatsapp_group WHERE 1=1').run();
+    // whatsapp_message + whatsapp_group_digest cascade via ON DELETE CASCADE from whatsapp_group
+  }
+  db.prepare('DELETE FROM provider_account WHERE provider_key = ? AND account_id = ?')
+    .run(r.providerKey, r.accountId);
+});
+tx();
+```
+
+The `whatsAppManager` reference is threaded into `registerProviderAccountHandlers` deps — same pattern as `scheduler` is threaded into `registerGmailHandlers`.
+
+---
+
+## Digest Job
+
+### Cron Registration
+
+Register in `src/main/whatsapp/digest-cron.ts`. Pattern mirrors `src/main/briefing/schedule.ts`:
+
+```typescript
+const CRON_KEY = 'whatsapp-digest';
+const CRON_SCHEDULE = '0 5 * * *';  // 05:00 local daily — runs before briefing (07:00)
+```
+
+Register via `scheduler.cronRegistry` (the shared `SchedulerHandle`). The p-queue from the same handle serializes this job against all other LLM calls.
+
+**DB-null guard** (same as `ipc/gmail.ts` lines 91–100):
+
+```typescript
+const task = cron.schedule(CRON_SCHEDULE, () => {
+  const db = dbHolder.db;
+  if (!db) {
+    pendingCatchup.add('whatsapp-digest');
+    return;
+  }
+  void runWhatsAppDigest({ db, scheduler, logger }).catch((err) => {
+    logger.warn({ scope: 'whatsapp-digest', err }, 'digest cron error');
+  });
+});
+scheduler.cronRegistry.set(CRON_KEY, task);
+```
+
+### Digest Engine: `runWhatsAppDigest`
+
+```typescript
+async function runWhatsAppDigest({ db, scheduler, logger, today }) {
+  const trackedGroups = db.prepare(
+    'SELECT jid, display_name FROM whatsapp_group WHERE tracked = 1'
+  ).all();
+
+  for (const group of trackedGroups) {
+    const existing = db.prepare(
+      'SELECT 1 FROM whatsapp_group_digest WHERE jid = ? AND date = ?'
+    ).get(group.jid, today);
+    if (existing) continue;  // idempotent
+
+    const messages = db.prepare(`
+      SELECT sender_jid, sent_at, body_text
+        FROM whatsapp_message
+       WHERE jid = ? AND sent_at >= datetime('now', '-24 hours')
+       ORDER BY sent_at ASC
+    `).all(group.jid);
+    if (messages.length === 0) continue;
+
+    const prompt = buildDigestPrompt(group.display_name, messages);
+
+    const result = await scheduler.queue.add(() =>
+      generateObject({
+        model: getLocalModel(),   // LOCAL ONLY — never frontier for group content
+        schema: DigestSchema,
+        prompt,
+      })
+    );
+
+    db.prepare(`
+      INSERT OR REPLACE INTO whatsapp_group_digest
+        (jid, date, summary, decisions, open_qx, model_id, generated_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      group.jid, today,
+      result.object.summary,
+      JSON.stringify(result.object.decisions ?? []),
+      JSON.stringify(result.object.open_questions ?? []),
+      getLocalModel().modelId,
+    );
   }
 }
 ```
 
-### Pattern 3: Barge-in via a single AbortController per turn
+**`DigestSchema`** (Zod):
 
-**What:** Each assistant turn owns one `AbortController`. Renderer VAD detecting user speech during `SPEAKING` fires `VOICE_BARGE_IN` over the control lane. The orchestrator calls `controller.abort()`, which (a) cancels the in-flight `streamText` (AI SDK 6 honors `abortSignal`), (b) drains/clears the TTS queue, (c) tells the renderer to `.stop()` the active `AudioBufferSourceNode`, and (d) resets state to `LISTENING` with the new incoming audio already buffering.
-
-**When to use:** Whenever the user talks over Aria. This is the defining feature of "feels conversational duplex."
-
-**Trade-offs:** Requires the LLM call, the TTS pipeline, and the audio playback node to ALL be individually cancellable and wired to the same signal. The renderer must keep capturing during `SPEAKING` (half-duplex would drop the interruption). Echo from the speaker into the mic must be suppressed — rely on Chromium's built-in AEC (`echoCancellation: true` in `getUserMedia` constraints) plus gating VAD-triggered barge-in on an energy threshold to avoid Aria interrupting herself.
-
-**Example:**
 ```typescript
-// orchestrator turn lifecycle
-let turn: AbortController | null = null;
-function startAssistantTurn(prompt: string) {
-  turn = new AbortController();
-  streamText({ model, prompt, abortSignal: turn.signal });
+const DigestSchema = z.object({
+  summary:        z.string().max(500),
+  decisions:      z.array(z.string().max(200)).max(5).default([]),
+  open_questions: z.array(z.string().max(200)).max(5).default([]),
+});
+```
+
+**Local-model invariant:** `getLocalModel()` is called unconditionally. No `router.classify()`. Group chat content is third-party PII; it must never be sent to a frontier model. This is a hard invariant, not a routing preference.
+
+---
+
+## Briefing Integration
+
+### Adding the WhatsApp Gatherer
+
+In `src/main/briefing/generate.ts`, add `gatherWhatsAppDigests` as a fourth gatherer alongside the existing three:
+
+```typescript
+function gatherWhatsAppDigests(db: Db, date: string): WhatsAppDigestCandidate[] {
+  try {
+    return db.prepare(`
+      SELECT g.display_name AS name, d.summary, d.decisions, d.open_qx, d.jid
+        FROM whatsapp_group_digest d
+        JOIN whatsapp_group g ON g.jid = d.jid
+       WHERE d.date = ? AND g.tracked = 1
+       ORDER BY d.generated_at ASC
+    `).all(date) as WhatsAppDigestCandidate[];
+  } catch {
+    return [];   // table not yet migrated; graceful degradation
+  }
 }
-function onBargeIn() {                       // VOICE_BARGE_IN from renderer VAD
-  turn?.abort();                             // cancels streamText
-  ttsQueue.clear();                          // stop feeding new sentences
-  emitToRenderer(CHANNELS.VOICE_STOP_PLAYBACK); // renderer: source.stop()
-  transitionTo('LISTENING');                 // re-arm STT on the new utterance
+```
+
+Integrate into `runBriefing` via the existing `Promise.allSettled` fan-out:
+
+```typescript
+const waPromise = Promise.resolve(gatherWhatsAppDigests(db, date));
+const [calRes, emailRes, newsRes, waRes] = await Promise.allSettled([
+  calPromise, emailPromise, newsPromise, waPromise
+]);
+```
+
+The section is additive — if empty or rejected, the briefing proceeds without error (consistent with the existing error-isolation pattern). Inject digests into `buildBriefingPrompt` as a new `=== WHATSAPP GROUPS ===` section.
+
+**`BriefingSchema` extension** (Zod, inside `generate.ts`):
+
+```typescript
+whatsapp: z.array(z.object({
+  jid:     z.string(),
+  name:    z.string(),
+  summary: z.string().max(200),
+})).max(3).default([]),
+```
+
+The renderer briefing section reads `payload.whatsapp[]` and renders an optional fourth section. An empty array hides the section entirely.
+
+---
+
+## IPC Layer
+
+### New Channels (ipc-contract.ts)
+
+```typescript
+// WhatsApp invoke channels (renderer → main)
+WHATSAPP_LINK          = 'whatsapp:link',           // start QR flow
+WHATSAPP_STATUS        = 'whatsapp:status',          // get connection state + QR string
+WHATSAPP_DISCONNECT    = 'whatsapp:disconnect',      // unlink + cascade
+WHATSAPP_LIST_GROUPS   = 'whatsapp:list-groups',     // list known groups from DB
+WHATSAPP_SET_TRACKED   = 'whatsapp:set-tracked',     // toggle tracking on a group
+// WhatsApp push channels (main → renderer, no-op handle stubs)
+WHATSAPP_QR_UPDATE     = 'whatsapp:qr-update',       // new QR string
+WHATSAPP_STATE_CHANGED = 'whatsapp:state-changed',   // connection state change
+```
+
+### IPC Registrar: `ipc/whatsapp.ts`
+
+Follow the exact pattern from `ipc/gmail.ts`:
+
+1. Export a `WHATSAPP_CHANNELS` const array — used in `ipc/index.ts` for the `skip` guard and for `ipcMain.removeHandler` loops before re-registration post-unlock.
+2. DB-null guard: return `{ error: 'DB_NOT_OPEN' }` if `dbHolder.db` is null.
+3. The two push-only channels (`WHATSAPP_QR_UPDATE`, `WHATSAPP_STATE_CHANGED`) are added to the `pushOnlyChannels` array in `ipc/index.ts` (same array as `VOICE_TRANSCRIPT_DELTA` etc.) — they need no-op `ipcMain.handle` stubs to pass the handler-count test.
+
+### Wiring in `ipc/index.ts`
+
+Pre-unlock stubs (matching `knowledgeChannels` pattern, lines 488–533):
+
+```typescript
+const whatsappInvokeChannels = [
+  CHANNELS.WHATSAPP_LINK, CHANNELS.WHATSAPP_STATUS, CHANNELS.WHATSAPP_DISCONNECT,
+  CHANNELS.WHATSAPP_LIST_GROUPS, CHANNELS.WHATSAPP_SET_TRACKED,
+];
+if (!whatsappInvokeChannels.every((c) => skip.has(c))) {
+  for (const c of whatsappInvokeChannels) {
+    if (!skip.has(c)) ipcMain.handle(c, () => ({ ok: false, error: 'db-locked' }));
+  }
+  whatsappInvokeChannels.forEach((c) => skip.add(c));
 }
 ```
 
-### Pattern 4: Intent routing reuses in-process services, never re-crosses IPC
+Post-unlock real handlers (in `onDbReady`):
 
-**What:** The transcribed utterance goes to `generateObject` (AI SDK 6 + Zod) producing a typed `IntentResult { surface, action, args }`. `surfaces.ts` maps that to a direct call of the SAME service function the existing IPC handler wraps. Read-actions (briefing, ask, summarize) return text → TTS. Write-actions (send email, move meeting) build/queue an `approval` row and enter the confirm flow.
+```typescript
+onDbReady: (db) => {
+  stopSyncOrchestrator(syncOrchestrator);
+  syncOrchestrator = startSyncOrchestrator({ db, scheduler: getScheduler(), logger });
 
-**When to use:** Every utterance that isn't a pure transport control.
+  stopWhatsAppSessionManager(whatsAppManager);
+  whatsAppManager = createWhatsAppSessionManager({ db, scheduler: getScheduler(), logger });
+  whatsAppManager.start();
 
-**Trade-offs:** Requires factoring the existing handlers so their core logic is callable as a plain function, not only via `ipcMain.handle`. Several already are (e.g. RAG `AnswerService`, scheduling propose). Where a handler inlines logic in the `ipcMain.handle` closure, extract a service function first. Net: a one-time refactor, but it removes duplication and guarantees voice and UI share one code path (and one set of gates).
-
-## Data Flow
-
-### Duplex turn flow (the cascade)
-
-```
-[User speaks] → getUserMedia → AudioWorklet (16k PCM frames) → Silero VAD
-     │                                                              │ endpoint
-     │ PCM frames (MessagePort, zero-copy)                          ▼
-     ▼                                                       VOICE_ENDPOINT (control)
-  whisper-worker (main) ──partials──▶ VOICE_PARTIAL_TRANSCRIPT ──▶ renderer caption
-     │ final transcript
-     ▼
-  IntentRouter (generateObject + Zod) ──▶ {surface, action, args}
-     │
-     ├─ READ action ──▶ existing service fn ──▶ streamText ──┐
-     │                                                       │ sentence chunks
-     │                                                       ▼
-     │                                            renderer Kokoro TTS ──▶ AudioBufferSource ──▶ [User hears]
-     │
-     └─ WRITE action ──▶ build approval row ──▶ VoiceConfirmDialog (spoken + visual)
-                              │ user says "yes" / clicks confirm
-                              ▼
-                   approval transition: state='approved', path='explicit'
-                              ▼
-                   existing send adapter ──▶ assertApproved(db, id) ──▶ provider send
-                              ▼
-                   "Done — email sent to Dana." ──▶ TTS
+  for (const c of WHATSAPP_CHANNELS) ipcMain.removeHandler(c);
+  registerWhatsAppHandlers(ipcMain, {
+    logger, dbHolder, scheduler: getScheduler(), manager: whatsAppManager,
+  });
+}
 ```
 
-### Barge-in interrupt flow
+The `whatsAppManager` reference is also threaded into `registerProviderAccountHandlers` deps via the same post-unlock registration slot.
+
+---
+
+## File / Directory Structure
 
 ```
-[User talks during SPEAKING] → VAD speech-detected (renderer) → VOICE_BARGE_IN (control lane)
-     ▼
-orchestrator.turn.abort()  →  streamText cancelled (AI SDK 6 abortSignal)
-     ▼                      →  ttsQueue.clear()
-VOICE_STOP_PLAYBACK (push)  →  renderer source.stop()  (audio cut < 100 ms)
-     ▼
-transitionTo(LISTENING)     →  new utterance already buffering in worklet → STT
+src/
+├── main/
+│   ├── whatsapp/
+│   │   ├── session-manager.ts    # Socket lifecycle, state machine, reconnect backoff
+│   │   ├── auth-state.ts         # useSQLiteAuthState — SQLite-backed creds + signal keys
+│   │   ├── ingest.ts             # messages.upsert handler: privacy filter + DB write
+│   │   ├── group-sync.ts         # groups.upsert + group-participants.update
+│   │   ├── digest-cron.ts        # node-cron job + runWhatsAppDigest engine
+│   │   └── digest-schema.ts      # Zod DigestSchema + buildDigestPrompt
+│   ├── ipc/
+│   │   ├── whatsapp.ts           # IPC registrar (NEW)
+│   │   ├── index.ts              # MODIFIED: pre-unlock stubs + onDbReady wiring
+│   │   └── provider-accounts.ts  # MODIFIED: whatsapp disconnect cascade
+│   ├── briefing/
+│   │   └── generate.ts           # MODIFIED: gatherWhatsAppDigests + BriefingSchema.whatsapp
+│   └── db/migrations/
+│       └── 138_whatsapp.sql      # 4 new tables + provider_account rebuild
+├── shared/
+│   ├── ipc-contract.ts           # MODIFIED: WHATSAPP_* constants + DTOs
+│   └── provider.ts               # MODIFIED: ProviderKey += 'whatsapp'
+└── renderer/
+    └── (QR modal + group picker + briefing whatsapp section — Wave 2 UI)
 ```
 
-### State machine (renderer + main mirror the same states)
+---
 
-```
-        ┌──────────────────────────────────────────────┐
-        ▼                                                │
-     IDLE ──(PTT down / wake-word / VAD speech)──▶ LISTENING
-        ▲                                                │ endpoint (VAD silence ≥ N ms)
-        │ session end                                    ▼
-        │                                            TRANSCRIBING
-        │                                                │ final transcript
-        │                                                ▼
-        │                                          ROUTING_INTENT
-        │                                        ┌───────┴────────┐
-        │                                   READ │                │ WRITE
-        │                                        ▼                ▼
-        │                                  THINKING/SPEAKING   CONFIRMING
-        │                                        │              │ approved → act → SPEAKING
-        └────────────────────────────────────────┴──────────────┘
-                                                 │ barge-in (any speaking state)
-                                                 ▼
-                                              LISTENING  (cancel turn, re-arm)
-```
+## Architectural Patterns
 
-**Single source of truth:** the **main** `VoiceOrchestrator` owns the authoritative state (it holds the AbortController, the gate, the DB). The renderer `VoiceSession` is a *mirror* updated by `VOICE_STATE` push events — it drives the UI orb and decides when to capture vs play, but it does not own correctness. This matches the existing pattern where main owns the approval state and the renderer reflects it.
+### Pattern 1: Post-Unlock Service Construction
 
-## Latency Budget — "feels conversational"
+**What:** Stateful main-process services that need DB access are constructed inside the `onDbReady` callback in `ipc/index.ts`. A `null`-initialized reference is swapped when the DB unlocks.
 
-Target: **user stops talking → first audio of Aria's reply ≤ ~900 ms** for the local cascade on a modern laptop (human conversational turn-taking gap is ~200–500 ms; ≤1 s reads as responsive, >1.5 s reads as laggy). Budget for the all-local path:
+**When to use:** Any service that reads from or writes to SQLite on startup. `WhatsAppSessionManager` fits because it reads `whatsapp_auth_state` to restore the socket.
 
-| Stage | Budget | Where spent / notes |
-|-------|--------|---------------------|
-| VAD endpoint debounce | 150–250 ms | Silence window before declaring end-of-turn. Tunable; too short = clips the user, too long = feels slow. The dominant *fixed* cost. |
-| Final STT decode (Whisper-turbo, last chunk) | 100–250 ms | Streaming partials hide most of this; only the tail chunk after endpoint counts. GPU/Metal/CUDA addon build cuts this ~3×. |
-| Intent classify (generateObject, local) | 50–150 ms | Small prompt, local model. Can be skipped for obvious continuations. |
-| LLM time-to-first-token (streamText) | 150–400 ms | Frontier API TTFT ~200–400 ms; local 8B TTFT ~100–200 ms. This is why streaming matters — we only wait for the FIRST token, not the whole answer. |
-| First-sentence TTS synth (Kokoro) | 80–200 ms | Kokoro-82M synthesizes a short sentence well under 200 ms; WebGPU ~2–10× faster than WASM. |
-| Audio scheduling / playback start | 20–50 ms | AudioBufferSourceNode start. |
-| **Total to first audio** | **~550–1000 ms** | Streaming overlaps STT-tail, intent, TTFT, and TTS so they don't fully sum in practice. |
+**Aria precedents:** `startSyncOrchestrator`, `createFolderRegistry`, entitlement service. The pattern is well-established and tested.
 
-**Where to spend optimization effort, in order:**
-1. **Stream everything** (Pattern 2) — biggest win, removes whole-answer wait.
-2. **GPU-build whisper.cpp** (Metal on mac, CUDA/Vulkan on Win) — STT is the heaviest CPU stage.
-3. **Tune the VAD endpoint window** — pure UX dial, costs nothing.
-4. **Kokoro on WebGPU** — only matters if WASM synth becomes the tail bottleneck.
-5. **Cloud opt-in path** — for users who accept it, cloud STT/TTS (e.g. Deepgram/ElevenLabs) can beat local TTFT, but routes audio off-device → consent-gated, mirrors the hybrid-LLM disclosure UX.
+### Pattern 2: Push Socket vs Poll Delta (Hybrid C)
 
-**Barge-in cut latency target: < 150 ms** from user-speech-onset to Aria's audio stopping — this is what makes interruption feel natural and is mostly `source.stop()` + a one-hop control message.
+**What:** Baileys is event-driven (WebSocket push), not poll-delta. The `SyncOrchestrator` is built around `listMessagesDelta` + cursors + `provider_sync_state`. WhatsApp uses a dedicated `WhatsAppSessionManager` as a peer service.
 
-## Voice-Confirm ↔ Approval Gate Integration (the trust seam)
+**Guard that prevents accidental routing:** `isMailCalendarAccount()` in `sync-orchestrator.ts` already gates `tickAccount` to `'google' | 'microsoft'`. A `provider_account` row with `provider_key='whatsapp'` will be silently skipped by the orchestrator at startup — no change needed there.
 
-This is the highest-stakes integration point. The rule: **voice never invents a new authorization path.**
+**The `provider_account` row serves only three purposes for WhatsApp:** UI display in the accounts list, status tracking (`status` field maps to socket state), and the disconnect cascade trigger. It does not participate in `scheduleAccount`, `tickAccount`, or `provider_sync_state`.
 
-```
-WRITE intent (send email / move meeting / push task)
-   ▼
-VoiceOrchestrator builds the SAME approval row the UI path builds
-   (state='proposed' or 'generating' → 'ready', severity/categories from classifier)
-   ▼
-CONFIRMING state: Aria speaks the action + shows VoiceConfirmDialog (reads existing approval DTO)
-   ▼
-User confirms — by voice ("yes, send it") OR by click
-   ▼
-voice confirm helper writes:  approve(approvalId)
-   → state='approved', approval_path='voice-explicit'
-   ▼
-SAME unified send adapter runs:  assertApproved(db, approvalId)  ← unchanged enforcement
-   → forced-explicit / high-severity / financial-legal-hr rules still apply verbatim
-   ▼
-provider send (Gmail/Graph/calendar/Todoist)
-```
+### Pattern 3: Privacy Filter at Ingestion Boundary
 
-**Non-negotiables for the roadmapper:**
-- **Voice-confirm produces `approval_path='voice-explicit'`** — NOT `'explicit'`. The `'voice-explicit'` value clears the `assertApproved` gate for low/medium severity actions (same flow as a UI click for those tiers), but is **REJECTED** by the dedicated `voice-forbidden-forced` branch for forced/high-severity (financial/legal/HR) actions. A voice "yes" is NOT a first-class explicit approval for high-stakes actions — it forces the on-screen click. This is the hard gate (VOICE-10).
-- **High-severity / financial-legal-hr categories require the visual confirm.** When `assertApproved` sees `approval_path='voice-explicit'` for a `forced`/high-severity row, it throws `ApprovalGateError` — the user must tap the UI. This prevents mishearing "yes" on an irreversible action from executing without explicit on-screen confirmation.
-- **The static-grep ratchet** (`single-mail-send-site.test.ts` and siblings) must be extended to assert the new voice write-paths ALSO route through the unified adapter — same shape as the Phase 4/6 silent-write-failure guards in memory. Add a voice send-path test in the same family.
+**What:** The tracked-group check is the absolute first operation on any inbound message — before any logging, buffering, or transformation.
 
-## Wake-Word: Process Model & Privacy Isolation
+**Why:** 1:1 messages are the user's personal communications. Untracked group messages belong to people who did not consent to Aria processing them. The filter must be synchronous (sqlite `.get()`) so it cannot be skipped by async ordering.
 
-**Process model:** Opt-in only, OFF by default. When enabled, run the detector in a **separate Electron `utilityProcess`** (not the renderer, not main):
+**Single source of truth:** `whatsapp_group.tracked = 1` in the DB. Not an in-memory set. This means the filter stays current across hot group additions from the UI without requiring a restart.
 
-- It opens its OWN minimal audio capture (or receives frames from a dedicated renderer worklet) and runs a tiny on-device KWS model (openWakeWord ONNX or Picovoice Porcupine).
-- It emits **only a boolean trigger event** to main (`VOICE_WAKE_TRIGGERED`) — it MUST NOT forward, buffer-to-disk, or transcribe audio. Pre-trigger audio is discarded in a ring buffer that never leaves the process.
-- It is independently killable: toggling wake-word off in Settings terminates the `utilityProcess` entirely, so "always listening" can be provably stopped.
+### Pattern 4: Canonical Channel Array + removeHandler
 
-**Why a separate process (not just a flag):**
-- **Auditable isolation** — a distinct PID with a single output (a trigger) is the privacy story you can show users and document.
-- **Crash/leak containment** — an always-on native model that wedges takes down only itself, not the app.
-- **Resource scoping** — easy to suspend on `powerMonitor` sleep (reuse the existing suspend/resume pattern from `lifecycle/powerMonitor.ts`).
+**What:** Each IPC registrar exports a `const WHATSAPP_CHANNELS: readonly string[]`. `ipc/index.ts` loops `ipcMain.removeHandler(c)` over this array before re-registering real handlers post-unlock.
 
-**Privacy/consent UX:** Wake-word enablement is a distinct consent toggle with a tray/menubar "mic active" indicator. The cloud-audio opt-in is a SEPARATE consent — wake-word being local-only is the default and never sends audio anywhere. Mirror the existing hybrid-LLM disclosure copy.
+**Why:** Aria's known pitfall — `ipcMain.handle` throws on second registration (MEMORY: `reference_electron_ipc_double_register`). Every channel that is stub-registered pre-unlock must be explicitly removed before the real registrar runs.
 
-**Latency note:** wake-word adds an activation step but not turn latency — once triggered it hands the live mic stream straight into the normal LISTENING state.
-
-## Scaling Considerations
-
-Single-user desktop app; "scale" = device capability and concurrency of voice with background work, not user count.
-
-| Dimension | Concern | Adjustment |
-|-----------|---------|------------|
-| Low-end CPU (no GPU) | Whisper-turbo decode slow; WASM TTS slow | Ship a "lite" path: smaller Whisper (base/small) auto-selected by a capability probe; warn that cloud opt-in gives best latency. Reuse the `autoPickModel.ts` capability-probe pattern. |
-| Voice during cron/sync | LLM `p-queue` (concurrency=1) means a running briefing-gen blocks the voice turn | Give voice turns priority in the queue, or a dedicated small queue for interactive voice so a background briefing doesn't stall a live conversation. **Roadmap flag:** the single concurrency=1 queue is a contention point for interactive voice. |
-| Memory | whisper.cpp + Kokoro + Ollama models co-resident | Lazy-load STT/TTS on first voice use; unload after idle timeout. Don't hold all models hot. |
-| GPU contention | Local LLM (Ollama) + Whisper-GPU + Kokoro-WebGPU all want the GPU | Document expected hardware; serialize GPU-heavy stages where needed; cloud opt-in as the pressure valve. |
+---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Capturing or playing audio in the main process
-**What people do:** Try to open the mic / speaker from Node in main.
-**Why it's wrong:** Main has no media device API; you'd bolt on a native audio lib, duplicating what Chromium already does well (incl. AEC, device switching, permissions).
-**Do this instead:** Renderer owns all device I/O via Web Audio; main only sees PCM destined for STT and text/control.
+### Anti-Pattern 1: Routing WhatsApp Through SyncOrchestrator
 
-### Anti-Pattern 2: Running whisper.cpp on the main event loop
-**What people do:** Call the native addon synchronously in the IPC handler.
-**Why it's wrong:** Native decode blocks the loop → IPC, the gate, and the UI all freeze during transcription. (Same class of bug as the better-sqlite3 ABI/blocking notes in memory.)
-**Do this instead:** `worker_thread` (or `utilityProcess`) for STT; stream frames in, post partials out.
+**What people do:** Add `'whatsapp'` to `isMailCalendarAccount()`, create a fake `listMessagesDelta` adapter that returns empty deltas.
 
-### Anti-Pattern 3: Voice actions taking a side-door around assertApproved
-**What people do:** Let the voice handler call the provider send directly because "the user already said yes out loud."
-**Why it's wrong:** Recreates the exact silent-write-failure shape caught in Phases 4 and 6 — a write path that skips the gate. A misheard "yes" then sends real email.
-**Do this instead:** Voice "yes" → explicit approval transition → unified adapter → `assertApproved`. Extend the static-grep ratchet to the voice path.
+**Why it's wrong:** WhatsApp pushes messages over a persistent WebSocket. There is no cursor API. A fake adapter misses messages during any poll interval and adds reconnect complexity inside the orchestrator's error handling path.
 
-### Anti-Pattern 4: Half-duplex (stop capturing while speaking)
-**What people do:** Mute the mic during TTS to avoid echo.
-**Why it's wrong:** Kills barge-in — the user can't interrupt, which is the whole point of "conversational duplex."
-**Do this instead:** Keep capturing during SPEAKING; rely on Chromium AEC + a VAD energy threshold to distinguish the user from Aria's own output.
+**Do this instead:** `WhatsAppSessionManager` as a peer service to `SyncOrchestrator`, constructed in the same `onDbReady` slot.
 
-### Anti-Pattern 5: Whole-answer-then-speak
-**What people do:** `generateText` the full reply, then synthesize.
-**Why it's wrong:** Adds the entire generation time to perceived latency; a 3-sentence answer feels like a 2-second pause.
-**Do this instead:** `streamText` + sentence splitter + streaming TTS (Pattern 2).
+### Anti-Pattern 2: File-System Auth State
 
-## Integration Points
+**What people do:** Use Baileys' built-in `useMultiFileAuthState('auth_dir')` pointing to the Electron userData directory.
 
-### New runtimes / libraries
+**Why it's wrong:** Auth material (noise key, signal identity key, session keys, pre-keys) sits in plaintext JSON files outside the SQLCipher envelope. The `auth_info_baileys/` directory contains sufficient material to impersonate the user's WhatsApp account.
 
-| Runtime | Integration pattern | Notes / gotchas |
-|---------|---------------------|------------------|
-| whisper.cpp (Node addon, e.g. whisper-node-addon) | Native module in a `worker_thread`; feed PCM32 chunks + VAD; receive partial + final text | Native build per-platform (electron-builder rebuild step); GPU build (Metal/CUDA/Vulkan) is the latency unlock. ABI must match Electron's Node (mirror the better-sqlite3 ABI-pinning discipline). |
-| kokoro-js (Transformers.js / ONNX) | Renderer; `TextSplitterStream` → audio chunks → `AudioBufferSourceNode` | Browser-first; WebGPU optional accel with WASM fallback. ~82M model downloaded/cached on first use. |
-| Chatterbox-Turbo (optional max-quality TTS) | Main `worker_thread`, PCM-out streamed to renderer playback | Heavier; only on the quality-priority path. Audio-out hop is why Kokoro-in-renderer is default. |
-| Silero-VAD (ONNX) | Renderer AudioWorklet-adjacent | Drives endpointing + barge-in; tiny, runs in WASM. |
-| openWakeWord / Porcupine | Separate `utilityProcess`, opt-in | Emits trigger boolean only; never audio. |
-| Cloud STT/TTS (opt-in) | Main adapter behind consent gate | Mirrors hybrid-LLM disclosure; audio leaves device only after explicit opt-in. |
+**Do this instead:** `useSQLiteAuthState(db)` — all creds + signal keys stored as rows in `whatsapp_auth_state` inside the encrypted DB.
 
-### Internal boundaries
+### Anti-Pattern 3: Persisting Media
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| renderer mic/worklet ↔ main STT | MessagePort (PCM, zero-copy) + control IPC | High-rate binary on the port; control on the registry channels. |
-| main STT ↔ orchestrator | in-process worker messages | partials + final transcript. |
-| orchestrator ↔ LLMRouter | direct call, `streamText` w/ abortSignal | reuse hybrid routing + redaction + fallback unchanged. |
-| orchestrator ↔ existing services | direct in-process call via `intent/surfaces.ts` | the single integration seam; same fns the IPC handlers use. |
-| orchestrator ↔ approvals gate | build approval row → `assertApproved` in unified adapter | unchanged enforcement; voice-confirm = explicit path. |
-| main ↔ renderer (state/partials/TTS-text) | `makeRendererEmitter` push channels | reuse existing push pattern. |
-| wake-word utilityProcess ↔ main | single trigger event | privacy-isolated. |
+**What people do:** Store `imageMessage`, `audioMessage`, `videoMessage` blobs alongside text.
 
-## New vs Modified — Build Order (phases continue from 14)
+**Why it's wrong:** Media blobs are 100KB–5MB each. 30-day retention for a busy group produces gigabytes. Baileys does not auto-download media; it requires an explicit `downloadMediaMessage()` call. Digest quality is not improved by images.
 
-**NEW modules:** `src/main/voice/**`, `src/main/ipc/voice.ts`, `src/shared/voice-types.ts`, `src/renderer/features/voice/**`, `src/renderer/hooks/useWakeWord.ts`.
-**MODIFY:** `src/shared/ipc-contract.ts` (add VOICE_* channels/methods/DTOs), `src/preload/index.ts` (push-channel overrides), `src/main/ipc/index.ts` (`registerVoiceHandlers` call), the chosen existing handlers (extract core logic to callable services where still inlined), `src/main/llm` call sites that voice uses (add a `streamText` entry point alongside `generateText`), `App.tsx` (mount VoiceOrb + route VoiceConfirmDialog), static-grep ratchet tests (extend to voice write-paths).
+**Do this instead:** `extractText(msg)` returns `null` for non-text messages; the `if (!bodyText) continue` guard drops them before any DB call.
 
-Suggested dependency-ordered sequence:
+### Anti-Pattern 4: Frontier Model for Digest
 
-1. **Phase 14 — Audio capture + playback spike (renderer-only).** Worklet PCM framing, Silero VAD, Kokoro playback of canned text. Proves the renderer audio path end-to-end with no main involvement. Deliverable: press-to-talk records, VAD endpoints, a hardcoded sentence speaks. *No gate risk; pure plumbing.*
-2. **Phase 15 — STT in a worker + transport.** whisper.cpp Node addon in `worker_thread`, PCM transport (start with `ipcRenderer` Float32 payloads, MessagePort if needed), partial+final transcripts pushed to renderer captions. Deliverable: speak → see live transcript. *Flag: native build/ABI.*
-3. **Phase 16 — Streaming cascade + VoiceOrchestrator (read-only).** `streamText` entry point, sentence-splitter → streaming TTS, the IDLE→LISTENING→…→SPEAKING state machine, and BARGE-IN with AbortController. Wire ONLY read intents (ask/briefing/summarize) through `intent/surfaces.ts`. Deliverable: full duplex conversation over read surfaces with interruption. *This is the "feels conversational" milestone.*
-4. **Phase 17 — Voice-confirm + write actions through the gate.** Intent routing for write surfaces (send/schedule/draft/task), `confirm.ts` → explicit approval transition → `assertApproved`, `VoiceConfirmDialog`, high-severity-forces-visual-tap rule, extend static-grep ratchet. Deliverable: "Aria, reply to Dana that I'll make it" → drafts, confirms, sends through the existing gate. *Highest trust stakes; do AFTER read-only proves the loop.*
-5. **Phase 18 — Wake-word + privacy isolation.** Opt-in `utilityProcess` KWS, consent UX, mic-active indicator, powerMonitor suspend, off-by-default. Deliverable: "Hey Aria" activates a turn; toggling off provably kills the process.
-6. **Phase 19 — Cloud opt-in + latency/quality polish.** Consent-gated cloud STT/TTS adapters, capability-probe model selection, GPU-build whisper, voice-priority queue lane, idle model unload. Deliverable: hybrid local/cloud audio mirroring the hybrid-LLM disclosure; tuned latency budget.
+**What people do:** Route digest generation through `router.classify()` which may send content to Anthropic/OpenAI based on routing logic.
 
-**Ordering rationale:** audio plumbing → transcription → the read-only conversational loop (where barge-in/cancellation is proven with zero write risk) → write actions through the gate (only once the loop is trustworthy) → wake-word (independent, opt-in) → cloud + perf polish (optimization, not core). Write-through-gate deliberately follows the read-only loop so the barge-in/cancellation machinery is battle-tested before any spoken action can send.
+**Why it's wrong:** Group chat messages are third-party PII. Members of those groups did not consent to their words being sent to a cloud API.
+
+**Do this instead:** Call `getLocalModel()` directly in `runWhatsAppDigest`. No classify step, no routing. Consider a linter rule or static grep ratchet that whatsapp source files never import `getFrontierModel`.
+
+### Anti-Pattern 5: Processing `type='append'` Messages
+
+**What people do:** Handle all `messages.upsert` events regardless of the `type` field.
+
+**Why it's wrong:** On reconnect, Baileys fires `type='append'` for the full message history buffer (potentially thousands of messages). Running the privacy filter + DB insert loop thousands of times blocks the main process and generates spurious `ingested_at` timestamps.
+
+**Do this instead:** `if (type !== 'notify') return;` as the very first guard in the `messages.upsert` handler.
+
+---
+
+## Build Order
+
+### Wave 1: Foundation (no renderer changes; establishes the seam)
+
+1. **Migration 138** — all 4 tables + `provider_account` rebuild. Must land first; everything else depends on the schema.
+2. **`whatsapp/auth-state.ts`** — `useSQLiteAuthState`. Self-contained; testable in isolation against an in-memory DB.
+3. **`whatsapp/session-manager.ts`** — State machine, `useSQLiteAuthState`, reconnect backoff. Depends on auth-state.ts.
+4. **`whatsapp/group-sync.ts`** — `groups.upsert` + `group-participants.update` handlers attached to session manager events.
+5. **`whatsapp/ingest.ts`** — `messages.upsert` handler with privacy filter + DB write attached to session manager.
+
+### Wave 2: IPC + UI (makes the feature user-accessible)
+
+6. **`shared/ipc-contract.ts`** — `WHATSAPP_*` channel constants + DTOs.
+7. **`shared/provider.ts`** — `ProviderKey` union += `'whatsapp'`.
+8. **`ipc/whatsapp.ts`** — IPC registrar with canonical channel array.
+9. **`ipc/index.ts`** — Pre-unlock stubs + `onDbReady` real-handler registration.
+10. **`ipc/provider-accounts.ts`** — Extend disconnect cascade.
+11. **Renderer: QR modal + group picker** — Depends on `WHATSAPP_*` IPC channels being live.
+
+### Wave 3: Digest + Briefing (the value delivery)
+
+12. **`whatsapp/digest-schema.ts`** — `DigestSchema` + `buildDigestPrompt`. Self-contained.
+13. **`whatsapp/digest-cron.ts`** — `runWhatsAppDigest` + cron registration at `'0 5 * * *'`.
+14. **`ipc/index.ts`** — Register digest cron in `onDbReady` alongside sync orchestrator start.
+15. **`briefing/generate.ts`** — `gatherWhatsAppDigests` + fourth `Promise.allSettled` arm + `BriefingSchema.whatsapp`.
+16. **Renderer: WhatsApp section in briefing** — Reads `payload.whatsapp[]`, renders as optional fourth section.
+
+### Deferred Seam Costs (kept cheap by this order)
+
+**Action-item extraction → `task_batch`:** Add a second `generateObject` call in `runWhatsAppDigest` with an `ActionItemSchema`. Writes rows to `task_batch` (Phase 6 existing table). Zero schema changes. `whatsapp_message` rows already exist.
+
+**Meeting-proposal detection → `calendar_change` approval:** Same pattern — a third `generateObject` call in the digest job, or a separate `messages.upsert` handler path. Routes output through the existing `approval` table (Phase 3). Zero schema changes.
+
+**RAG capture:** `whatsapp_message.body_text` is already plain text in the correct format for the existing chunker pipeline. Add `source_kind='whatsapp'` to the `rag_chunk` INSERT in `ingest.ts` and a `corpus='whatsapp'` filter in the RAG query path. Zero new tables.
+
+---
+
+## Integration Points Summary
+
+| Seam | File | Change Type |
+|------|------|------------|
+| DB schema | `migrations/138_whatsapp.sql` | NEW: 4 tables + provider_account rebuild with `legacy_alter_table=ON` |
+| Post-unlock construction | `ipc/index.ts` `onDbReady` callback | MODIFIED: add `whatsAppManager` alongside `syncOrchestrator` |
+| Pre-unlock stubs | `ipc/index.ts` (new block) | MODIFIED: stub WHATSAPP invoke channels; push channels into `pushOnlyChannels` |
+| Disconnect cascade | `ipc/provider-accounts.ts` ~line 58 | MODIFIED: `'whatsapp'` branch — stop manager + delete auth state + cascade |
+| Briefing gatherer | `briefing/generate.ts` ~line 378 | MODIFIED: 4th `Promise.allSettled` arm + `gatherWhatsAppDigests` |
+| Briefing schema | `briefing/generate.ts` `BriefingSchema` | MODIFIED: add `whatsapp: z.array(...).default([])` |
+| Shared types | `shared/provider.ts` | MODIFIED: `ProviderKey` += `'whatsapp'` |
+| IPC contract | `shared/ipc-contract.ts` | MODIFIED: 7 new WHATSAPP channel constants + DTOs |
+| ProviderRegistry | `integrations/registry.ts` | NO CHANGE: `buildProvider` already throws for unknown keys; WhatsApp never calls `registry.get()` |
+| SyncOrchestrator | `integrations/sync-orchestrator.ts` | NO CHANGE: `isMailCalendarAccount()` returns false for `'whatsapp'`; rows silently skipped |
+
+---
 
 ## Sources
 
-- Aria source (verified): `src/shared/ipc-contract.ts`, `src/preload/index.ts`, `src/main/ipc/index.ts`, `src/main/approvals/gate.ts`, `src/main/llm/router.ts`, `src/main/ipc/ask.ts`, `src/main/llm/providers.ts`, `src/main/ipc/entitlement.ts` (makeRendererEmitter), `src/main/lifecycle/scheduler.ts`.
-- [whisper.cpp (ggml-org)](https://github.com/ggml-org/whisper.cpp) and [streaming example](https://github.com/ggml-org/whisper.cpp/blob/master/examples/stream/README.md) — chunked streaming + VAD mode.
-- [whisper-node-addon (Kutalia)](https://github.com/Kutalia/whisper-node-addon) — Node addon accepting PCM32 chunks, VAD, GPU accel.
-- [kokoro-js (npm)](https://www.npmjs.com/package/kokoro-js) and [StreamingKokoroJS](https://rhulha.github.io/StreamingKokoroJS/) — `TextSplitterStream` sentence-chunked streaming, WebGPU/WASM.
-- [Deploy Open-Source TTS 2026 (Spheron)](https://www.spheron.network/blog/deploy-open-source-tts-gpu-cloud-2026/) — Kokoro/Chatterbox 2026 landscape (confirms model choices already locked in PROJECT.md).
-- Electron docs (training-data, HIGH confidence on the API surface): `MessageChannelMain`/`MessagePortMain` for binary lanes, `utilityProcess` for isolated workers, `webContents.send` for push.
-- AI SDK 6 (CLAUDE.md stack + ask.ts usage): `streamText` `textStream` + `abortSignal` for cancellable streaming; `generateObject` + Zod for typed intent.
+- Baileys `ConnectionState` type (qr, connection values, lastDisconnect): `github.com/WhiskeySockets/Baileys/blob/master/src/Types/State.ts` — HIGH confidence (verified live)
+- Baileys `DisconnectReason` enum (all numeric codes): `github.com/WhiskeySockets/Baileys/blob/master/src/Types/index.ts` — HIGH confidence (verified live)
+- Baileys `BaileysEventMap` (messages.upsert type field, groups.upsert shape): `github.com/WhiskeySockets/Baileys/blob/master/src/Types/Events.ts` — HIGH confidence (verified live)
+- Baileys `AuthenticationState`/`AuthenticationCreds` (creds + keys structure): `github.com/WhiskeySockets/Baileys/blob/master/src/Types/Auth.ts` — HIGH confidence (verified live)
+- Aria `provider_account` DDL + FK structure: `src/main/db/migrations/011_provider_accounts.sql` — HIGH confidence (read live at HEAD)
+- Aria `legacy_alter_table` pattern: `src/main/db/migrations/135_repair_approval_child_fks.sql` — HIGH confidence (read live at HEAD)
+- Aria `ipc/index.ts` (pre-unlock stub + onDbReady patterns): read live at HEAD, all patterns verified
+- Aria `ipc/gmail.ts` (cron + db-null guard + suspend/resume pattern): read live at HEAD
+- Aria `ipc/provider-accounts.ts` (disconnect cascade pattern): read live at HEAD
+- Aria `briefing/generate.ts` (Promise.allSettled gatherer fan-out pattern): read live at HEAD
+- Aria `integrations/sync-orchestrator.ts` (`isMailCalendarAccount` guard): read live at HEAD
 
 ---
-*Architecture research for: Aria v2.0 duplex voice interface*
-*Researched: 2026-06-02*
+
+*Architecture research for: Baileys WhatsApp integration into Aria's Electron main-process integration layer*
+*Researched: 2026-06-09*

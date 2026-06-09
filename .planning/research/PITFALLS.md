@@ -1,229 +1,297 @@
 # Pitfalls Research
 
-**Domain:** Adding a hybrid (local-first + cloud-opt-in) duplex VOICE interface to an existing Electron 41 / Node / React local-first AI exec assistant (Aria v2.0)
-**Researched:** 2026-06-02
-**Confidence:** MEDIUM-HIGH (architecture/latency/AEC findings well-corroborated; specific local-model RAM numbers MEDIUM; Aria-codebase mapping HIGH from direct reads)
+**Domain:** Adding an unofficial Baileys WhatsApp integration to a local-first Electron desktop AI assistant (Aria v2.1)
+**Researched:** 2026-06-09
+**Confidence:** HIGH for ban mechanics + Baileys operational issues (corroborated across multiple GitHub issues + official docs); HIGH for supply-chain risk (confirmed incident); MEDIUM for passive-use ban probability (realistic assessment from community reports, no controlled study exists); MEDIUM for privacy/legal defensibility (guidance extrapolated from GDPR sources, not legal advice)
 
-> **Phase numbering:** v2.0 continues from Phase 14 (v1.0 ended at Phase 13). Phase names below are *suggested* labels for the roadmapper, not yet-existing phases. The two non-negotiable hard gates this research surfaces are flagged **[HARD GATE]** and **[STATIC RATCHET]**.
+> **Phase numbering:** v2.1 continues from Phase 20 (v2.0 parked after Phase 17). Phase labels below are suggested guidance for the roadmapper; the two non-negotiable gates are flagged **[HARD GATE]** and **[STATIC RATCHET]**.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Voice-triggering an irreversible/approval-gated action without read-back + explicit voice-confirm (THE BIG ONE)
+### Pitfall 1: Sending ANY message — not just automation, but any output — through the Baileys socket (THE HARDEST BAN TRIGGER)
 
 **What goes wrong:**
-The user says "reply to Sarah and tell her yes, Tuesday works." STT mishears a name, a time, or a recipient ("Sarah" → "Sara" → wrong contact; "Tuesday" → "Thursday"; "send to all" instead of "send to Al"). Voice "feels" frictionless, so the build wires the spoken intent straight to the existing send/calendar adapters and auto-executes. An exec's email goes to the wrong person, or a meeting moves on the wrong day. In Aria's trust model — "the user is never surprised by something Aria sent or moved" — this is the single failure that destroys the product.
+Baileys sends various non-human outputs through the socket by default: delivery receipts (ACKs), presence updates (`online`/`composing`), read receipts, and app-state sync signals. Even if Aria never calls `sendMessage()`, some of these background signals deviate from legitimate WhatsApp Web behavior patterns that WhatsApp's ML detection scores. If any code path sends an outbound message frame — even a well-intentioned "typing stopped" presence update — for an account that WhatsApp has flagged as suspicious, the ban trigger fires faster and harder.
 
 **Why it happens:**
-Two compounding pressures. (1) Voice UX dogma says "minimize friction" — designers strip confirmation steps to feel magical. (2) The path of least engineering resistance is to have the voice agent's tool-call invoke the *same* function the UI button invokes, bypassing the human-in-the-loop screen the chokepoint was designed around. The `assertApproved` gate (`src/main/approvals/gate.ts`) only verifies that a row reached `state='approved'` via the correct `approval_path` — it does NOT know whether a *human looked at a screen* or whether a *voice agent auto-clicked approve*. Voice can satisfy the gate's letter while violating its spirit.
+Developers scope "read-only" narrowly to mean "I don't call `sendMessage()`," while Baileys still emits ACKs and presence on the socket by default. The distinction between passive ingestion and background protocol chatter is invisible at the application layer.
 
 **How to avoid:**
-- Voice never auto-executes a send/calendar-change/task-push. Voice can *draft and stage* an approval row (`state='draft'`), but the transition to `approved` MUST come from a **separate, explicit voice-confirm turn after a verbatim read-back**: Aria speaks back the *materialized* action ("I'll email sarah-chen@acme.com: 'Tuesday at 2pm works.' Send it?") and requires an unambiguous affirmative ("send it" / "yes send") — not a backchannel "mhm," not silence, not "okay" mid-sentence.
-- **[HARD GATE]** Treat voice-confirm as a NEW `approval_path` value (e.g. `'voice-explicit'`), and make `assertApproved` require that forced categories (financial/legal/hr) and `severity==='high'` rows still demand the *typed/clicked* `'explicit'` path — i.e. **voice can never satisfy the forced-explicit override**. High-stakes sends must fall back to the screen. This is a one-line extension of the existing `isForced` check at gate.ts:84-99.
-- **[STATIC RATCHET]** Extend the existing single-send-site static-grep test (`tests/static/single-mail-send-site.test.ts`) and the sibling write-event/push-action chokepoints so the voice command handler is provably NOT in the set of callers that reach `send.ts` / `write-event.ts` / `push-actions.ts` directly. Voice must route through the same approval staging the UI uses.
-- Read-back must reflect the *resolved* entities (resolved contact email, absolute date, absolute time in user's tz), never the raw transcript — so a mis-resolution is audible before it's actionable.
-- Provide a spoken "cancel / stop / never mind" that aborts the staged action and is recognized even mid-read-back (see barge-in, Pitfall 3).
+- Set `markOnlineOnConnect: false` in the `makeWASocket` config to prevent the socket advertising `online` on connect (which suppresses phone push notifications and reduces the presence-advertisement footprint).
+- Follow up with `await sock.sendPresenceUpdate('unavailable')` immediately after connect to explicitly go dark.
+- Set `emitOwnEvents: false` to prevent the socket echoing your own events.
+- **[HARD GATE]** Grep-ratchet: `WhatsAppSessionManager` MUST NOT import or call any send/message/presence function except the two suppression calls above. This must be a static test checked on every PR, not a code-review hope.
+- As of Baileys v7.0.0, the library stopped sending ACKs on delivery because "WhatsApp seems to be banning users for this" — confirm the version in use has this fix.
+- Never send read receipts (do not call `sendReadReceipts`). Read receipt automation has been explicitly linked to ban waves.
 
 **Warning signs:**
-- A voice tool-call handler `import`s `send.ts`, `write-event.ts`, or `push-actions.ts`.
-- Any code path sets `approval_path='explicit'` from a voice event.
-- Demo flow shows "Aria, email Bob" → email sent with no second turn.
-- No absolute-date/absolute-recipient in the spoken confirmation.
+- Any `sock.sendMessage()`, `sock.sendReceipt()`, `sock.updatePresence()` call-site in `WhatsAppSessionManager` outside the initial suppress sequence.
+- A code review shows "helpful" status updates (e.g., "mark group messages as read so the phone stays clean").
 
-**Phase to address:** **Phase 14 (Voice safety / confirm contract)** — design this BEFORE any conversational fluency work. It is the gating architectural decision of the milestone.
+**Phase to address:** Foundation phase (link + ingest). Wire the ratchet before the socket is connected for the first time.
 
 ---
 
-### Pitfall 2: Mic captures Aria's own TTS → self-interruption / feedback loop (AEC failure)
+### Pitfall 2: The ban is REAL even for passive ingestion — but manageable. Don't undersell it to the user.
 
 **What goes wrong:**
-With both mic and speaker open (full duplex), the microphone hears Aria's own spoken output. The VAD/barge-in logic interprets Aria's voice as the user "interrupting," so Aria cuts itself off mid-sentence; or STT transcribes Aria's own TTS and feeds it back into the LLM, producing a self-conversation / runaway loop. On laptop speakers (not headphones) this is the default outcome, not an edge case.
+Two failure modes: (a) the developer convinces themselves "read-only = safe" and ships without the explicit ban-risk consent UI, and the user's primary personal number is banned; (b) the developer over-reads the risk, adds friction so extreme nobody links, and the feature fails for the wrong reason. The nuanced truth: passive Baileys ingestion carries **lower but non-zero** ban risk, primarily from protocol fingerprinting (the socket's TLS fingerprint, user-agent string, and protocol behavior are identifiable as Baileys, not a real WhatsApp Web browser tab), not from message volume. Ban waves periodically sweep unofficial clients indiscriminately.
 
 **Why it happens:**
-Browser/Chromium AEC (`getUserMedia({ audio: { echoCancellation: true }})`) assumes the "far-end" reference audio is playing through an `<audio>` element or Web Audio graph the browser controls. If TTS audio arrives as raw PCM over a WebSocket/IPC stream and is played through a custom AudioContext/buffer the AEC doesn't "see," there is no reference signal and the echo is never subtracted. **Worse: there is an open Electron bug (electron/electron#47043, 2026) where `echoCancellation: true` does nothing in Electron even though identical code cancels echo in Chrome.** So the one knob developers reach for may silently no-op on Aria's exact runtime.
+Risk is genuinely ambiguous. The confirmed ban triggers are: (1) sending bulk/automated messages, (2) running ACKs/receipts at machine speed, (3) rapid reconnect loops (looks like credential stuffing), (4) stale WA Web version string, (5) indiscriminate ban sweeps. Passive listeners who present the correct version string, reconnect gently, and send nothing are materially lower risk — but "lower" is not "zero."
 
 **How to avoid:**
-- **Do not rely on `echoCancellation: true` alone in Electron — verify it empirically on Win + macOS before building on it.** Assume it may no-op.
-- Primary defense = **half-duplex gating during playback**: while Aria is speaking, hard-suppress mic input (stop sending chunks to STT). This is the technique production builds converge on. Combine with an **extended cooldown (~1.0–1.5s) at an elevated VAD threshold after playback ends** to swallow room-resonance decay tails.
-- For *true* barge-in (user can interrupt while Aria talks), you cannot fully gate — so feed Aria's TTS output as the **AEC reference signal** into a dedicated AEC stage (e.g. a WebRTC/Speex AEC module or a Koala-style echo/noise suppressor) rather than trusting Chromium's built-in. The TTS audio you generate is the known far-end signal; subtract it explicitly.
-- Default to **headphone-friendly** UX and detect speaker-vs-headphone output to choose half-duplex (speakers) vs full barge-in (headset) behavior.
+- **Explicit consent modal at link time** (already locked in the milestone context). The modal must say, in plain language: "Aria connects as a WhatsApp Web companion device using an unofficial library. WhatsApp does not endorse this. Your account could be suspended. We recommend linking a secondary number if you use WhatsApp for critical business."
+- Offer a "secondary number recommendation" path in the UI: a Google Voice or carrier secondary SIM used for group tracking is a common community pattern that limits blast radius.
+- Passive-mode hardening (see Pitfall 1) reduces risk but does not eliminate it.
+- Surface ban status detection: if the socket receives a `401 / logged_out` or a WhatsApp-side "account at risk" signal, surface it immediately as a non-dismissable banner so the user can react before a permanent ban.
 
 **Warning signs:**
-- Aria interrupts herself when no one is talking.
-- Transcript log contains Aria's own phrases as "user" turns.
-- Works on headphones in testing, fails the moment a tester uses laptop speakers.
-- Echo only on one OS (the Electron AEC no-op is platform-variable).
+- Link modal has no explicit ban-risk language.
+- No secondary-number suggestion in onboarding.
+- Ban detection (`'connection.update'` with `lastDisconnect.error.output?.statusCode === 401`) is not wired to a user-visible alert.
 
-**Phase to address:** **Phase 15 (Audio I/O + AEC + duplex plumbing)** — must land before barge-in and before any always-listening mode.
+**Phase to address:** Foundation phase. The consent modal ships with the first QR screen; ban-detection wiring ships with the socket lifecycle.
 
 ---
 
-### Pitfall 3: Barge-in done wrong — "finishing the old thought" / failing to cancel in-flight LLM+TTS
+### Pitfall 3: Session / auth-state corruption on unclean shutdown
 
 **What goes wrong:**
-User starts speaking over Aria. The naive implementation keeps generating and playing the *previous* response (the LLM is still streaming tokens; TTS has 2–3 sentences buffered; the audio queue keeps draining). Aria talks over the user, "finishes the old thought," then answers the new one — feeling deaf and rude. Or the cancel fires but only stops *playback*, leaving the LLM still generating and the next answer contaminated by the interrupted-but-uncommitted context.
+Baileys stores session keys (Signal Protocol encryption state) in the auth state. If the Electron app is force-quit, crashes, or the machine loses power while a key-update write is in flight, the persisted auth state diverges from WhatsApp's server-side view. The next connect attempt produces `Bad MAC` decryption errors for every incoming message, a reconnect loop, and eventually a forced logout requiring the user to re-scan the QR code. This is confirmed by multiple open GitHub issues.
 
 **Why it happens:**
-A cascading pipeline (VAD → STT → LLM → sentence-chunk → TTS → audio-queue) has *several* in-flight buffers. Barge-in only works if a single cancel signal propagates to ALL of them: abort the LLM stream (AbortController), flush the TTS generation queue, flush the audio output buffer, AND correctly record what the user actually *heard* (partial assistant turn) so conversation state isn't corrupted. Most first cuts only `pause()` the audio element.
+The built-in `useMultiFileAuthState` writes JSON files on every key change — it is explicitly documented as "DONT USE IN PROD, purely for demo purposes, consumes a lot of IO." Aria's SQLCipher DB is the right home for auth state but the migration must handle transaction atomicity: a partial write (app crash mid-save) must not leave the DB in a state where Signal sessions are inconsistent.
 
 **How to avoid:**
-- One `AbortController` (or cancellation token) per assistant turn, threaded through every stage: LLM `streamText` abort → TTS request cancel → audio buffer flush. Barge-in fires the abort once; every stage listens.
-- Target metrics from 2026 production guidance: **user-speech-onset → TTS-suppression < 200ms**; barge-in detection accuracy 95%+; false-positive AND false-negative barge-in < 5%.
-- Distinguish **backchannel** ("mhm", "right", "yeah") from a real **barge-in** — a turn-detection/endpointing model (LiveKit TurnDetector, Pipecat SmartTurnAnalyzer class) or at minimum an energy + min-duration + partial-transcript heuristic. Backchannels must NOT interrupt.
-- On barge-in, persist the *spoken-so-far* portion as the assistant turn ("I was saying X… [interrupted]") so the LLM context reflects what the user actually heard, not the full unspoken generation.
+- Implement a `useSQLiteAuthState` adapter backed by the existing `better-sqlite3` + SQLCipher DB (migration 138, `whatsapp_auth_state` table). Use a single `db.transaction(() => { ... })()` wrapper for every `authState.keys.set()` call so a crash mid-write rolls back atomically, not partially.
+- Never use `useMultiFileAuthState` in production; treat it as test-only scaffolding.
+- On `connection.update` with `lastDisconnect.error` caused by `DisconnectReason.badSession` or `DisconnectReason.loggedOut`, delete the auth-state rows and transition the `provider_account` row to `status='needs-auth'` to prompt re-link rather than reconnect-looping.
+- Store a `session_generation` counter in `provider_account`; increment it on each re-link. Stale key rows from a previous generation are cleaned up on next successful connect.
 
 **Warning signs:**
-- "Stop" doesn't stop until the current sentence finishes.
-- After interrupting, Aria answers the *old* question.
-- A cough or "uh-huh" cuts Aria off.
-- Cancelling kills audio but CPU stays pegged (LLM still generating).
+- Auth state persisted to flat JSON files or to the DB without a transaction wrapper.
+- `Bad MAC` errors in logs after app restart.
+- Reconnect loop that never settles (exponential-backoff counter not checked; loop not halted after N failures).
 
-**Phase to address:** **Phase 16 (Turn-taking + barge-in + cancellation)** — depends on Phase 15 audio plumbing; the cancellation token must be designed into the pipeline from the start, not retrofitted.
+**Phase to address:** Foundation phase. The auth-state adapter is the first thing written before the socket opens.
 
 ---
 
-### Pitfall 4: Perceived latency — waiting for full LLM/TTS before first audio
+### Pitfall 4: `stream:error (conflict)` from running two socket instances against the same credentials
 
 **What goes wrong:**
-Time-to-first-audio is 2–4s because the pipeline waits for the *complete* LLM response before starting TTS, and waits for the *complete* TTS render before playing. The user experiences dead air after speaking and assumes Aria didn't hear them — they repeat themselves, causing double-processing.
+WhatsApp permits only one active connection per "linked device" slot. If two Electron windows, two app instances, or a crashed-but-not-cleaned-up socket plus a fresh one both try to connect with the same credentials, WhatsApp terminates both with `stream:error type='conflict'` / status 440. On Aria's Windows single-instance enforcement (already in place via `app.requestSingleInstanceLock()`), this should not happen normally — but it can happen during development (two terminals), during hot-reloading if the old socket is not destroyed before the new one opens, or if the existing single-instance guard is bypassed in a test harness.
 
 **Why it happens:**
-Easiest-to-write code is sequential: `const text = await llm(); const audio = await tts(text); play(audio)`. Each `await` of a full result stacks 1–3s (LLM) + 200–500ms (TTS).
+The `makeWASocket()` call is not gated by a guard that checks whether a socket is already live before creating a new one. Hot-reload destroys the module but not the open WebSocket.
 
 **How to avoid:**
-- **Stream end-to-end:** LLM tokens → chunk at sentence/clause boundaries → stream each chunk to TTS → play audio chunks as they arrive. Production guidance puts first-audio under ~300ms this way.
-- Send the FIRST sentence to TTS the moment it's complete; don't wait for the paragraph.
-- Add per-stage telemetry (STT TTFB/final, LLM first-token, TTS first-audio, end-to-end) so regressions are visible. Local SQLite debug table mirrors the existing OpenTelemetry-local pattern.
-- Use a short, instant **acknowledgement cue** (earcon or "let me check") to cover unavoidable retrieval latency (e.g. RAG lookups) instead of silence.
+- `WhatsAppSessionManager` is a singleton with a guard: `if (this.socket) { await this.disconnect(); }` before every `makeWASocket()` call.
+- Wire into Aria's existing `app.requestSingleInstanceLock()` path; the WhatsApp socket must not start if lock is not held.
+- On `stream:error conflict` in `connection.update`, log and halt reconnection (this is NOT a transient error; reconnecting immediately makes it worse by triggering a ban signal).
+- In dev mode, add a `beforeExit` handler that calls `sock.end()` so hot-reloads leave the socket in a known closed state.
 
 **Warning signs:**
-- Users repeat themselves.
-- First-audio metric > 800ms p50.
-- `await fullResponse` anywhere between STT and TTS.
+- Multiple `makeWASocket()` instantiations without a prior `end()` guard.
+- `stream:error (conflict)` in logs followed by an immediate reconnect attempt.
+- Integration tests that call the session manager without the single-instance guard.
 
-**Phase to address:** **Phase 16/17 (Streaming pipeline)** — bake streaming + telemetry into the pipeline contract.
-
----
-
-### Pitfall 5: End-of-speech / VAD mistuning — Aria cuts the user off or waits forever
-
-**What goes wrong:**
-Endpointing too aggressive → Aria starts responding while the user is mid-thought (pausing to breathe). Too lax → multi-second awkward delay before Aria responds. Either makes the assistant feel broken.
-
-**Why it happens:**
-A single fixed silence-timeout VAD can't tell "thinking pause" from "done talking." Energy-only VAD also false-triggers on keyboard clicks, HVAC, breathing.
-
-**How to avoid:**
-- VAD = energy threshold + voice classifier + minimum-duration guard (not energy alone). Telephony-grade tuning lives between -50 and -30 dBFS; desktop near-field mics differ — tune empirically per device class.
-- Prefer a **semantic/model-based turn detector** (classifies backchannel vs continued-speech vs end-of-turn) over a raw silence timer where feasible.
-- Make endpointing sensitivity a user-tunable setting (some execs speak with long pauses).
-
-**Warning signs:** Aria responds to half-sentences; or 2–3s silence before responses; VAD triggers on background noise.
-
-**Phase to address:** **Phase 16 (Turn-taking)** — co-designed with barge-in.
+**Phase to address:** Foundation phase, socket lifecycle design.
 
 ---
 
-### Pitfall 6: Always-listening wake-word — false activations, privacy, OS permission, and battery
+### Pitfall 5: Reconnect loop — uncontrolled retry turns a transient disconnect into a ban signal
 
 **What goes wrong:**
-(a) An always-on mic recording in the background spooks privacy-conscious execs (the exact persona) and may trip corporate device policy. (b) DIY wake-word (run STT continuously and string-match) burns CPU/battery and produces frequent false activations — Aria "wakes up" during a meeting and starts capturing audio it shouldn't. (c) On macOS, the OS mic-permission prompt and the menu-bar "orange dot" appear; if Aria requests mic at launch (not lazily at first voice use) users deny it and the feature is dead. (d) False wake during a confidential conversation = audio buffered/processed when it shouldn't be.
+Baileys' `connection.update` fires `connection: 'close'` on any disconnect. Naively reconnecting immediately and unconditionally (the first `connection.update` example in every tutorial) means a flaky network condition produces dozens of reconnect attempts per minute. WhatsApp's detection treats rapid reconnect bursts as credential-stuffing and escalates to a ban.
 
 **Why it happens:**
-Always-listening is treated as "just keep the mic open." Continuous full STT is the wrong tool; it's expensive and inaccurate as a trigger.
+The tutorial "just reconnect if it closes" pattern has no backoff, no cap, and no distinction between recoverable disconnects (network blip) and non-recoverable ones (401 loggedOut, 440 conflict, 403 account_banned).
 
 **How to avoid:**
-- Use a purpose-built on-device wake-word engine (Picovoice Porcupine: 97%+ true-positive, <1 false-alarm/hour, fixed-point C, negligible CPU; or openWakeWord). Audio for wake-detection never leaves the machine and is never persisted.
-- **Default always-listening OFF** (CLAUDE memory already locked "autoLaunch off default" posture; mirror it). Push-to-talk is the default activation; wake-word is explicit opt-in with a clear consent + disclosure screen.
-- **Lazy, just-in-time OS mic permission** (request at first voice use, not at launch) — mirrors the locked "lazy mac permission" decision from the Phase 12 tray work.
-- Ring-buffer only; pre-roll audio before the wake word is discarded unless wake fires. No raw audio written to disk.
-- Visible always-listening indicator (tray/in-app) so the user always knows the mic is hot — trust posture demands it.
+- Classify disconnect reasons strictly:
+  - **Non-recoverable (do NOT reconnect):** `DisconnectReason.loggedOut (401)`, `DisconnectReason.badSession`, status 403 (banned), status 440 (conflict). Transition to `status='needs-auth'` or `status='banned'` and surface in UI.
+  - **Recoverable (reconnect with backoff):** network errors, timeout (428), restart required (515).
+- Exponential backoff for recoverable disconnects: 5s → 15s → 60s → 300s → 600s (cap). Add ±20% jitter.
+- Hard cap at 5 consecutive reconnect failures → transition to `status='degraded'`, stop retrying, notify user.
+- Wire into `powerMonitor` (`suspend`/`resume` events): suspend the socket on sleep, reconnect once on wake (not immediately — 3–5s delay to let the network re-establish).
 
-**Warning signs:** mic permission requested at startup; CPU baseline rises when "idle"; Aria activates on TV/podcast audio; no visible "listening" affordance.
+**Warning signs:**
+- Any `connection.update` handler that reconnects unconditionally on `connection: 'close'`.
+- No distinct handling for `statusCode === 401` vs `statusCode === 428`.
+- No reconnect-attempt counter with a ceiling.
 
-**Phase to address:** **Phase 18 (Wake-word / always-listening, opt-in)** — explicitly AFTER push-to-talk ships, so the safe default exists first.
+**Phase to address:** Foundation phase, socket lifecycle.
 
 ---
 
-### Pitfall 7: Cloud opt-in audio leaves the machine without true consent — local-first guarantee violated
+### Pitfall 6: WA Web version drift — stale version string causes protocol rejection or ban
 
 **What goes wrong:**
-The cloud opt-in path (for higher-quality STT/TTS) streams the exec's *raw voice* — and whatever they said, which may include PII, financials, legal, HR content — to a third-party API. If this isn't gated identically to the existing hybrid-LLM PII routing, it silently breaks "data never leaves the machine except as scoped LLM prompts with PII pre-routed to a local model." Voice audio is *more* sensitive than text: it's biometric, and it can't be PII-redacted before sending the way text can.
+Baileys presents a WhatsApp Web version string during the handshake. If this string is too old, WhatsApp's servers reject the connection with a 405 `Method Not Allowed`. If it is too new (set by blindly calling `fetchLatestWaWebVersion()` every connect), it may present a version WhatsApp's server hasn't seen from this device fingerprint before, which triggers fingerprinting alerts. There is also a documented bug where `fetchLatestBaileysVersion()` returns a recently-deprecated version that immediately fails.
 
 **Why it happens:**
-Cloud STT is easier and higher quality, so it becomes a tempting default. Consent gets bolted on as a checkbox no one reads.
+Developers see `fetchLatestWaWebVersion` in the docs and add it to every connect to "stay current," not realizing the recommendation is to NOT call it every time.
 
 **How to avoid:**
-- **Local-first default, cloud strictly opt-in with explicit per-feature disclosure** (already a locked Key Decision). Voice audio routing MUST reuse/extend the existing sensitivity classifier: sensitive-flagged conversations stay on-device STT/TTS even when cloud opt-in is enabled.
-- Voice biometric audio cannot be "PII-redacted" pre-send — so the rule is stricter than text: if a turn is sensitivity-flagged, **no raw audio off-machine, period** (route to local Whisper). Only non-sensitive turns may use cloud STT, and only after consent.
-- Consent UX before any audio leaves: name the provider, what's sent, retention. Persist consent state; surface an always-visible indicator when a turn used cloud.
-- **[STATIC RATCHET candidate]** A test asserting no cloud-STT call site is reachable without the consent flag + sensitivity check, paralleling the LLM-routing guard.
+- Do NOT call `fetchLatestWaWebVersion()` on every connect. Baileys' documentation explicitly states: "It is not recommended to set the latest version on your socket every time you connect — you may face incompatibility."
+- Pin the version to a tested value in a config constant. Monitor Baileys releases and only update the pinned version after testing.
+- Add a startup check: if the pinned version is more than N months behind the current Baileys release, log a warning in the diagnostic panel to prompt the developer to review.
+- Track Baileys releases via GitHub releases RSS or a scheduled GitHub API check; treat a new Baileys version as a potential breaking change requiring validation before deploying.
 
-**Warning signs:** cloud STT default-on; no per-turn local-vs-cloud routing; sensitivity classifier not consulted on audio; consent is a single global toggle with no disclosure.
+**Warning signs:**
+- `fetchLatestWaWebVersion()` called inside the `makeWASocket` options.
+- Version string never reviewed after initial setup.
+- Connection fails with HTTP 405 or immediately closes after handshake.
 
-**Phase to address:** **Phase 17 (Hybrid voice routing + consent)** — reuse the v1 hybrid-LLM routing pattern; do not invent a parallel consent system.
+**Phase to address:** Foundation phase (initial socket config) + ongoing maintenance.
 
 ---
 
-### Pitfall 8: Local model resource burden — RAM/CPU/VRAM, multi-GB downloads, terrible first-run UX
+### Pitfall 7: Baileys library maintenance cadence — integration goes dark when WhatsApp ships a protocol update
 
 **What goes wrong:**
-Whisper large-v3-turbo (~809M params; GGUF roughly 1.5–3GB on disk, large-v3 full ~3–4GB runtime) + Kokoro/Chatterbox TTS + the existing local LLM (Ollama 7–8B, ~5–6GB) + Electron/Chromium all compete for RAM on a typical exec ultrabook (16GB, no discrete GPU). Result: swapping, fans, real-time-factor > 1 (transcription slower than speech), and a multi-GB first-run download that blocks the user with a spinner. Execs abandon.
+Baileys is a reverse-engineered library that tracks WhatsApp's undocumented WebSocket protocol. When WhatsApp ships a protocol update (approximately every 2–4 months), Baileys may break entirely: the connection fails, messages are not delivered, or decryption fails. The v7.0.0-rc.9 release in early 2026 had a 100% connection failure bug in the auth handshake. Between a WhatsApp protocol change and a Baileys fix being merged, tested, and released, the integration can be completely dark for days to weeks.
 
 **Why it happens:**
-Models picked for quality in isolation, not for the *combined* footprint of STT+TTS+LLM running concurrently on integrated-GPU/CPU-only laptops.
+The library is maintained by community volunteers, not a funded team. WhatsApp actively obfuscates protocol changes. There is no SLA or compatibility guarantee.
 
 **How to avoid:**
-- Budget RAM holistically: STT + TTS + LLM + app must coexist in ~8–10GB headroom. Prefer large-v3-**turbo** (distilled, much lighter than large-v3) and Kokoro-82M (tiny). Quantize (Q4/Q5 GGUF). Consider unloading the local LLM while actively transcribing if memory is tight (serialize via the existing p-queue pattern).
-- **First-run model download is a designed flow, not a spinner:** progress UI, resumable downloads, background fetch, size disclosure up front, graceful "voice unavailable until download completes" state. Ship the app without bundling GB of models.
-- Detect hardware at first voice-enable; if under spec, recommend cloud opt-in (with consent) or push-to-talk-only / disable always-listening.
-- Measure real-time-factor on CPU-only; if RTF > 1, fall back to a smaller STT model or cloud.
+- The app must treat the WhatsApp integration as an **optional, degradable** capability with three explicit states: `'connected'` / `'degraded'` / `'needs-auth'`. Never block the app boot or the daily briefing on WhatsApp availability.
+- On startup, if the Baileys socket cannot connect within a timeout (e.g. 30s) after N retries with backoff, set state to `'degraded'` and continue. The daily briefing runs without WhatsApp data.
+- Surface the degraded state in the UI: "WhatsApp unavailable — may need an app update." Do not silently drop WhatsApp from the briefing with no explanation.
+- Monitor the `WhiskeySockets/Baileys` GitHub releases feed. Subscribe to release notifications. A new major/minor version is a potential breaking change that needs re-testing before shipping in a Aria update.
+- Pin Baileys to a minor version (`~7.x.x` not `^7.x.x` or `latest`) to avoid auto-pulling breaking RC releases.
+- Write an integration smoke test (not mocked) that connects to a real WhatsApp account in a staging phone and verifies a group message is received within 60s. Run this in CI on Baileys dependency updates.
 
-**Warning signs:** install size balloons; fans spin on transcription; RTF > 1 on a 16GB laptop; first-run blocks on a multi-GB download with no progress.
+**Warning signs:**
+- Baileys pinned to `latest` or without a lock.
+- App boot waits for WhatsApp socket readiness.
+- No degraded-state UI; briefing silently missing WhatsApp section.
+- Last Baileys version review was more than 8 weeks ago.
 
-**Phase to address:** **Phase 15 (model lifecycle/download) + Phase 17 (hardware-aware routing)**.
+**Phase to address:** Foundation phase (degraded-state architecture), digest phase (verify briefing gracefully omits WhatsApp when degraded).
 
 ---
 
-### Pitfall 9: Electron native-addon ABI break for whisper.cpp bindings (Aria has been bitten by this exact class)
+### Pitfall 8: Supply-chain attack — malicious Baileys fork on npm
 
 **What goes wrong:**
-whisper.cpp Node bindings are a native addon (`.node`). Aria's MEMORY already records repeated better-sqlite3 ABI pain: Electron 41 needs `NODE_MODULE_VERSION` matched via electron-rebuild's dual-ABI dance, and a Node-ABI binary stranded an Electron launch (`NODE_MODULE_VERSION 141 vs 145`). A whisper addon built against system Node will crash at runtime inside Electron exactly the same way — and esbuild/electron-vite never typechecks or rebuilds native deps, so it ships and crashes on the user's machine.
+In December 2025, a malicious npm package named `lotusbail` (a Baileys fork with 56,000 downloads) stole WhatsApp session tokens, intercepted messages, and silently paired attacker-controlled devices to victims' accounts. A second malicious fork `@dappaoffc/baileys-mod` injected code starting at version 8.0.1. Because Baileys forks are plentiful and similar-sounding, package confusion is a real attack vector. The stolen credentials give the attacker persistent access even after the package is uninstalled.
 
 **Why it happens:**
-Native addons must be compiled against Electron's V8/Node ABI, not the host Node. electron-vite doesn't handle this; the existing dual-build workaround is bespoke. A new native addon is a new ABI surface.
+Many developers add a "Baileys fork with feature X" from a blog post without checking the npm package name against the canonical `@whiskeysockets/baileys`. npm's ecosystem has no code-signing requirement. Name-squatting and fork confusion are easy.
 
 **How to avoid:**
-- Strongly prefer a **sidecar/worker process** for STT/TTS over an in-process native addon: run whisper.cpp (and a TTS server if applicable) as a child process / localhost service — mirrors the existing Ollama-sidecar pattern (port 11434). This sidesteps the Electron ABI problem entirely and isolates crashes/memory from the main process.
-- If an in-process addon is unavoidable, fold it into the **existing electron-rebuild dual-ABI build** (same machinery that pins electron@41.6.1 for better-sqlite3) and add it to the ABI-mismatch recovery runbook in MEMORY. Prefer bindings that ship prebuilt `.node` per Electron ABI (e.g. whisper-node-addon) and pin versions.
-- Run `npm run typecheck` + a smoke launch of the *packaged* app after adding the binding — the "esbuild skips typecheck" memory says runtime is the only place these surface.
-- Don't run STT/TTS on the main thread regardless — it blocks the single-writer SQLite/IPC loop. Worker or sidecar, always.
+- **Only ever install `@whiskeysockets/baileys`** — the canonical package. Lock the exact version in `package.json` (use `=` not `^` or `~`) and commit `pnpm-lock.yaml`. Never accept PRs or documentation suggestions to switch to any other Baileys package name without auditing the source.
+- Run `npm audit` and Socket.dev package audits on every dependency update.
+- After installing or updating Baileys, verify the installed package checksum against the npm registry. CI should fail on lockfile drift.
+- If a "fork" is needed for a feature, fork the canonical repo directly, do not use a third-party npm fork.
 
-**Warning signs:** `NODE_MODULE_VERSION X vs Y` at launch; addon works in `node` REPL but crashes in Electron; CI green but packaged app dies; main-process jank during transcription.
+**Warning signs:**
+- `package.json` lists `baileys`, `baileys-extended`, `lotusbail`, or any name that is not `@whiskeysockets/baileys`.
+- A blog tutorial or PR suggests switching to a different package.
+- `pnpm-lock.yaml` not committed or CI not running `--frozen-lockfile`.
 
-**Phase to address:** **Phase 15 (Audio I/O + model runtime)** — pick sidecar-vs-addon and prove the packaged build launches BEFORE building features on top.
+**Phase to address:** Foundation phase (dependency setup); enforced by lock file from day one.
 
 ---
 
-### Pitfall 10: Audio device hell — wrong device, sample-rate mismatch, hot-swap, permissions
+### Pitfall 9: Third-party PII storage — group messages contain other people's content
 
 **What goes wrong:**
-Aria grabs the wrong input (laptop mic instead of the user's headset), or the user plugs in AirPods mid-conversation and audio dies. Sample-rate mismatch (Whisper wants 16kHz mono; the device delivers 44.1/48kHz stereo) produces garbage transcription if resampling is skipped. On Windows, exclusive-mode devices and Bluetooth HFP-vs-A2DP profile switching mangle quality (Bluetooth mic = narrowband). Permission denied silently yields a dead mic with no error.
+Every tracked group message stored on disk includes the sender's phone number, display name, and message text — data the sender never consented to have collected by Aria. In EU/UK jurisdictions, this is third-party personal data under GDPR/UK GDPR. Even in less regulated jurisdictions, storing group content in a local SQLite DB that could be subpoenaed or exfiltrated creates exposure. The specific danger for Aria: if the user ever uses "export data" or "attach logs to a bug report" features, group-member contact data leaks.
 
 **Why it happens:**
-"It works on my mac with my mic" — device enumeration, hot-plug handling, and resampling are unglamorous and skipped in the demo.
+Developers store the full message object for completeness ("I might need it later"), not realizing that phone numbers and display names are personal data. Local-only storage feels safe, but it is not exempt from data-subject rights or legal discovery.
 
 **How to avoid:**
-- Explicit device selection UI + sensible default; listen for `devicechange` and handle hot-swap gracefully (re-acquire stream, don't crash).
-- Always resample to whisper's expected 16kHz mono in the pipeline; never assume device rate.
-- Handle permission-denied and no-device states with a visible, actionable error (not silent failure).
-- Warn on Bluetooth-mic narrowband quality; recommend wired/built-in for accuracy.
-- Test the Win Bluetooth HFP profile switch (enabling the BT mic drops the BT speaker to narrowband — affects AEC and TTS quality simultaneously).
+- **[HARD GATE]** Group messages sent to the frontier LLM (Anthropic/OpenAI/Google) is a hard architectural prohibition — already locked in the milestone. Enforce this as a static ratchet: the WhatsApp summarization call site must use `ollama`/local-only, never the frontier provider.
+- Minimize PII in storage: store sender JID (hashed or pseudonymized) for deduplication, not raw phone numbers or display names, unless display name is needed for the digest. Provide a clear in-app retention and deletion policy.
+- The 30-day rolling retention window (already locked) limits accumulation.
+- Bug-report / log-export features must explicitly exclude `whatsapp_message` and `whatsapp_group` tables. The export code must have a deny-list, not an allow-list.
+- Document the privacy posture in the consent modal: "Group messages are stored on your device only, for 30 days, summarized locally. They are never sent to any cloud service."
+- For EU users: this is a "personal use" processing activity (GDPR Art. 2(2)(c) household/personal activity exemption may apply), but only as long as the app is genuinely personal-use, never redistributed as a SaaS, and data never leaves the machine.
 
-**Warning signs:** transcription garbage at certain sample rates; wrong mic used; app crashes on device unplug; silent dead mic.
+**Warning signs:**
+- Any call to `generateText` / `streamText` from the AI SDK with WhatsApp message content AND a non-Ollama provider.
+- Bug-report export includes `whatsapp_*` tables.
+- No retention sweep running to enforce 30-day window.
+- Sender phone numbers stored in plaintext in the DB (vs. hashed).
 
-**Phase to address:** **Phase 15 (Audio I/O)**.
+**Phase to address:** Foundation phase (schema design + ratchet); digest phase (retention sweep); deferred phases (extraction pipelines must not route to frontier).
+
+---
+
+### Pitfall 10: Memory growth from message buffers — 0.1MB per message leak in Baileys 7.x
+
+**What goes wrong:**
+A confirmed open bug in Baileys 7.0.0-rc.8 (GitHub issue #2090, status: open/unresolved as of June 2026): Node.js heap grows by approximately 0.1MB per message received, with no GC reclamation. For a heavy group chat (hundreds of messages/day across multiple groups), an Electron process running all day accumulates hundreds of MB of unreleased heap. On a 16GB exec laptop already running Ollama + the Electron app, this is a real crash vector over multi-day sessions.
+
+**Why it happens:**
+Baileys internally holds references to message events that prevent GC. The upstream bug is unpatched. Aria's `WhatsAppSessionManager` sits in the Electron main process and shares the V8 heap with the rest of the app.
+
+**How to avoid:**
+- Monitor the `WhatsAppSessionManager` memory footprint: log `process.memoryUsage().heapUsed` on a 30-minute interval and alert (log + user-visible indicator) if the process heap exceeds a configurable threshold (default: 400MB over baseline).
+- Implement a **nightly socket recycle**: at 3am (or on the next `powerMonitor` wake after 3am), gracefully close and reopen the Baileys socket to release accumulated heap. This is already necessary for the daily briefing window anyway.
+- Do NOT store the raw Baileys message event objects in memory beyond the immediate ingestion handler. Extract the fields needed for `whatsapp_message` (group_jid, sender_jid, text, timestamp), write to SQLite, and discard the event object immediately. Retain no references.
+- Track the upstream issue; when it is resolved, remove the nightly recycle workaround (with a comment and a link to the issue).
+
+**Warning signs:**
+- Heap climbing monotonically in production logs.
+- No periodic socket recycle or memory monitoring.
+- Raw Baileys message event objects stored in any array/Map/cache beyond the ingestion handler.
+
+**Phase to address:** Foundation phase (ingestion handler design); socket lifecycle includes nightly recycle from day one.
+
+---
+
+### Pitfall 11: Electron main-process socket blocking the single SQLite writer
+
+**What goes wrong:**
+Aria's `better-sqlite3` writer is synchronous and single-writer. The Baileys event handlers in `WhatsAppSessionManager` fire on the Node.js event loop in the Electron main process. If a group chat floods with messages (a large exec group with 50+ members having an active thread), the event loop is saturated handling Baileys events + writing each message synchronously to SQLite. This blocks IPC responses to the renderer, making the UI feel frozen, and potentially blocks the daily briefing generation.
+
+**Why it happens:**
+The briefing integration is the first time Aria's main process has a high-frequency push event source (WhatsApp) alongside the existing low-frequency poll sources (email, calendar). The single-writer assumption was designed for occasional polls; continuous message streams require explicit buffering.
+
+**How to avoid:**
+- Batch SQLite writes: accumulate incoming messages in an in-memory queue and flush to SQLite at a fixed interval (e.g., every 2 seconds) using a single transaction, rather than writing one row per message event. Use the existing `p-queue` pattern to serialize the flush against other SQLite writers.
+- Implement a per-group message rate limiter at the ingestion layer: if a group emits more than N messages in a T-second window, drop duplicates or batch them. The briefing digest does not need millisecond precision.
+- The Baileys socket event handlers must be non-blocking: parse the event, push to the in-memory queue, return immediately. No synchronous SQLite calls inside an event handler.
+- Add a circuit breaker: if the in-memory queue grows beyond M items (e.g., 1000), log a warning and stop ingesting until the queue drains, rather than consuming unbounded memory.
+
+**Warning signs:**
+- `db.prepare(...).run(...)` inside a Baileys `messages.upsert` event handler (synchronous call on the event thread).
+- UI freezes during active group chats.
+- IPC response latency metrics spike when WhatsApp is active.
+
+**Phase to address:** Foundation phase (ingestion handler design — buffer-and-batch from day one, not as a retrofit).
+
+---
+
+### Pitfall 12: QR timeout and the "needs re-link" UX trap
+
+**What goes wrong:**
+The QR code for initial linking has a 3-minute TTL. If the user does not scan within that window, the code expires and the socket disconnects. If the UI does not clearly expire the QR display and offer "generate new QR," users try to scan a stale code, see nothing happen, and conclude the feature is broken. Additionally, if the socket disconnects during the QR flow (before linking completes), the partial auth state may be corrupted, requiring the user to clear it before trying again.
+
+**Why it happens:**
+QR display is often treated as a one-shot flow: generate, show, wait. The TTL and the need for regeneration are not handled in the happy-path demo.
+
+**How to avoid:**
+- Track QR code age client-side; after 2:30 (30s before TTL), display a "QR code expired — tap to refresh" prompt. On tap, call `sock.end()` and recreate the socket (which triggers a new QR).
+- Never show a stale QR without a visible expiry countdown or expired state.
+- If `connection.update` fires `connection: 'close'` during the QR flow (before `connection: 'open'`), wipe any partial auth state from the DB before prompting to try again (partial Signal pre-keys stored but no account linked = corrupt state on reconnect).
+- On successful link (`connection: 'open'` + credentials saved), immediately transition from the QR screen to the group-selection screen; do not leave the user on a blank or loading state.
+
+**Warning signs:**
+- QR code displayed without a visible timeout indicator.
+- No "refresh QR" affordance.
+- Connection close during QR flow leaves stale rows in `whatsapp_auth_state`.
+
+**Phase to address:** Foundation phase (QR link flow UI).
 
 ---
 
@@ -231,117 +299,147 @@ Aria grabs the wrong input (laptop mic instead of the user's headset), or the us
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Voice tool-call invokes send/write-event directly (skip approval staging) | Fast demo, "magical" feel | Bypasses the chokepoint; a single mis-hear sends to the wrong exec → product-killing | **Never** |
-| Rely on `echoCancellation:true` for AEC | One-line "fix" | No-ops in Electron (#47043); ships self-interruption to users on speakers | Never as sole defense; only as a bonus atop half-duplex gating |
-| In-process whisper native addon (no sidecar) | Simpler IPC, no child process | New Electron ABI surface; crashes take down main process; main-thread jank | Only if prebuilt-per-ABI binding + folded into existing dual-build + smoke-tested on packaged app |
-| Sequential STT→LLM→TTS (no streaming) | Trivial to write | 2–4s perceived lag; users repeat themselves | Prototype only; replace before any UAT |
-| Cloud STT default-on for quality | Best transcription out of the box | Violates local-first guarantee; biometric exec audio leaks | Never default; opt-in + consent + sensitivity-gated only |
-| Single fixed silence-timeout VAD | Quick endpointing | Cuts users off / long waits; no backchannel handling | MVP push-to-talk only; upgrade for duplex |
-| Always-listening on by default | "Always there" feel | Privacy alarm for exec persona; battery/CPU; corporate-policy risk | Never default; explicit opt-in |
+| Use `useMultiFileAuthState` (the bundled demo helper) | Zero setup, works out of the box | Corrupts on unclean shutdown; non-atomic writes; heavy IO; explicitly documented "do not use in prod" | **Never in production**; test scaffolding only |
+| Store raw Baileys event objects in a Map/cache | Easy access to message history | 0.1MB/message leak; heap OOM after multi-day run | **Never**; extract fields and discard the event immediately |
+| Reconnect unconditionally on `connection.close` | "Always reconnects" feel | Rapid reconnect bursts trigger WhatsApp ban detection | **Never**; always classify disconnect reason + backoff |
+| Call `fetchLatestWaWebVersion()` on every connect | "Always current" | Fingerprinting alerts; version incompatibility; connection failures | **Never on every connect**; pin tested version, review on Baileys release |
+| Pin Baileys to `latest` or `^version` | Automatic updates | RC/beta breaks ship to users; supply-chain fork confusion | **Never**; pin to exact version with lock file |
+| Route WhatsApp group content to frontier LLM | Better summaries | Violates local-first PII guarantee; third-party data leaves machine | **Never**; local Ollama only |
+| Send message/ACK "just to keep the connection alive" | Avoids idle disconnect | Adds to send-activity footprint; accelerates ban risk | **Never**; use keepalive built into Baileys socket, not application-layer pings |
+| Write `db.run()` inside Baileys event handler | Simple code path | Synchronous write blocks event loop; UI freezes on active groups | **Never**; buffer + batch flush |
+
+---
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Chromium `getUserMedia` AEC (Electron) | Assume `echoCancellation:true` cancels TTS echo | It no-ops in Electron and can't see WebSocket/custom-buffer audio anyway; gate mic during playback + explicit AEC with TTS as reference |
-| whisper.cpp Node addon | Build against system Node | Build against Electron ABI via electron-rebuild dual-build, OR run as sidecar; pin versions; smoke-test packaged app |
-| Local LLM (existing Ollama) | Run STT/TTS in same memory budget blindly | Holistic RAM budget; serialize heavy ops via existing p-queue; consider unload-while-transcribing |
-| Cloud STT/TTS provider | Treat like the LLM provider; send all audio | Stricter: sensitivity-flagged turns NEVER leave machine (can't redact biometric audio); consent + provider disclosure first |
-| Existing `assertApproved` gate | Add a `'voice'` path that satisfies forced-explicit | Voice path must be *blocked* from forced categories/high severity; those still require typed/clicked explicit |
-| OS mic permission (macOS) | Request at app launch | Lazy request at first voice use; mirror locked Phase 12 lazy-permission decision |
-| Wake-word | Continuous full STT + string match | Purpose-built on-device engine (Porcupine/openWakeWord); ring-buffer; no disk persistence |
+| Baileys socket init | Create socket without checking if one is already live | Guard: `if (this.socket) await this.disconnect()` before every `makeWASocket()` |
+| Baileys auth state | Use `useMultiFileAuthState` | Implement `useSQLiteAuthState` with `db.transaction()` wrapper for atomic key updates |
+| WhatsApp version string | Call `fetchLatestWaWebVersion()` on every connect | Pin tested version constant; review on Baileys releases only |
+| Reconnect logic | Reconnect on any `connection.close` | Classify status code; exponential backoff; hard cap; no reconnect on 401/403/440 |
+| Electron single-instance | Add WhatsApp socket without checking `requestSingleInstanceLock` | WhatsApp socket start must be gated on single-instance lock ownership |
+| SQLite writes on message ingest | Synchronous `db.run()` per message event | Buffer messages in-memory; batch flush with `p-queue` on interval |
+| Ollama summarization | Pass full message objects to the LLM | Extract and truncate text fields only; never pass JIDs, phone numbers, or raw message objects |
+| Bug report / log export | Include all DB tables in export | Explicit deny-list: `whatsapp_message`, `whatsapp_group`, `whatsapp_auth_state` excluded from exports |
+| npm dependency | Install any `baileys` package from a blog | Only `@whiskeysockets/baileys` at pinned exact version with lockfile |
+
+---
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Non-streaming pipeline | 2–4s first-audio; users repeat | Stream LLM→chunk→TTS→play; target <300ms first-audio | Immediately, every turn |
-| STT/TTS on main thread | UI/IPC/SQLite jank during speech | Worker or sidecar process | First long utterance |
-| RTF > 1 on CPU-only | Transcription lags behind speech; backlog | turbo + quantized model; hardware detect; cloud fallback | 16GB no-GPU laptop (the persona's machine) |
-| All models resident at once | Swapping, fans, OOM | Holistic RAM budget; serialize/unload via p-queue | STT+TTS+LLM+app concurrently on 16GB |
-| In-flight buffers not cancelled on barge-in | CPU pegged after "stop"; old answer plays | Single AbortController threaded through all stages | Every interruption |
+| Synchronous SQLite writes per message event | UI freezes; IPC latency spikes during active group chats | Buffer + batch flush every 2s via p-queue | Any group with >5 messages/min sustained |
+| Raw Baileys event object retention | Heap climbs 0.1MB/message, never GC'd | Extract fields, discard event object immediately; nightly socket recycle | ~1000 messages/day = ~100MB/day accumulation |
+| Socket reconnect loop | CPU peg; WhatsApp sees credential-stuffing pattern | Exponential backoff + reconnect cap + reason classification | Any network instability without backoff |
+| All groups tracked with full history sync | First sync pulls months of history for each group; huge write storm | Track only from join date; `syncFullHistory: false` in socket config | First link with many active groups |
+| Ollama summarization blocking daily briefing | Briefing generation delayed by group summary step | Run group summaries as background pre-computation before briefing cron fires | Groups with >500 messages in 24h |
+
+---
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Raw exec audio to cloud STT without sensitivity gate | Biometric + PII/financial/legal/HR leak off-machine; breaks local-first guarantee | Sensitivity-flagged turns local-only; consent + disclosure; reuse hybrid-routing classifier |
-| Voice satisfies forced-explicit approval path | Mis-heard high-stakes action auto-sent | `assertApproved`: voice path blocked from forced categories & high severity **[HARD GATE]** |
-| Always-listening audio persisted to disk | Confidential conversations recorded inadvertently | Ring-buffer only; discard pre-wake audio; never write raw audio |
-| No visible mic-hot indicator | User unaware mic is live | Always-on listening indicator in tray/UI |
-| Wake-word false-fire during confidential meeting | Unintended capture/processing | High-precision on-device engine; tunable sensitivity; visible state; easy mute |
+| Install non-canonical Baileys package | Credentials exfiltrated; attacker permanently paired to user's WhatsApp | Lockfile pinned to `@whiskeysockets/baileys` exact version; CI `--frozen-lockfile` |
+| WhatsApp group content sent to frontier LLM | Third-party PII off-machine; local-first guarantee violated | **[STATIC RATCHET]** — static grep test: WhatsApp message data cannot reach non-Ollama AI SDK provider |
+| Auth state stored without encryption | Session keys in plaintext on disk = anyone with disk access owns the WhatsApp session | All auth state in SQLCipher-encrypted DB (migration 138); never flat JSON files |
+| Bug-report export includes WhatsApp tables | Group member PII (names, numbers, message content) leaked | Explicit deny-list in export code; test that export excludes these tables |
+| No ban detection / account-at-risk surfacing | User discovers ban from their phone, not from Aria | Wire `connection.update` 401/403 to non-dismissable UI banner and `provider_account.status = 'banned'` |
+
+---
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Auto-execute spoken actions | Wrong send/move; broken trust | Read-back resolved entities + explicit voice-confirm turn |
-| Silence after user speaks | User thinks Aria didn't hear; repeats | Instant earcon/ack cue; stream first-audio fast |
-| Aria talks over user / finishes old thought | Feels deaf and rude | <200ms barge-in suppression + full-pipeline cancel |
-| Backchannel ("mhm") interrupts Aria | Choppy, can't acknowledge | Backchannel-vs-barge-in classifier |
-| Multi-GB blocking first-run download | Abandonment | Resumable progress UI; voice-unavailable-until-ready state |
-| Mic permission at launch | Denied → feature dead | Lazy just-in-time permission at first voice use |
-| Read-back of raw transcript not resolved entities | Mis-resolution not audible | Speak resolved email/date/time |
+| No explicit ban-risk consent at link time | User's primary number banned; trust destroyed | Explicit modal with secondary-number recommendation before QR is shown |
+| QR code shown without expiry countdown | User tries stale QR, feature "doesn't work" | 2:30 countdown + "QR expired — refresh" prompt with auto-refresh |
+| Degraded state silent (WhatsApp section just missing from briefing) | User confused; files bug thinking feature broken | Non-dismissable "WhatsApp unavailable" banner with last-successful-connection timestamp |
+| Group selection absent (all groups ingested) | Third-party PII from unintended groups stored; privacy posture violated | Mandatory group selection step before any ingestion; untracked groups are never read or stored |
+| No retention-expiry confirmation | Messages accumulated beyond 30 days; storage bloat | Show retention settings in account row; confirm deletion when user disconnects WhatsApp |
+| "Reconnecting…" spinner with no timeout | User waits indefinitely; perceived hang | After 3 failed reconnects, show actionable "WhatsApp needs re-linking" prompt |
+
+---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Voice send/calendar flow:** Often missing the *separate explicit confirm turn after resolved-entity read-back* — verify voice cannot reach `send.ts`/`write-event.ts`/`push-actions.ts` and cannot set `approval_path='explicit'`; verify forced categories fall back to screen.
-- [ ] **AEC:** Often "works on headphones" only — verify on laptop *speakers* on both Win and macOS; verify `echoCancellation` isn't the sole defense.
-- [ ] **Barge-in:** Often only pauses audio — verify LLM stream aborts AND TTS queue flushes AND partial-spoken turn is persisted to context.
-- [ ] **Streaming:** Often awaits full response — verify first-audio p50 < ~800ms via telemetry; no `await fullResponse` between STT and TTS.
-- [ ] **Native addon:** Often CI-green/packaged-dead — verify packaged app launches with no `NODE_MODULE_VERSION` mismatch; STT off main thread.
-- [ ] **Cloud opt-in:** Often global toggle — verify per-turn local-vs-cloud routing honors sensitivity classifier; consent discloses provider/retention.
-- [ ] **Wake-word:** Often always-on/persisted — verify default OFF, ring-buffer only, visible indicator, lazy permission.
-- [ ] **Model first-run:** Often a bare spinner — verify resumable download + progress + size disclosure + graceful unavailable state.
-- [ ] **Device handling:** Often single-device assumption — verify hot-swap (`devicechange`), 16kHz resample, permission-denied error surfaced.
+- [ ] **Ban-risk consent:** Verify the link modal contains explicit ban-risk language AND a secondary-number suggestion; not just a generic "connect WhatsApp" button.
+- [ ] **Passive posture:** Verify `markOnlineOnConnect: false` + `sendPresenceUpdate('unavailable')` are set; grep for any `sendMessage` / `sendReceipt` call in `WhatsAppSessionManager` (should be zero except the suppress sequence).
+- [ ] **Static ratchet — no frontier LLM for WhatsApp:** Verify a test asserts that WhatsApp message content cannot reach an Anthropic/OpenAI/Google provider call site.
+- [ ] **Auth state atomicity:** Verify `authState.keys.set()` is wrapped in `db.transaction()`; verify no `useMultiFileAuthState` in production code paths.
+- [ ] **Disconnect reason classification:** Verify `connection.update` handler has explicit branches for 401 (no reconnect), 440 (no reconnect), 403 (banned), vs recoverable codes with backoff.
+- [ ] **Memory leak guard:** Verify no raw Baileys event objects stored beyond the ingestion handler; verify nightly socket recycle is scheduled.
+- [ ] **SQLite write buffering:** Verify `db.run()` is NOT called inside a Baileys event handler; verify messages are batched before write.
+- [ ] **Single instance guard:** Verify `makeWASocket()` cannot be called while another socket is live; verify integration with `app.requestSingleInstanceLock()`.
+- [ ] **Bug-report exclusion:** Verify `whatsapp_message` / `whatsapp_group` / `whatsapp_auth_state` tables are excluded from any diagnostic export.
+- [ ] **Degraded-state briefing:** Verify the daily briefing generates successfully and gracefully when `provider_account.status !== 'connected'` for WhatsApp.
+- [ ] **npm lockfile:** Verify `@whiskeysockets/baileys` is at an exact pinned version with no semver range; `pnpm-lock.yaml` committed and CI uses `--frozen-lockfile`.
+- [ ] **Retention sweep:** Verify a scheduled job runs to delete `whatsapp_message` rows older than 30 days.
+
+---
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Voice auto-executed wrong action | HIGH (reputational) | The whole reason for the chokepoint — design prevents recovery being needed. If shipped: emergency disable of voice-action path; audit `action_audit_log`; the existing approve→write silent-failure followup applies. |
-| AEC self-loop in the field | MEDIUM | Ship half-duplex gating as hotfix (stop mic during playback) — works without proper AEC; add explicit AEC later |
-| Native-addon ABI crash | MEDIUM | Same runbook as better-sqlite3: rebuild against Electron ABI / copy correct variant; better: migrate to sidecar |
-| RTF>1 / OOM on user laptop | MEDIUM | Hardware-detect fallback to smaller model or cloud opt-in; disable always-listening |
-| Cloud audio leaked before consent fix | HIGH | Disclose; purge provider-side if possible; sensitivity-gate retroactively; consent re-prompt |
-| Wake-word false-fires | LOW | Raise sensitivity threshold; swap to higher-precision engine; expose tuning |
+| Auth state corruption / Bad MAC after crash | LOW | Delete `whatsapp_auth_state` rows for the affected `provider_account`; set `status='needs-auth'`; prompt re-link via QR |
+| Stream:error conflict (two instances) | LOW | Kill the duplicate process; the surviving instance reconnects normally on next app open |
+| WhatsApp account temporarily banned | MEDIUM | Surface "account temporarily suspended" in UI; instruct user to open official WhatsApp app and follow appeal prompts; disconnect Aria integration until appeal resolved |
+| WhatsApp account permanently banned | HIGH | No recovery path for the number. Aria must gracefully disable the WhatsApp integration; offer to archive local data or delete it. This is why secondary-number recommendation matters. |
+| Baileys protocol break (library dark) | MEDIUM | Set all WhatsApp `provider_account` rows to `status='degraded'`; briefing omits WhatsApp section; surface "WhatsApp unavailable — check for Aria update" banner; monitor Baileys releases for fix. |
+| Supply-chain attack (malicious package installed) | HIGH | Revoke WhatsApp session immediately from official WhatsApp app (Settings → Linked Devices → remove all); rotate any credentials stored near the session; audit what the malicious package could have accessed. |
+| Heap OOM from message leak | LOW–MEDIUM | Force-restart the Electron app; nightly recycle mitigates; if severe, temporarily disable WhatsApp ingestion until memory is under control |
+
+---
 
 ## Pitfall-to-Phase Mapping
 
-> Suggested phases for v2.0 (numbering from 14). Roadmapper should treat Phase 14 (voice safety contract) and Phase 15 (audio/AEC/runtime) as prerequisites for everything else.
+> Phase numbering continues from v2.0 (which ended at Phase 17 parked). Suggested labels for roadmapper.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 1. Voice-triggered irreversible action **[HARD GATE]** | Phase 14 — Voice safety / confirm contract | Static-grep: voice handler not a caller of send/write-event/push; gate test: voice path rejected for forced categories & high severity; UAT: read-back + explicit confirm required |
-| 2. AEC / mic captures own TTS | Phase 15 — Audio I/O + AEC | Speaker test on Win+Mac; no self-turns in transcript; half-duplex verified independent of `echoCancellation` |
-| 3. Barge-in cancellation | Phase 16 — Turn-taking + barge-in | <200ms suppression metric; LLM-abort + TTS-flush + partial-turn-persist asserted |
-| 4. Perceived latency | Phase 16/17 — Streaming pipeline | first-audio p50 telemetry; no full-response await |
-| 5. VAD/endpointing mistuning | Phase 16 — Turn-taking | Backchannel-vs-endpoint test; user-tunable sensitivity |
-| 6. Wake-word privacy/false-fire/battery | Phase 18 — Always-listening (opt-in, after PTT) | Default-off verified; ring-buffer; visible indicator; lazy permission; false-alarm rate |
-| 7. Cloud audio consent/leak | Phase 17 — Hybrid voice routing + consent | Per-turn routing honors sensitivity; **[STATIC RATCHET candidate]** no cloud-STT site reachable without consent+sensitivity check |
-| 8. Local model resource burden | Phase 15 (download/runtime) + Phase 17 (HW-aware routing) | RAM budget on 16GB no-GPU; RTF≤1; resumable download UX |
-| 9. Electron native-addon ABI | Phase 15 — model runtime | Packaged-app launch smoke; STT off main thread; sidecar preferred |
-| 10. Audio device hell | Phase 15 — Audio I/O | Hot-swap, 16kHz resample, permission-denied surfaced |
+| 1. Outbound send in "passive" posture **[HARD GATE + STATIC RATCHET]** | Foundation (link + socket lifecycle) | Static grep: no `sendMessage`/`sendReceipt` except suppress calls; `markOnlineOnConnect: false` confirmed in config |
+| 2. Ban risk — honest consent + secondary-number UX | Foundation (QR link flow) | Manual: consent modal reviewed; ban-detection `401` wired to UI banner |
+| 3. Auth-state corruption on unclean shutdown | Foundation (auth-state adapter) | Test: kill app mid-write; verify next launch reconnects without Bad MAC; `useMultiFileAuthState` absent from prod code |
+| 4. `stream:error conflict` from two instances | Foundation (socket lifecycle) | Integration test: two `makeWASocket()` calls against same creds = second call tears down first cleanly; single-instance lock gate asserted |
+| 5. Reconnect loop / ban signal | Foundation (socket lifecycle) | Test: simulate 401 disconnect → no reconnect attempt; simulate network error → reconnect with backoff up to cap |
+| 6. WA Web version drift | Foundation (socket config) + ongoing | Config constant present; `fetchLatestWaWebVersion()` absent from socket init; version pinned in lockfile |
+| 7. Library maintenance / integration goes dark | Foundation (degraded-state architecture) + Digest | Briefing smoke test with WhatsApp `status='degraded'`: briefing generates; UI shows degraded banner |
+| 8. Supply-chain (malicious fork) | Foundation (dependency setup) | Lockfile check: only `@whiskeysockets/baileys`; CI `--frozen-lockfile`; `npm audit` clean |
+| 9. Third-party PII / frontier LLM **[STATIC RATCHET]** | Foundation (schema) + Digest (summarization) | Static ratchet: WhatsApp message data unreachable from non-Ollama AI call sites; export excludes WA tables |
+| 10. Memory growth / heap leak | Foundation (ingestion handler) + Digest | Heap monitoring logs present; no raw event objects stored; nightly socket recycle scheduled |
+| 11. Main-process socket blocking SQLite writer | Foundation (ingestion handler) | IPC latency test during simulated message flood; no synchronous `db.run()` in event handlers |
+| 12. QR timeout / stale QR UX | Foundation (QR link flow UI) | Manual UAT: let QR expire; verify refresh prompt appears; verify stale auth rows cleaned on pre-link disconnect |
+
+---
 
 ## Sources
 
-- [Voice AI Barge-In and Turn-Taking: A 2026 Implementation Guide — futureagi.com](https://futureagi.com/blog/voice-ai-barge-in-turn-taking-2026/) — barge-in metrics (<200ms, 95%+, <5% FP/FN), cancellation, context preservation
-- [Turn Detection for Voice Agents: VAD, Endpointing, Model-Based — LiveKit](https://livekit.com/blog/turn-detection-voice-agents-vad-endpointing-model-based-detection) — VAD = energy+classifier+min-duration; model-based turn detection
-- [Real-Time vs Turn-Based (Cascading) Voice Agent Architecture — Softcery](https://softcery.com/lab/ai-voice-agents-real-time-vs-turn-based-tts-stt-architecture) — cascading pipeline stages, streaming, first-audio <300ms
-- [Chained Voice Agent Architectures — brain.co](https://brain.co/blog/chained-voice-agent-architectures-speech-to-speech-vs-chained-pipeline-vs-hybrid-approaches) — pipeline cancellation path on barge-in
-- [Measuring Latency in STT (TTFB, Partials, Finals, RTF) — Gladia](https://www.gladia.io/blog/measuring-latency-in-stt) — per-stage latency, RTF
-- [I Built a Voice AI with Sub-500ms Latency: The Echo Cancellation Problem — DEV](https://dev.to/remi_etien/i-built-a-voice-ai-with-sub-500ms-latency-heres-the-echo-cancellation-problem-nobody-talks-about-14la) — half-duplex gating, two-tier RMS, cooldown, browser AEC can't see custom audio
-- [echoCancellation does nothing in Electron — electron/electron#47043](https://github.com/electron/electron/issues/47043) — the Electron AEC no-op bug
-- [Echo Issue While Sharing Screen with Audio — electron/electron#48446](https://github.com/electron/electron/issues/48446) — Electron audio loopback/echo
-- [Porcupine Wake Word — Picovoice](https://picovoice.ai/products/voice/wake-word/) — on-device, 97%+ TP, <1 false-alarm/hr, negligible CPU, no audio leaves device
-- [Wake Word Detection Guide 2026 — Picovoice](https://picovoice.ai/blog/complete-guide-to-wake-word/) — must run locally for privacy/latency/resources
-- [whisper-node-addon (cross-platform prebuilt Electron bindings) — GitHub](https://github.com/Kutalia/whisper-node-addon) — prebuilt .node per platform/ABI, zero-config Electron
-- [whisper.cpp — ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) — addon.node example, VAD, quantization
-- [Whisper Model Sizes Explained — OpenWhispr](https://openwhispr.com/blog/whisper-model-sizes-explained) — turbo = distilled 809M, lighter than large-v3
-- [whisper-large-v3 Model Memory Requirements — HuggingFace](https://huggingface.co/openai/whisper-large-v3/discussions/83) — ~2.9GB file / ~3.9GB runtime for large-v3
-- [USPTO 11935529 — virtual assistant execution of ambiguous command](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/11935529) — reversible-first / confirm-before-irreversible safety pattern
-- Aria codebase (direct read): `src/main/approvals/gate.ts` (assertApproved, forced-explicit override, CR-01 fail-closed), `tests/static/single-mail-send-site.test.ts` (chokepoint ratchet), CLAUDE.md stack (Ollama sidecar pattern, electron@41 pin, p-queue serialization), MEMORY (better-sqlite3 ABI history, esbuild-skips-typecheck, lazy-mac-permission, autoLaunch-off-default)
+- [High number of bans on WhatsApp! — WhiskeySockets/Baileys #1869](https://github.com/WhiskeySockets/Baileys/issues/1869) — ban wave affects passive users too; indiscriminate sweeps
+- ["Your account may be at risk" warning — tulir/whatsmeow #810](https://github.com/tulir/whatsmeow/issues/810) — warning triggered on both passive and active clients using WhatsMeow and Baileys
+- [Memory Leak 7.0.0-rc.8 — WhiskeySockets/Baileys #2090](https://github.com/WhiskeySockets/Baileys/issues/2090) — 0.1MB/message leak, open/unresolved
+- [Baileys reconnect mobile rejects session — #2110](https://github.com/WhiskeySockets/Baileys/issues/2110) — reconnect after credential reuse triggers mobile-side rejection
+- [Session is getting logged out / Bad MAC — #1976](https://github.com/WhiskeySockets/Baileys/issues/1976) — auth state corruption patterns
+- [Bad MAC — #2234](https://github.com/WhiskeySockets/Baileys/issues/2234) — Signal session decryption errors from Baileys
+- [Stream Errored (conflict) — openclaw #9094](https://github.com/openclaw/openclaw/issues/9094) — status 440 conflict from two simultaneous sessions
+- [fetchLatestWaWebVersion getting bad request — #1929](https://github.com/WhiskeySockets/Baileys/issues/1929) — version fetch fails / returns deprecated version
+- [fetchLatestBaileysVersion() breaks connection — #1990](https://github.com/WhiskeySockets/Baileys/issues/1990) — version auto-fetch causes connection failures
+- [Baileys configuration docs — baileys.wiki](https://baileys.wiki/docs/socket/configuration/) — `markOnlineOnConnect`, `emitOwnEvents`, `getMessage`, `cachedGroupMetadata`
+- [Baileys connecting docs — baileys.wiki](https://baileys.wiki/docs/socket/connecting/) — warning against `useMultiFileAuthState` in production
+- [Baileys intro — baileys.wiki](https://baileys.wiki/docs/intro/) — ToS disclaimer, library scope, Node 17+ requirement
+- [Migrate to v7.x.x — baileys.wiki](https://baileys.wiki/docs/migration/to-v7.0.0/) — LID mapping, breaking changes, ACK removal
+- [Malicious npm package lotusbail steals WhatsApp accounts — BleepingComputer](https://www.bleepingcomputer.com/news/security/malicious-npm-package-steals-whatsapp-accounts-and-messages/) — supply-chain attack, 56K downloads, credential exfiltration
+- [Malicious @dappaoffc/baileys-mod — Xygeni Security](https://xygeni.io/blog/malicious-npm-package-in-baileys-fork-skyzopedia-case/) — second malicious fork, injected newsletter subscription
+- [WhatsApp reconnect loop lacks exponential backoff — openclaw #60626](https://github.com/openclaw/openclaw/issues/60626) — reconnect-loop ban risk
+- [QR code 3-minute TTL / reconnection — Baileys connection lifecycle](https://whiskeysockets-baileys-94.mintlify.app/concepts/connection) — ACTIVE_LOGIN_TTL_MS, QR expiry, only `loggedOut` is non-recoverable
+- [WhatsApp Automation Ban Risk — kraya-ai.com](https://blog.kraya-ai.com/whatsapp-automation-ban-risk) — ML detection signals: reply-ratio, contact-graph, temporal patterns
+- [OpenClaw WhatsApp Risks — zenvanriel.com](https://zenvanriel.com/ai-engineer-blog/openclaw-whatsapp-risks-engineers-guide/) — passive vs active risk assessment
+- [WhatsApp ToS — whatsapp.com/legal/terms-of-service](https://www.whatsapp.com/legal/terms-of-service) — prohibition on unauthorized applications and scraping
+- [GDPR and WhatsApp group messages — rosello-mallol.com](https://www.rosello-mallol.com/en/work-whatsapp-groups-gdpr/) — third-party consent requirements for group member data
+- Aria codebase: `CLAUDE.md` (stack decisions — `better-sqlite3` synchronous single-writer, `p-queue` LLM serialization, Ollama sidecar, safeStorage, `app.requestSingleInstanceLock`), `PROJECT.md` (v2.1 locked decisions — hybrid provider_account + WhatsAppSessionManager, local-only Ollama summarization, 30-day retention, migration 138 schema)
 
 ---
-*Pitfalls research for: adding a hybrid duplex voice interface to Aria (Electron 41, local-first, approval-gated)*
-*Researched: 2026-06-02*
+*Pitfalls research for: Baileys WhatsApp integration in Aria v2.1 (Electron main process, local-first, SQLCipher, approval-gated)*
+*Researched: 2026-06-09*

@@ -1,149 +1,387 @@
-# Stack Research
+# Stack Research — WhatsApp Integration (v2.1 Additions Only)
 
-**Domain:** Voice pipeline (hybrid local-first STT/TTS + cloud opt-in) for an Electron/Node/TS desktop app — Aria v2.0 milestone
-**Researched:** 2026-06-02
-**Confidence:** HIGH (versions verified against the npm registry on 2026-06-02; licenses verified against package metadata + project docs)
-
-> Scope note: model *accuracy/quality* was already researched (Whisper large-v3-turbo, Kokoro-82M, Chatterbox-Turbo, etc.) and is NOT re-litigated here. This file is about the **runtime/glue stack** — how to RUN those models from Node/Electron, capture/transport audio, and the consent-gated cloud path. Aria is a **commercial** product, so every recommendation is checked for commercial-use fitness. This supersedes the v1.0 STACK.md.
+**Domain:** Adding Baileys WhatsApp integration to existing Electron 41 + better-sqlite3 + electron-vite app
+**Researched:** 2026-06-09
+**Confidence:** HIGH (versions verified live against npm registry on 2026-06-09; interfaces verified against GitHub source)
 
 ---
 
-## Recommended Stack
+> Scope note: This file covers ONLY the new packages required for v2.1 WhatsApp group-tracking.
+> The existing v1 stack (Electron 41, React 18, better-sqlite3, Vercel AI SDK 5, etc.)
+> is locked and not re-researched here.
+
+---
+
+## Recommended Stack Additions
 
 ### Core Technologies
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| **smart-whisper** | 0.8.1 (MIT) | Local STT — native `whisper.cpp` addon with model manager + auto offload/reload | Cleanest **library-mode** binding (no shelling out to a CLI). Loads a model once and runs multiple inferences against it, auto-offloads to free RAM, exposes a streaming-friendly transcribe API — the right shape for a duplex conversational loop. Main-process native addon fits Aria's existing pattern. **Caveat: last published 2024-10; see "Maintenance risk."** |
-| **nodejs-whisper** | 0.3.0 (MIT) | Local STT — fallback / file-mode transcription via `whisper.cpp` | Actively maintained (last publish 2026-04-11). Wraps the `whisper.cpp` CLI; auto-converts audio to 16 kHz WAV and emits `.txt/.srt/.vtt/.json`. Process-spawn per call = not ideal for low-latency duplex, but a safe current fallback for batch jobs (uploaded meeting file) and insurance against smart-whisper bit-rot. |
-| **whisper.cpp** | latest (`ggml-org/whisper.cpp`, MIT) | The STT inference engine both bindings compile | Canonical engine for Whisper large-v3-turbo on-device. CPU by default; **Metal** auto-enabled on macOS; **CUDA/Vulkan** opt-in at build time. This is the binary you ship. |
-| **kokoro-js** | 1.2.1 (Apache-2.0) | Local TTS — Kokoro-82M via Transformers.js + ONNX Runtime | Pure-JS, runs Kokoro-82M (Apache-licensed weights) on `cpu` in Node or `webgpu`/`wasm` in renderer. Ships a `TextSplitterStream` for **chunk-by-chunk streaming** audio out — needed to start speaking before the LLM finishes. No native build, no API key. Best default local TTS. |
-| **onnxruntime-node** | 1.26.0 (MIT) | ONNX inference runtime for TTS (and Chatterbox path) | Backend for ONNX TTS on the Node side. Prebuilt binaries for win/mac/linux incl. CUDA EP. Needed if you run Chatterbox-Turbo-ONNX or pin Kokoro to a specific ORT version rather than the bundled Transformers.js wasm. |
-| **@ricky0123/vad-web** | 0.0.30 (ISC) | Voice Activity Detection (Silero VAD) in the renderer | De-facto JS VAD. Bundles Silero VAD (MIT model). ISC = commercial-safe. Runs in the renderer with `getUserMedia`, emits speech-start/speech-end events that drive turn-taking + barge-in. Actively maintained (2025-11). |
-| **openai** | 6.41.0 (Apache-2.0) | Cloud opt-in STT + TTS + Realtime (consent-gated path) | Already in Aria's orbit (AI-SDK uses OpenAI). One SDK covers `audio.transcriptions` (Whisper/gpt-4o-transcribe), `audio.speech` (TTS), and the Realtime API. Reuse the existing key + the same consent/disclosure UX that gates frontier LLM calls. |
+| Technology | Version | License | Purpose | Why Recommended |
+|------------|---------|---------|---------|-----------------|
+| `@whiskeysockets/baileys` | `6.7.23` (pin exact) | MIT | WhatsApp Web multi-device WebSocket client | Pure-JS, no native rebuild, actively maintained. **Pin 6.7.23 not 7.0.0-rc13** — v7 is still RC with breaking API changes and a new WASM dep; see version decision section. |
+| `qrcode` | `1.5.4` | MIT | Render Baileys QR string to a data-URL or SVG for the renderer | Pure-JS (135 kB unpacked), zero native deps, stable API. |
 
-### Supporting Libraries
+### Supporting Libraries — Transitive (do not install directly)
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| **@ricky0123/vad-react** | 0.0.36 (ISC) | React hook wrapper around vad-web | Aria's renderer is React 18 — use `useMicVAD` instead of wiring vad-web by hand. |
-| **@openai/agents-realtime** | 0.11.6 (MIT) | Higher-level WebRTC/WebSocket client for OpenAI Realtime | Only if you choose OpenAI Realtime as the *full-duplex cloud* tier. Handles session, audio in/out, interruptions. Optional — raw `openai` SDK + WebSocket also works. |
-| **whisper-node-addon** | 1.0.2 (MIT) | Prebuilt cross-platform `whisper.cpp` `.node` binaries for Electron | Insurance if smart-whisper/nodejs-whisper native builds fight `electron-rebuild`. Ships prebuilt `.node` for win-x64, linux x64/arm64, mac x64/arm64 with runtime arch detection; "zero-config for Electron." Evaluate as the binding if build pain appears. |
-| **sherpa-onnx-node** | 1.13.2 (Apache-2.0) | Alt all-in-one on-device STT **and** TTS via ONNX | Fallback engine family (k2-fsa). Actively maintained (2026-05). Worth knowing if Kokoro-via-Transformers.js or whisper bindings disappoint; hosts ASR + TTS through one ORT addon. Not the default — adds a second inference stack. |
-| **@elevenlabs/elevenlabs-js** | latest (MIT SDK) | Premium cloud TTS (consent-gated, "max quality" tier) | If the cloud opt-in path wants best-in-class voice / cloning beyond OpenAI TTS. Flash v2.5 ~75 ms latency, WebSocket streaming. **Cost:** ~$300/1M chars overage vs OpenAI TTS-1 $15/1M — premium. Optional upsell tier, not default cloud. |
+These are pulled by Baileys and documented here for awareness. Do not add them to `package.json`.
+
+| Library | Version (via Baileys) | Type | Notes |
+|---------|----------------------|------|-------|
+| `libsignal` | git dep in 6.7.x | Pure JS | Signal protocol crypto. Published 6.0.0 is v7-only. 6.7.23 pulls from git. No native files. |
+| `protobufjs` | `^7.2.4` | Pure JS | WhatsApp binary proto serialization |
+| `ws` | `^8.13.0` | Pure JS | WebSocket transport |
+| `async-mutex` | `^0.5.0` | Pure JS | Concurrency guard — used inside `makeCacheableSignalKeyStore` |
+| `pino` | `^9.6` | Pure JS | Structured logger. Aria already uses pino 9.x — no conflict. |
+| `@cacheable/node-cache` | `^1.4.0` | Pure JS | In-memory key cache for signal store |
+| `music-metadata` | `^11.7.0` | Pure JS | Audio metadata (needed by Baileys internals; not for text-only use) |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `@electron/rebuild` | Rebuild native STT addons against Electron's ABI | smart-whisper / whisper-node-addon are native — same ABI-lock discipline Aria already lives with for better-sqlite3 (Electron 41, NODE_MODULE_VERSION 141). Add them to the dual-build matrix. |
-| `electron-builder` `extraResources` / `asarUnpack` | Ship GGML model files + native `.node` outside the asar | `.bin` whisper models and `.node`/`.onnx` blobs must be **asarUnpack**ed or placed in `resourcesPath` (the same pattern Aria already uses for the brand icon via `resolveBrandIcon`). |
-| AudioWorklet (Web Audio, no package) | Renderer-side 16 kHz/16-bit PCM downsampling | Capture is `getUserMedia` → `AudioWorklet` → resample to 16 kHz mono PCM (both whisper.cpp and VAD want 16 kHz). Bundle the worklet as an inline Blob URL to dodge Electron CSP/file-protocol issues. |
+| `@types/qrcode` | TypeScript types for qrcode | `pnpm add -D @types/qrcode` |
+
+---
 
 ## Installation
 
 ```bash
-# Local STT (smart-whisper primary; nodejs-whisper fallback)
-npm install smart-whisper nodejs-whisper
+# Core additions (text-only, no media peers)
+pnpm add @whiskeysockets/baileys@6.7.23 qrcode@1.5.4
 
-# Local TTS
-npm install kokoro-js onnxruntime-node
-
-# VAD (renderer)
-npm install @ricky0123/vad-web @ricky0123/vad-react
-
-# Cloud opt-in (consent-gated) — openai already present via AI SDK
-npm install openai
-npm install @openai/agents-realtime   # optional, full-duplex cloud tier
-# npm install @elevenlabs/elevenlabs-js  # optional premium TTS tier
-
-# Optional fallbacks / build insurance
-# npm install whisper-node-addon sherpa-onnx-node
-
-# Native addon rebuild for Electron's ABI
-npm install -D @electron/rebuild
+# TypeScript types
+pnpm add -D @types/qrcode
 ```
 
-> **Wake-word is intentionally NOT in the install block** — it carries a licensing trap that must be decided before adding a dependency. See "What NOT to Use" and the wake-word variant.
+**No `electron-rebuild` step is needed for these packages.** See native modules section.
+
+---
+
+## Baileys Version Decision: 6.7.23 vs 7.0.0-rc13
+
+**Use `6.7.23` (tagged `legacy` on npm), pinned exactly — not `latest` which resolves to `7.0.0-rc13`.**
+
+The `latest` dist-tag on npm resolves to `7.0.0-rc13` (published 2026-05-21). If you run `pnpm add @whiskeysockets/baileys` without a version, you get the RC. That is the wrong choice.
+
+### Why not v7.0.0-rc13
+
+| Risk | Detail |
+|------|--------|
+| Still RC after 13 releases | No stable v7.x exists yet. RC13 published 2026-05-21. |
+| Known auth bugs in recent RCs | Three 401/device_removed authentication handshake bugs were documented in RC9 and partially patched across RC10–RC13. RC13 itself is a hotfix for a protocolMessage parsing regression. |
+| Breaking change: LID system | WhatsApp's Local Identifier (LID) overhaul changed `MessageKey`, `Contact`, and `GroupMetadata` types throughout. Any code reading JIDs needs a rewrite. `isJidUser()` removed; new `WAMessageAddressingMode` enum added. |
+| Breaking change: ACKs removed | v7 no longer sends delivery ACKs (ban-risk mitigation), changing how you detect message receipt. |
+| New `whatsapp-rust-bridge` dep | v7 requires `whatsapp-rust-bridge@0.5.4` — a Rust-compiled WebAssembly module. No `.node` native files (verified: `npm pack --dry-run` shows 5 files, WASM inlined in 2 MB `dist/index.js`), but WASM loaded from inside Electron's ASAR archive can fail silently on some platforms. Solvable but adds complexity not present in 6.7.x. |
+| New `p-queue@^9` dep | v7 requires p-queue 9; Aria already uses p-queue 8 for LLM serialization. Dual versions in one project are possible but messy. |
+
+### Why 6.7.23 specifically
+
+- Last release on the `legacy` dist-tag (published 2026-05-21 — same day as RC13, maintained in parallel)
+- All `6.7.x` from `6.7.20` onward are ESM — the critical fact that drives the electron-vite config change below
+- `6.7.14`–`6.7.18` are CJS; do not use them (stale security patches)
+- **6.7.23 is the most-patched, most-stable release for the 6.x API surface**
+
+### Pin strategy
+
+```json
+// package.json — no caret
+"@whiskeysockets/baileys": "6.7.23"
+```
+
+Comment in `WhatsAppSessionManager.ts`: "Pinned to 6.7.23 (legacy tag). v7 migration blocked on LID API stabilization + WASM-asar resolution."
+
+### Version churn risk
+
+Baileys releases when WhatsApp updates its Web client protocol. The maintainers have historically shipped hotfixes within 24–72 hours of WhatsApp breaking changes. This means you may need to bump the pin reactively. Monitor `github.com/WhiskeySockets/Baileys/releases`. The 6.7.x legacy branch also receives hotfixes (6.7.22 → 6.7.23 are both 2026-05 patches).
+
+---
+
+## ESM in electron-vite — Required Config Change
+
+**Both `6.7.20`+ and `7.x` are pure-ESM** (`"type": "module"` — verified via `npm view @whiskeysockets/baileys@6.7.23 type`). Aria's main process uses electron-vite with `externalizeDepsPlugin`, which marks dependencies as external and leaves them as runtime `require()` calls. That will throw `ERR_REQUIRE_ESM` for Baileys.
+
+**Fix: add Baileys to the `exclude` list** in the main process config so electron-vite bundles it (Rollup handles ESM→CJS interop at build time):
+
+```typescript
+// electron.vite.config.ts — main section, add plugins:
+main: {
+  plugins: [externalizeDepsPlugin({ exclude: ['@whiskeysockets/baileys'] })],
+  define: oauthDefine,
+  build: { /* ...existing */ },
+  resolve: { /* ...existing */ },
+},
+```
+
+This is exactly the same pattern Aria already uses for `zod` in the preload section. No dynamic `import()` wrapper needed — Rollup inlines and transforms.
+
+**Alternative not recommended:** Converting the entire main process to ESM (`"type": "module"`) is a larger migration that risks better-sqlite3's synchronous API assumptions and all existing CommonJS imports.
+
+---
+
+## Native Modules — No New Rebuild Burden
+
+None of the recommended additions require native rebuild.
+
+| Package | Type | electron-rebuild needed? |
+|---------|------|--------------------------|
+| `@whiskeysockets/baileys@6.7.23` | Pure ESM JS | No |
+| `libsignal` (git dep in 6.7.x) | Pure JS — confirmed via `npm pack --dry-run`, 22 files, no `.node` | No |
+| `protobufjs@7.x` | Pure JS | No |
+| `ws@8.x` | Pure JS | No |
+| `qrcode@1.5.4` | Pure JS | No |
+
+Aria's existing `pnpm rebuild:native:electron` pipeline only touches `better-sqlite3` and `better-sqlite3-multiple-ciphers`. **This does not change.**
+
+Contrast with optional peer deps that must NOT be installed:
+
+- `sharp` — native C++ (libvips), requires rebuild, ~40 MB prebuilt per platform
+- `jimp` — pure JS but ~10 MB, only for image thumbnails
+- `audio-decode` — only for voice-note duration extraction
+- `link-preview-js` — only for rich link previews
+
+All three are declared `optional` in `peerDependenciesMeta`. Do not install them.
+
+---
+
+## Custom AuthenticationState — SQL-Backed Implementation
+
+Baileys requires an `AuthenticationState` object. The exact interface (verified from `src/Types/Auth.ts` at HEAD of WhiskeySockets/Baileys):
+
+```typescript
+type AuthenticationState = {
+  creds: AuthenticationCreds   // device noise + signal keys + account metadata
+  keys: SignalKeyStore          // per-session encryption key store
+}
+```
+
+### SignalDataTypeMap — what keys your store must handle (6.7.x)
+
+```typescript
+type SignalDataTypeMap = {
+  'pre-key':                KeyPair                              // { public: Uint8Array; private: Uint8Array }
+  'session':                Uint8Array                           // serialized session record
+  'sender-key':             Uint8Array                           // group sender-key blob
+  'sender-key-memory':      { [jid: string]: boolean }
+  'app-state-sync-key':     proto.Message.IAppStateSyncKeyData
+  'app-state-sync-version': LTHashState
+  'identity-key':           Uint8Array
+}
+// Note: 'lid-mapping', 'device-list', 'tctoken' are v7-only. Not present in 6.7.x.
+```
+
+### SignalKeyStore interface — must implement
+
+```typescript
+type SignalKeyStore = {
+  get<T extends keyof SignalDataTypeMap>(
+    type: T,
+    ids: string[]
+  ): Awaitable<{ [id: string]: SignalDataTypeMap[T] }>
+
+  set(data: SignalDataSet): Awaitable<void>
+
+  clear?(): Awaitable<void>   // called on logout — delete all keys except creds
+}
+// Awaitable<T> = T | Promise<T>
+// better-sqlite3 is synchronous — returning T directly satisfies Awaitable<T>
+```
+
+### SQL table design
+
+A single key-value table in the existing SQLCipher DB covers both creds and signal keys. This goes in migration 138 alongside `whatsapp_group`, `whatsapp_message`, and `whatsapp_group_digest`:
+
+```sql
+CREATE TABLE whatsapp_auth_state (
+  key_type   TEXT    NOT NULL,  -- 'creds' | 'pre-key' | 'session' | 'sender-key' | etc.
+  key_id     TEXT    NOT NULL,  -- empty string '' for creds; signal key ID for everything else
+  value      TEXT    NOT NULL,  -- JSON string with BufferJSON.replacer applied
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (key_type, key_id)
+);
+```
+
+### Serialization: BufferJSON
+
+Baileys uses `BufferJSON` (exported from `@whiskeysockets/baileys`) to serialize credentials. `Buffer` and `Uint8Array` become `{ type: 'Buffer', data: [...] }`. You must use the same replacer/reviver — do not use plain `JSON.stringify/parse`:
+
+```typescript
+import { BufferJSON, initAuthCreds } from '@whiskeysockets/baileys'
+
+// Read creds
+const row = db.prepare(
+  'SELECT value FROM whatsapp_auth_state WHERE key_type=? AND key_id=?'
+).get('creds', '') as { value: string } | undefined
+
+const creds = row
+  ? JSON.parse(row.value, BufferJSON.reviver)
+  : initAuthCreds()
+
+// Write creds (call after sock.ev.on('creds.update'))
+const saveCreds = () => {
+  const serialized = JSON.stringify(creds, BufferJSON.replacer)
+  db.prepare(
+    'INSERT OR REPLACE INTO whatsapp_auth_state (key_type, key_id, value, updated_at) VALUES (?,?,?,unixepoch())'
+  ).run('creds', '', serialized)
+}
+```
+
+### SignalKeyStore implementation (better-sqlite3)
+
+```typescript
+import { SignalKeyStore, SignalDataSet, BufferJSON } from '@whiskeysockets/baileys'
+import type Database from 'better-sqlite3'
+
+function makeSQLiteSignalKeyStore(db: Database.Database): SignalKeyStore {
+  const select = db.prepare<[string, string]>(
+    'SELECT value FROM whatsapp_auth_state WHERE key_type=? AND key_id=?'
+  )
+  const upsert = db.prepare<[string, string, string]>(
+    'INSERT OR REPLACE INTO whatsapp_auth_state (key_type, key_id, value, updated_at) VALUES (?,?,?,unixepoch())'
+  )
+  const del = db.prepare<[string, string]>(
+    'DELETE FROM whatsapp_auth_state WHERE key_type=? AND key_id=?'
+  )
+
+  return {
+    get(type, ids) {
+      const result: Record<string, any> = {}
+      for (const id of ids) {
+        const row = select.get(type, id) as { value: string } | undefined
+        if (row) result[id] = JSON.parse(row.value, BufferJSON.reviver)
+      }
+      return result   // sync return satisfies Awaitable<T>
+    },
+
+    set(data: SignalDataSet) {
+      const tx = db.transaction(() => {
+        for (const [type, entries] of Object.entries(data)) {
+          if (!entries) continue
+          for (const [id, value] of Object.entries(entries)) {
+            if (value == null) del.run(type, id)
+            else upsert.run(type, id, JSON.stringify(value, BufferJSON.replacer))
+          }
+        }
+      })
+      tx()  // sync transaction
+    },
+
+    clear() {
+      db.prepare("DELETE FROM whatsapp_auth_state WHERE key_type != 'creds'").run()
+    }
+  }
+}
+```
+
+### Wiring to makeWASocket — always wrap with makeCacheableSignalKeyStore
+
+```typescript
+import { makeWASocket, makeCacheableSignalKeyStore } from '@whiskeysockets/baileys'
+import pino from 'pino'
+
+const logger = pino({ level: 'silent' })   // or wire to Aria's existing pino instance
+
+const sock = makeWASocket({
+  auth: {
+    creds,
+    keys: makeCacheableSignalKeyStore(makeSQLiteSignalKeyStore(db), logger),
+  },
+  logger,
+  getMessage: async (key) => {
+    // Return the message proto for retry — query whatsapp_message table
+    const row = db.prepare('SELECT proto_bytes FROM whatsapp_message WHERE wa_msg_id=?')
+                  .get(key.id) as { proto_bytes: Buffer } | undefined
+    if (!row) return undefined
+    // deserialize and return proto.IMessage
+  }
+})
+```
+
+`makeCacheableSignalKeyStore` adds an LRU in-memory cache over the signal key operations, dramatically reducing DB hits for active sessions. Always wrap — do not pass the raw store directly.
+
+---
+
+## QR Code Rendering
+
+Baileys emits a QR string via `connection.update` when pairing is needed. Convert in the main process and send to the renderer via typed IPC:
+
+```typescript
+import QRCode from 'qrcode'
+
+sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
+  if (qr) {
+    const dataUrl = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'L' })
+    mainWindow.webContents.send('whatsapp:qr', dataUrl)
+  }
+  if (connection === 'open') {
+    mainWindow.webContents.send('whatsapp:connected')
+  }
+  if (connection === 'close') {
+    // handle reconnect or ban detection via lastDisconnect.error
+  }
+})
+```
+
+**`errorCorrectionLevel: 'L'`** — Baileys RC10 release notes explicitly noted the new QR format uses decreased error correction. Use `'L'` even in 6.7.23 for forward-compatibility and a smaller, faster-to-scan code.
+
+**Bundle impact:** `qrcode@1.5.4` unpacked size is 135 kB. Its three runtime deps (`pngjs` ~330 kB, `dijkstrajs` ~13 kB, `yargs` ~200 kB) total ~680 kB. These are pure-JS CommonJS modules; they do not need exclusion from `externalizeDepsPlugin` (regular `require()` works fine). Total main-process bundle addition: under 1 MB.
+
+---
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| smart-whisper (library binding) | nodejs-whisper (CLI wrapper) | Batch/file transcription (uploaded meeting recording) where spawn latency is irrelevant; or if smart-whisper's stale native build breaks on Electron 41. |
-| smart-whisper | whisper-node-addon (prebuilt) | If you cannot get a clean native build under `electron-rebuild`; prebuilt `.node` per platform avoids node-gyp entirely. |
-| kokoro-js (Transformers.js) | Chatterbox-Turbo-ONNX via onnxruntime-node | When you want Chatterbox's emotion/paralinguistic tags + voice cloning and sub-200 ms latency; heavier (350M params, prefers GPU) but MIT-licensed and ONNX-exported. Selectable local voice, not the default. |
-| kokoro-js | sherpa-onnx-node TTS | If you want ASR+TTS unified under one ORT addon and Kokoro-via-wasm is too slow on low-end CPUs. |
-| OpenAI Realtime (cloud duplex) | Local cascading STT→LLM→TTS | **Local is the default** per locked decision. Cloud Realtime only on explicit consent for lowest-latency/highest-quality duplex; mirrors hybrid-LLM routing. |
-| OpenAI TTS (cloud default) | ElevenLabs Flash v2.5 | When the user opts into a "max quality / cloned voice" tier and accepts ~20x per-char cost. |
-| @ricky0123/vad-web (Silero) | Picovoice Cobra VAD | Only if you're *already* paying Picovoice for wake-word and want one vendor; otherwise Silero (MIT) is free and commercial-safe. |
+| `@whiskeysockets/baileys@6.7.23` | `whatsapp-web.js` | Never for Aria — bundles headless Chromium (~170 MB); rejected by architecture decision |
+| `@whiskeysockets/baileys@6.7.23` | `baileys` (npm bare name) | Never — this is an outdated/stale fork namespace; WhiskeySockets is the active fork |
+| `@whiskeysockets/baileys@6.7.23` | `@whiskeysockets/baileys@7.0.0-rc13` | When v7 reaches a stable release and LID API churn settles |
+| `qrcode` | `qrcode-terminal` | Terminal-only output; useless for Electron UI |
+| SQL-backed auth state | `useMultiFileAuthState` (built-in) | Never for Aria — loose JSON files outside the SQLCipher boundary; race-prone; exposed to filesystem inspection |
+| `makeSQLiteSignalKeyStore` (custom) | Community `mysql-baileys`, `baileysauth` | Those target MySQL/Postgres/MongoDB; no SQLite adapters in the community exist as of research date. Roll your own using the pattern above — it is ~60 lines. |
 
-## What NOT to Use
+---
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| **openWakeWord pretrained models** | Code is Apache-2.0 but the **pretrained models are CC BY-NC-SA 4.0 (non-commercial)** — training data has unknown upstream licensing. Shipping them in a commercial product violates the license. | Either (a) train your own openWakeWord models on licensed/synthetic data, or (b) license **Picovoice Porcupine** (`@picovoice/porcupine-node` 4.0.2). Porcupine free tier allows commercial use but **only up to 3 monthly active users**; real deployment needs Foundation ($6k/yr) or Enterprise ($30k/yr). **Flag this cost before committing to always-listening.** |
-| **XTTS-v2 / Coqui** | CPML license = **non-commercial**. Already flagged in model research. | Kokoro-82M (Apache-2.0) or Chatterbox (MIT). |
-| **Moshi / single-model duplex locally** | Needs A100-class GPU; won't run on a typical exec laptop. | Local **cascading** STT→LLM→TTS with VAD-driven turn-taking + barge-in (the locked architecture). |
-| **whisper-node (`ariym`)** | Older CLI binding, stale; superseded. | smart-whisper / nodejs-whisper. |
-| **mic / node-record-lpcm16** | Last published 2022; depend on external `sox`/`arecord` binaries you'd bundle per-OS; fragile in packaged Electron. | Capture audio in the **renderer** via `getUserMedia` + AudioWorklet; stream PCM to main over IPC. No native recorder binary. |
-| **desktopCapturer for microphone** | It's for screen/system audio and has known Windows renderer-crash bugs (electron #42765, #46369); overkill for mic. | Plain `getUserMedia({audio:true})` in renderer. |
+## What NOT to Add
 
-## Stack Patterns by Variant
+| Avoid | Why | Notes |
+|-------|-----|-------|
+| `sharp` | Native C++ (libvips) — requires electron-rebuild, ~40 MB prebuilt per platform | Only needed for image thumbnails. Listed as optional peer dep — skip entirely. |
+| `jimp` | Pure JS but ~10 MB; only for sticker/image thumbnail generation | Optional peer dep — skip for text-only. |
+| `audio-decode` | Only for voice-note duration extraction | Optional peer dep — not needed. |
+| `link-preview-js` | Only for rich link previews in outbound messages | Optional peer dep — not needed. |
+| `ffmpeg` / `fluent-ffmpeg` | Audio/video conversion — also a system binary dep | Not needed for text-only group ingestion. |
+| `puppeteer` / `playwright` | The `whatsapp-web.js` approach — bundles Chromium (~170 MB) | Architecture decision: rejected. |
+| `@wppconnect-team/wppconnect` | Same Chromium-based approach as whatsapp-web.js | Same rejection reason. |
 
-**Local default path (always available, no consent needed):**
-- Capture: renderer `getUserMedia` → AudioWorklet → 16 kHz mono PCM
-- Gate: `@ricky0123/vad-web` (Silero, MIT) detects speech start/end → barge-in support
-- STT: `smart-whisper` in **main** process running `whisper.cpp` + Whisper large-v3-turbo (Metal on mac, CPU elsewhere, CUDA opt-in)
-- Reasoning: existing Vercel AI-SDK hybrid router (local Ollama / frontier per sensitivity)
-- TTS: `kokoro-js` (Kokoro-82M) streaming chunks back to renderer for playback
-- Because: zero data leaves the machine; preserves Aria's local-first guarantee as the default.
-
-**Cloud opt-in path (consent-gated, "max quality"):**
-- Same capture + VAD in renderer
-- Route to **OpenAI Realtime** (`@openai/agents-realtime` WebRTC) for full duplex, OR `openai.audio.transcriptions` + `openai.audio.speech` for cascaded cloud, OR ElevenLabs for premium TTS only
-- Gate behind the **same consent/disclosure UX** that governs frontier LLM prompts; PII pre-routing rules still apply
-- Because: mirrors the existing hybrid-LLM routing decision; crosses the network only on explicit opt-in.
-
-**Push-to-talk (default activation):**
-- No wake-word dependency — a hotkey/UI button starts capture. Zero licensing cost. Ship this first.
-
-**Always-listening wake-word (opt-in activation):**
-- Requires **Porcupine** (commercial license needed beyond 3 MAU) because openWakeWord's pretrained models are non-commercial.
-- This is the one feature with a hard licensing/cost gate. Requirements must decide: (a) pay Picovoice, (b) train custom openWakeWord models, or (c) defer always-listening to v2.1.
-
-**Audio transport (renderer ↔ main):**
-- Renderer owns capture + playback (Web Audio is renderer-only in Electron). Main owns the native STT/TTS engines.
-- Stream PCM frames renderer→main and synthesized audio main→renderer over the existing **typed IPC** layer (Aria already has a preload IPC surface). Use transferable `ArrayBuffer`/chunked messages; avoid a localhost socket sidecar unless a binding forces it.
+---
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| smart-whisper / whisper-node-addon | Electron 41 (NODE_MODULE_VERSION 141) | Native addons — **must** run through `@electron/rebuild` and join Aria's dual-build/ABI matrix (same lock that bites better-sqlite3). Verify before each Electron bump. |
-| kokoro-js 1.2.1 | onnxruntime-node 1.26 / Transformers.js | kokoro-js bundles its own ORT-web (wasm) for Node `cpu`; only pin `onnxruntime-node` separately if you need a specific EP (CUDA) or run Chatterbox-ONNX alongside. |
-| @ricky0123/vad-web 0.0.30 | renderer (Web Audio / wasm) | Runs in renderer, not main. Pairs with vad-react 0.0.36. Pre-1.0 — pin exact versions. |
-| openai 6.41.0 | @openai/agents-realtime 0.11.6 | Both current as of 2026-06-01. Realtime model is GA (`gpt-realtime`, ~$0.06/min audio in, $0.24/min out). |
-| .bin GGML models / .onnx / .node | electron-builder asar | Must be `asarUnpack`ed or shipped via `resourcesPath` (reuse the `resolveBrandIcon` pattern). |
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `@whiskeysockets/baileys@6.7.23` | Node >= 20.0.0 | Electron 41 ships Node 22 — fully compatible. Verified via `engines` field. |
+| `@whiskeysockets/baileys@6.7.23` | `pino@^9.6` | No conflict — Aria already uses pino 9.x |
+| `@whiskeysockets/baileys@6.7.23` | `p-queue@^8` | No conflict — Baileys 6.7.x does not depend on p-queue. (v7.x would pull p-queue 9, creating a peer conflict with Aria's p-queue 8.) |
+| `qrcode@1.5.4` | All Node 18+ | No engine restriction |
+| `libsignal` (git dep) | `@whiskeysockets/baileys@6.7.x` | The published `libsignal@6.0.0` on npm is a v7-only release (published 2026-05-13, same day as RC10/11). Do NOT install `libsignal@6.0.0` separately when using 6.7.23 — it will be ignored or create a version conflict. |
 
-### Maintenance risk flags (HIGH-value for downstream)
-
-- **smart-whisper last published 2024-10** — functional but not actively updated. If it fails to build against a future Electron, migration target is `whisper-node-addon` (prebuilt, MIT, 2025-08) or `nodejs-whisper` (CLI, 2026-04). Keep both wired-but-disabled to de-risk.
-- **@ricky0123/vad-* are pre-1.0 (0.0.x)** — stable in practice and widely used, but pin exact versions and expect occasional API churn.
-- **Porcupine cost cliff** — free past 3 monthly-active-users requires a paid plan ($6k–$30k/yr). Single biggest commercial trap in the voice stack; surface in requirements before scoping always-listening.
+---
 
 ## Sources
 
-- npm registry (`npm view`) — verified versions/licenses/publish dates on 2026-06-02: smart-whisper 0.8.1 (MIT, 2024-10), nodejs-whisper 0.3.0 (MIT, 2026-04), kokoro-js 1.2.1 (Apache-2.0, 2025-05), @ricky0123/vad-web 0.0.30 (ISC, 2025-11), @ricky0123/vad-react 0.0.36 (ISC), onnxruntime-node 1.26.0 (MIT, 2026-05), openai 6.41.0 (Apache-2.0, 2026-06), @openai/agents-realtime 0.11.6 (MIT, 2026-06), @picovoice/porcupine-node 4.0.2 (Apache-2.0, 2026-04), whisper-node-addon 1.0.2 (MIT, 2025-08), sherpa-onnx-node 1.13.2 (Apache-2.0, 2026-05). — HIGH
-- Context7 `/ggml-org/whisper.cpp`, `/ariym/whisper-node` — whisper.cpp engine + Node binding landscape — HIGH
-- github.com/JacobLinCool/smart-whisper, github.com/ChetanXpro/nodejs-whisper, github.com/Kutalia/whisper-node-addon — binding capabilities + Electron prebuilt claims — MEDIUM
-- npmjs.com/package/kokoro-js + HF post (Xenova) — Apache weights, TextSplitterStream streaming, cpu/wasm/webgpu devices — HIGH
-- github.com/resemble-ai/chatterbox + HF ResembleAI/chatterbox-turbo-ONNX — MIT, 350M Turbo, ONNX export, paralinguistic tags — MEDIUM
-- github.com/dscripka/openWakeWord + picovoice.ai/pricing + introducing-picovoices-free-tier — **openWakeWord pretrained = CC BY-NC-SA 4.0 (non-commercial)**; Porcupine free ≤3 MAU, Foundation $6k/yr, Enterprise $30k/yr — HIGH (licensing), MEDIUM (exact pricing)
-- developers.openai.com/api/docs/guides/realtime + realtime-webrtc + pricing; openai.com/index/introducing-gpt-realtime — GA gpt-realtime, WebRTC/WS/SIP, ~$0.06/$0.24 per min audio — HIGH
-- elevenlabs.io/text-to-speech-api + pricing; deepgram TTS-API comparison — ElevenLabs Flash v2.5 ~75 ms, WebSocket; OpenAI TTS-1 $15/1M vs ElevenLabs ~$300/1M overage — MEDIUM
-- electronjs.org/docs/api/desktop-capturer + electron issues #42765/#46369 + web.dev microphone-process — renderer getUserMedia + AudioWorklet 16 kHz PCM pattern; desktopCapturer mic crashes on Windows — HIGH
+- npm registry (`npm view @whiskeysockets/baileys --json`, 2026-06-09): versions, dist-tags (`latest=7.0.0-rc13`, `legacy=6.7.23`), module type, dependencies, peerDependenciesMeta — HIGH
+- npm registry (`npm view @whiskeysockets/baileys@6.7.23 type`): confirmed `"type": "module"` — HIGH
+- npm registry (`npm view @whiskeysockets/baileys@6.7.14` through `6.7.18`): confirmed CJS (no type field) — HIGH
+- npm registry (`npm pack whatsapp-rust-bridge@0.5.4 --dry-run`): 5 files, WASM inlined in `dist/index.js`, no `.node` files — HIGH
+- npm registry (`npm pack libsignal@6.0.0 --dry-run`): 22 pure-JS files, no `.node` files — HIGH
+- npm registry (`npm view qrcode@1.5.4`): version, deps, unpacked size 135 kB — HIGH
+- GitHub `WhiskeySockets/Baileys` `src/Types/Auth.ts` (HEAD, fetched 2026-06-09): complete `SignalDataTypeMap` (7 keys in 6.7.x), `SignalKeyStore`, `AuthenticationState` types — HIGH
+- GitHub `WhiskeySockets/Baileys` `src/Utils/auth-utils.ts` (HEAD): `initAuthCreds` function, BufferJSON serialization pattern — HIGH
+- GitHub `WhiskeySockets/Baileys` `Example/example.ts` (HEAD): `makeWASocket` wiring, `makeCacheableSignalKeyStore` usage pattern — HIGH
+- [Baileys v7 migration guide](https://baileys.wiki/docs/migration/to-v7.0.0/): breaking changes (LID system, ACKs removed, ESM, new SignalDataTypeMap keys) — HIGH
+- [Baileys RC10 release notes](https://github.com/WhiskeySockets/Baileys/releases): `whatsapp-rust-bridge` integration, QR error correction change, 30x speedup claim — HIGH
+- [electron-vite troubleshooting guide](https://electron-vite.org/guide/troubleshooting): `externalizeDepsPlugin exclude` pattern for ESM packages — HIGH
+- Aria `electron.vite.config.ts` (local, read 2026-06-09): existing `zod` exclude pattern in preload — HIGH (same pattern applies to Baileys in main)
 
 ---
-*Stack research for: hybrid local-first + cloud-opt-in voice pipeline on Electron/Node/TS (Aria v2.0)*
-*Researched: 2026-06-02*
+*Stack research for: WhatsApp Baileys integration (v2.1 additions only)*
+*Researched: 2026-06-09*
