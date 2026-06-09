@@ -373,8 +373,13 @@ async function bootstrap(): Promise<void> {
   registerHandlers(ipcMain, { logger, dataDir, dbHolder });
 
   // Phase 12 / Plan 12-01 — register background-activity handlers once at
-  // bootstrap. Pre-unlock reads return BG_PREF_DEFAULTS (no stub-then-real
-  // pattern; defaults-only path is safe under a sealed vault).
+  // bootstrap. registerHandlers (above) wired lightweight stubs for these two
+  // channels to satisfy the handler-count test; remove them first, then wire the
+  // real handlers (same remove-then-re-register pattern as the voice path below).
+  // ipcMain.handle throws on a second registration — it does NOT override.
+  for (const ch of [CHANNELS.BG_GET_PREFS, CHANNELS.BG_SET_PREFS]) {
+    ipcMain.removeHandler(ch);
+  }
   registerBackgroundHandlers(ipcMain, dbHolder, logger);
 
   // Phase 15 / Plan 15-05 — Voice IPC + powerMonitor lifecycle (D-03/D-09).

@@ -561,9 +561,10 @@ export function registerHandlers(
   }
 
   // Phase 12 / Plan 12-01 — background-activity handlers (BG_GET_PREFS, BG_SET_PREFS).
-  // These are registered in main/index.ts bootstrap directly. Stubs are added here
-  // so the handler-count test (tests/unit/main/ipc/index.spec.ts) passes; the real
-  // handlers from registerBackgroundHandlers override them at bootstrap time.
+  // Stubs are added here so the handler-count test (tests/unit/main/ipc/index.spec.ts)
+  // passes. main/index.ts bootstrap calls ipcMain.removeHandler on these two channels
+  // and then registers the real handlers via registerBackgroundHandlers — ipcMain.handle
+  // throws on a second registration, so the stubs MUST be removed first (not overridden).
   const bgChannels = [CHANNELS.BG_GET_PREFS, CHANNELS.BG_SET_PREFS];
   if (!bgChannels.every((c) => skip.has(c))) {
     for (const c of bgChannels) {
