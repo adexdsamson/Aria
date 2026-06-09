@@ -14,10 +14,17 @@
  */
 import * as path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
-import PQueue from 'p-queue';
+import PQueueImport from 'p-queue';
 import type { Logger } from 'pino';
 import type { FolderRegistry, FileRow } from './folder-registry';
 import type { FolderIngestionService } from './ingestion-service';
+
+// p-queue v8 is ESM-only; under the bundler's CJS interop the default export
+// lands on `.default`. Normalize at module load (mirrors lifecycle/scheduler.ts).
+// Without this, `new PQueue()` throws "is not a constructor" and the knowledge
+// folder lifecycle fails to start on every boot.
+const PQueue: typeof PQueueImport = ((PQueueImport as unknown as { default?: typeof PQueueImport }).default ??
+  PQueueImport) as typeof PQueueImport;
 
 /**
  * Glob patterns excluded from watching. Mirrors the prescan excludes.
