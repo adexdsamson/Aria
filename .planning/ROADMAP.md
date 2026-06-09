@@ -26,7 +26,7 @@
 - [x] **Phase 14: Voice Safety / Confirm Contract** - Design the voice-confirm contract, the HARD GATE blocking voice from forced/high-severity, and the STATIC RATCHET on voice write-paths — before any fluency work. (completed 2026-06-03)
 - [x] **Phase 15: Audio I/O + Model Runtime** - Renderer mic/VAD/playback + STT sidecar that survives packaging; prove AEC + ABI + RAM + device handling on the packaged app. (completed 2026-06-04)
 - [x] **Phase 16: Streaming Cascade + Barge-in (read-only)** - The "feels conversational" loop with zero write risk: streaming STT→LLM→TTS, barge-in, spoken briefing/answer playback. (completed 2026-06-07)
-- [ ] **Phase 17: Voice-Confirm + Writes Through the Gate** - Voice-driven triage/scheduling/drafting via the confirm flow + assertApproved; mishear recovery; cloud opt-in consent + voice settings.
+- [x] **Phase 17: Voice-Confirm + Writes Through the Gate** - Voice-driven triage/scheduling/drafting via the confirm flow + assertApproved; mishear recovery; cloud opt-in consent + voice settings. (completed 2026-06-09)
 - [ ] **Phase 18: Opt-in Wake-Word + Privacy Isolation** - "Hey Aria" in a privacy-isolated, provably-killable process, OFF by default — gated on the commercial wake-word licensing decision.
 - [ ] **Phase 19: Cloud Opt-in Polish + Performance** - GPU whisper, MessagePort PCM, voice-priority p-queue lane, idle model unload, accessibility polish. (Optimization, not net-new capability.)
 
@@ -105,7 +105,7 @@ Plans:
 - [x] 17-04-PLAN.md — Wave 2: cloud-stt.ts (D-13) + shouldUseCloud() sensitivity gate (D-15) + real VOICE_GET/SET_PREFS handlers (D-16)
 - [x] 17-05-PLAN.md — Wave 3: voiceConfirm wired live via VOICE_CONFIRM_APPROVAL handler + confirm-classifier (D-06) + useVoiceSession pendingApprovalId + useVoiceConfirm hook (D-04/D-09/D-10)
 - [x] 17-06-PLAN.md — Wave 3: VoiceSection.tsx settings UI (D-16/VOICE-08) + ApprovalCard forceExplicit suppression + Cancel button (D-07/D-09/D-11/D-12)
-- [ ] 17-07-PLAN.md — Wave 4: D-17 ratchet update + voice-write-path integration test (SC2) + voice-confirm cancel path test (SC3) + human-verify checkpoint
+- [x] 17-07-PLAN.md — Wave 4: D-17 ratchet update + voice-write-path integration test (SC2) + voice-confirm cancel path test (SC3) + human-verify checkpoint
 **UI hint**: yes
 
 ### Phase 18: Opt-in Wake-Word + Privacy Isolation
@@ -139,7 +139,7 @@ Plans:
 | 14. Voice Safety / Confirm Contract | 3/3 | Complete    | 2026-06-03 |
 | 15. Audio I/O + Model Runtime | 9/9 | Complete   | 2026-06-04 |
 | 16. Streaming Cascade + Barge-in | 6/6 | Complete   | 2026-06-07 |
-| 17. Voice-Confirm + Writes Through the Gate | 6/7 | In Progress|  |
+| 17. Voice-Confirm + Writes Through the Gate | 7/7 | Complete   | 2026-06-09 |
 | 18. Opt-in Wake-Word + Privacy Isolation | 0/0 | Not started | - |
 | 19. Cloud Opt-in Polish + Performance | 0/0 | Not started | - |
 
