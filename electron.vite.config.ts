@@ -45,6 +45,11 @@ const oauthDefine = {
 
 const config: UserConfig = {
   main: {
+    // Baileys is ESM-only; bundling it into out/main via Rollup (instead of
+    // leaving it as an external require) is the only way to make it work in
+    // Electron's CommonJS main process. Every other dep stays external.
+    // Mirror of the preload zod-exclude pattern at line 67.
+    plugins: [externalizeDepsPlugin({ exclude: ['@whiskeysockets/baileys'] })],
     define: oauthDefine,
     build: {
       outDir: 'out/main',
