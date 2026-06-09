@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-09T23:05:44.788Z"
+last_updated: "2026-06-09T23:23:50.605Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 8
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 20 (foundation) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-06-10
 
@@ -47,6 +47,14 @@ Last activity: 2026-06-10
 ## Next Action
 
 **`/gsd-execute-phase 20`** — Continue with Plan 20-03 (migration 138 + auth-state).
+
+## Decisions (Phase 20, Plan 03)
+
+- whatsapp_auth_state column named `type` (not `key_type`) — matches auth-state.spec.ts raw SQL `WHERE type=` queries; plan's Assumption A2 used `key_type` but functionally equivalent
+- migration 138 leaves PRAGMA foreign_keys=OFF after COMMIT; connect.ts re-enables FK via `db.pragma('foreign_keys=ON')` after `runMigrations()` (Rule 3 fix — blocking test issue)
+- provider_sync_state resource CHECK extended to include 'session' in migration 138 — WhatsApp uses 'session' resource type for its auth cursor; tested via spec INSERT
+- gmail_account_view and calendar_account_view recreated inside migration 138 transaction (they reference provider_account which was renamed/dropped+rebuilt)
+- gate 4 proven: auth-state.spec.ts test injects throw on second insert via db.prepare monkey-patch; 0 rows committed confirms true transaction rollback
 
 ## Decisions (Phase 20, Plan 02)
 
