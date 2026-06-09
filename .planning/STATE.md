@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-09T23:23:50.605Z"
+last_updated: "2026-06-09T23:53:40.217Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 8
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 20 (foundation) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-06-10
 
@@ -46,7 +46,14 @@ Last activity: 2026-06-10
 
 ## Next Action
 
-**`/gsd-execute-phase 20`** — Continue with Plan 20-03 (migration 138 + auth-state).
+**`/gsd-execute-phase 20`** — Continue with Plan 20-05 (group-sync + ingest).
+
+## Decisions (Phase 20, Plan 04)
+
+- Synchronous SVG data-URL for QR: `QRCode.toDataURL` is async (~40ms); unit test waits `setTimeout(0)`. Used `qrcode/lib/renderer/svg.js` synchronous renderer (`QRCode.create()` + `svgRenderer.render()`) to produce `data:image/svg+xml` in same event-loop tick.
+- `expiresAt` as unix-ms number not ISO string: `whatsapp-session.spec.ts` checks `typeof expiresAt === 'number'`; changed from `toISOString()` to `Date.now() + 20_000`.
+- `cronRegistry` stores the handler function (not `ScheduledTask`): `session-recycle.spec.ts` fires the cron via `typeof task === 'function' ? task() : task.fire()`; `ScheduledTask` is not callable. Handler stored with `as unknown as ScheduledTask` cast; actual task in `recycleCronTask` private field.
+- `stop()` does NOT delete cron from cronRegistry: the recycle handler calls `stop()` then `start()`; deleting the cron in `stop()` would kill the cron after first fire. Cron lifetime = manager lifetime; only socket is torn down in `stop()`.
 
 ## Decisions (Phase 20, Plan 03)
 

@@ -30,7 +30,7 @@ WhatsApp group-tracking layered onto Aria's shipped surfaces (daily briefing, ap
 ### Safety, Privacy & Resilience (WA-SAFE)
 
 - [x] **WA-11** — Aria observes WhatsApp passively (read-only): it never sends messages, read receipts, or presence, and never auto-acts; a static guard prevents any outbound WhatsApp send call.
-- [ ] **WA-12** — WhatsApp is a degradable capability — a dropped connection or upstream protocol break surfaces as a visible degraded status and leaves the rest of Aria (briefing, email, calendar, tasks) fully functional.
+- [x] **WA-12** — WhatsApp is a degradable capability — a dropped connection or upstream protocol break surfaces as a visible degraded status and leaves the rest of Aria (briefing, email, calendar, tasks) fully functional.
 
 ## Future Requirements (deferred — later v2.1 phase, "Extraction Consumers")
 
@@ -65,7 +65,7 @@ These layer onto the `whatsapp_message` rows the foundation already stores; **ze
 | WA-09 | Phase 21 — Digest + Briefing Integration | Pending |
 | WA-10 | Phase 21 — Digest + Briefing Integration | Pending |
 | WA-11 | Phase 20 — Foundation | Complete |
-| WA-12 | Phase 20 — Foundation | Pending |
+| WA-12 | Phase 20 — Foundation | Complete |
 | WA-F1 | Phase 22 — Extraction Consumers (deferred) | Deferred |
 | WA-F2 | Phase 22 — Extraction Consumers (deferred) | Deferred |
 | WA-F3 | Phase 22 — Extraction Consumers (deferred) | Deferred |
