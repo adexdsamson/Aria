@@ -80,8 +80,41 @@ function ensureNodeVariant(): void {
 
 export async function setup(): Promise<void> {
   ensureNodeVariant();
-  fs.copyFileSync(NODE_VARIANT, ACTIVE);
-  console.log('[setup-native-abi] swapped Node-ABI binary into build/Release/better_sqlite3.node');
+  // On Windows, the active binary (better_sqlite3.node) may be held by a running
+  // Electron/electron-vite process. In that case ALL write attempts to it fail
+  // with EBUSY or EPERM. We tolerate this in the same way teardown() does: log a
+  // warning and continue. Tests that don't use better-sqlite3 (e.g. pure renderer
+  // store specs) will still work correctly. Tests that DO require SQLite will fail
+  // at import time with a descriptive ABI error — that's the expected failure mode
+  // and is preferable to blocking the entire test run.
+  try {
+    fs.copyFileSync(NODE_VARIANT, ACTIVE);
+    console.log('[setup-native-abi] swapped Node-ABI binary into build/Release/better_sqlite3.node');
+  } catch (outerErr: unknown) {
+    const outerCode = (outerErr as NodeJS.ErrnoException | undefined)?.code;
+    if (outerCode !== 'EBUSY' && outerCode !== 'EPERM') {
+      throw outerErr;
+    }
+    // Source locked: try reading it into a buffer first, then writing the buffer
+    // to ACTIVE (avoids CoW shortcut on Windows that can fail on a mapped source).
+    try {
+      const buf = fs.readFileSync(NODE_VARIANT);
+      fs.writeFileSync(ACTIVE, buf);
+      console.log('[setup-native-abi] swapped Node-ABI binary (buffer-copy fallback)');
+    } catch (innerErr: unknown) {
+      const innerCode = (innerErr as NodeJS.ErrnoException | undefined)?.code;
+      if (innerCode === 'EBUSY' || innerCode === 'EPERM') {
+        // Both source and destination are locked (Electron is running).
+        // Best-effort: proceed without swapping. Non-SQLite tests still work.
+        console.warn(
+          `[setup-native-abi] could not swap Node-ABI binary (${innerCode} on active). ` +
+            'SQLite-dependent tests may fail. Stop the Electron app to resolve.',
+        );
+      } else {
+        throw innerErr;
+      }
+    }
+  }
 }
 
 export async function teardown(): Promise<void> {

@@ -287,10 +287,16 @@ export function createVoiceSessionStore(): VoiceSessionStore {
             });
           }
         } else {
-          // Normal answer turn: existing VOICE_FEED_ANSWER path is handled by
-          // the IPC push subscription (onVoiceTranscript → setTranscript).
-          // The voiceFeedAnswer IPC is called externally by the capture layer
-          // after receiving the final transcript — we don't call it here.
+          // Normal answer turn: fire voiceFeedAnswer IPC so the main-side
+          // voiceSessionManager.startAnswer pipeline receives the question.
+          // Fire-and-forget — do NOT await (setTranscript is synchronous).
+          // Guard against test environments where window.aria is undefined.
+          if (text.trim().length > 0 && typeof window !== 'undefined' && window.aria) {
+            (window.aria as AriaApi).voiceFeedAnswer?.({
+              sessionId: currentSessionId,
+              question: text,
+            });
+          }
         }
       } else {
         setState({ liveTranscript: text });

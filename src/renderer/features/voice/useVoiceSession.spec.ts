@@ -22,11 +22,15 @@ function makeAriaApi(overrides?: {
   onVoiceTranscript?: (cb: (d: unknown) => void) => () => void;
   onVoiceState?: (cb: (d: unknown) => void) => () => void;
   onVoiceModelProgress?: (cb: (d: unknown) => void) => () => void;
+  voiceFeedAnswer?: ReturnType<typeof vi.fn>;
+  voiceConfirmApproval?: ReturnType<typeof vi.fn>;
 }) {
   return {
     onVoiceTranscript: overrides?.onVoiceTranscript ?? vi.fn(() => vi.fn()),
     onVoiceState: overrides?.onVoiceState ?? vi.fn(() => vi.fn()),
     onVoiceModelProgress: overrides?.onVoiceModelProgress ?? vi.fn(() => vi.fn()),
+    voiceFeedAnswer: overrides?.voiceFeedAnswer ?? vi.fn(() => Promise.resolve({ ok: true })),
+    voiceConfirmApproval: overrides?.voiceConfirmApproval ?? vi.fn(() => Promise.resolve({ ok: true })),
   };
 }
 
@@ -56,18 +60,20 @@ describe('createVoiceSessionStore', () => {
     expect(state.micGated).toBe(true);
   });
 
-  it('startTurn() is blocked (no-op) while state === speaking (D-13 half-duplex gate)', () => {
+  it('startTurn() triggers bargeIn (D-01) while state === speaking — transitions to idle', () => {
+    // D-01: re-pressing PTT while speaking = barge-in (interrupt TTS), not a no-op.
+    // bargeIn() clears the speaking state and transitions to idle immediately.
     const store = createVoiceSessionStore();
     // Simulate speaking state by calling onPlaybackStart
     store.getState().onPlaybackStart();
     expect(store.getState().voiceState).toBe('speaking');
 
-    // Attempt PTT start while speaking — must be rejected
+    // Attempt PTT start while speaking — triggers barge-in (D-01), not a no-op
     store.getState().startTurn();
 
-    // State must remain speaking, not listening
-    expect(store.getState().voiceState).toBe('speaking');
-    expect(store.getState().micGated).toBe(true);
+    // D-01: bargeIn transitions to idle
+    expect(store.getState().voiceState).toBe('idle');
+    expect(store.getState().micGated).toBe(false);
   });
 
   it('onPlaybackStart sets state=speaking and micGated=true', () => {
@@ -166,5 +172,85 @@ describe('createVoiceSessionStore', () => {
     capturedCb!('listening');
 
     expect(store.getState().voiceState).toBe('listening');
+  });
+
+  // ─── voiceFeedAnswer routing tests ───────────────────────────────────────────
+
+  it('setTranscript final=true + non-empty text calls voiceFeedAnswer with sessionId and question', () => {
+    const voiceFeedAnswer = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const ariaApi = makeAriaApi({ voiceFeedAnswer });
+
+    const originalAria = (globalThis as Record<string, unknown>).aria;
+    (globalThis as Record<string, unknown>).aria = ariaApi;
+
+    try {
+      const store = createVoiceSessionStore();
+      store.getState().startTurn();
+      store.getState().setTranscript('what day is it', true);
+
+      expect(voiceFeedAnswer).toHaveBeenCalledTimes(1);
+      expect(voiceFeedAnswer).toHaveBeenCalledWith({
+        sessionId: expect.any(String),
+        question: 'what day is it',
+      });
+    } finally {
+      (globalThis as Record<string, unknown>).aria = originalAria;
+    }
+  });
+
+  it('setTranscript final=true + empty text does NOT call voiceFeedAnswer', () => {
+    const voiceFeedAnswer = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const ariaApi = makeAriaApi({ voiceFeedAnswer });
+
+    const originalAria = (globalThis as Record<string, unknown>).aria;
+    (globalThis as Record<string, unknown>).aria = ariaApi;
+
+    try {
+      const store = createVoiceSessionStore();
+      store.getState().startTurn();
+      store.getState().setTranscript('', true);
+
+      expect(voiceFeedAnswer).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as Record<string, unknown>).aria = originalAria;
+    }
+  });
+
+  it('setTranscript final=true + whitespace-only text does NOT call voiceFeedAnswer', () => {
+    const voiceFeedAnswer = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const ariaApi = makeAriaApi({ voiceFeedAnswer });
+
+    const originalAria = (globalThis as Record<string, unknown>).aria;
+    (globalThis as Record<string, unknown>).aria = ariaApi;
+
+    try {
+      const store = createVoiceSessionStore();
+      store.getState().startTurn();
+      store.getState().setTranscript('   ', true);
+
+      expect(voiceFeedAnswer).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as Record<string, unknown>).aria = originalAria;
+    }
+  });
+
+  it('setTranscript final=true + pendingApprovalId set does NOT call voiceFeedAnswer', () => {
+    const voiceFeedAnswer = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const voiceConfirmApproval = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const ariaApi = makeAriaApi({ voiceFeedAnswer, voiceConfirmApproval });
+
+    const originalAria = (globalThis as Record<string, unknown>).aria;
+    (globalThis as Record<string, unknown>).aria = ariaApi;
+
+    try {
+      const store = createVoiceSessionStore();
+      store.getState().startTurn();
+      store.getState().setPendingApproval('appr-1');
+      store.getState().setTranscript('yes confirm', true);
+
+      expect(voiceFeedAnswer).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as Record<string, unknown>).aria = originalAria;
+    }
   });
 });
