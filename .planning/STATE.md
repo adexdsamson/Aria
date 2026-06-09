@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
-status: Not started
-last_updated: "2026-06-09T21:15:11.347Z"
-last_activity: 2026-06-09 — Milestone v2.1 roadmap created; Phase 20 is next
+status: executing
+last_updated: "2026-06-09T22:49:53.321Z"
+last_activity: 2026-06-09
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 8
+  completed_plans: 1
   percent: 0
 ---
 
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 20 — Foundation
-Plan: —
-Status: Not started
-Last activity: 2026-06-09 — Milestone v2.1 roadmap created; Phase 20 is next
+Phase: 20 (foundation) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-06-09
 
 **Progress bar:** Phase 0/3 complete · 0% · [ · · · ]
 
@@ -46,7 +46,14 @@ Last activity: 2026-06-09 — Milestone v2.1 roadmap created; Phase 20 is next
 
 ## Next Action
 
-**`/gsd-plan-phase 20`** — Foundation: socket + auth state + QR link flow + group selection + ingestion + IPC/UI + migration 138. All integration points verified against live source at HEAD. No pre-planning research needed.
+**`/gsd-execute-phase 20`** — Continue with Plan 20-02 (migration 138 + auth-state).
+
+## Decisions (Phase 20, Plan 01)
+
+- Pre-unlock WHATSAPP stubs added in Plan 20-01 (not deferred to 20-06) to keep handler-count test green — mirrors knowledgeChannels pattern (RESEARCH.md Pattern 2)
+- ProviderAccountInput.providerKey widened to include 'whatsapp' in types.ts for the provider_account row WhatsApp will use
+- registry.ts throws ProviderNotFoundError for 'whatsapp' (WhatsApp uses WhatsAppSessionManager, not ProviderRegistry)
+- ProviderAccountDto.providerKey + providerAccountDisconnect/Update AriaApi args widened to support renderer disconnect cascade
 
 ## Decisions (Phase 15)
 

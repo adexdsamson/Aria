@@ -189,7 +189,7 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
   5. The connection status badge (linked / reconnecting / needs-relink / disconnected) updates visibly on session events, and a degraded WhatsApp connection leaves the Briefing, Email, Calendar, and Tasks screens fully functional.
 **Plans**: 8 plans (7 waves)
 Plans:
-- [ ] 20-01-PLAN.md — Wave 1: pin baileys@6.7.23 + qrcode@1.5.4 + lockfile (gate 10) + main.plugins externalize exclude (gate 11) + ProviderKey/7 WHATSAPP_* channels + DTOs
+- [x] 20-01-PLAN.md — Wave 1: pin baileys@6.7.23 + qrcode@1.5.4 + lockfile (gate 10) + main.plugins externalize exclude (gate 11) + ProviderKey/7 WHATSAPP_* channels + DTOs
 - [ ] 20-02-PLAN.md — Wave 1: Wave 0 test infra — 2 green-before-dir static ratchets (passive-posture, no-frontier) + 7 spec scaffolds (ingest-privacy CRITICAL, auth-state, reconnect, recycle, retention, migration-138, consent)
 - [ ] 20-03-PLAN.md — Wave 2: migration 138 (4 tables + provider_account CHECK rebuild w/ legacy_alter_table=ON, gate 12) + auth-state.ts (transactional keys.set, gate 4)
 - [ ] 20-04-PLAN.md — Wave 3: session-manager.ts — passive socket (gates 1/2) + QR push + reconnect classify (gate 5) + recycle cron (gate 6) + boot-safe degrade
@@ -226,7 +226,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Foundation | 0/8 | Planned | - |
+| 20. Foundation | 1/8 | In Progress|  |
 | 21. Digest + Briefing Integration | 0/0 | Not started | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
