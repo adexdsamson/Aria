@@ -63,7 +63,7 @@ function makeFakeSttSidecar(): SttSidecarManager {
 
 function makeFakeDownloadController(): ModelDownloadController {
   return {
-    disclosedSize: vi.fn().mockReturnValue(601_882_624),
+    disclosedSize: vi.fn().mockReturnValue(574_041_195),
     start: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),
     resume: vi.fn(),

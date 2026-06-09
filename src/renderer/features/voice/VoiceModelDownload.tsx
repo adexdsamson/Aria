@@ -63,13 +63,14 @@ interface DownloadState {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-/** Format bytes as "X.X MB" (one decimal). */
+/** Format bytes as "X.X MB" (one decimal, decimal MB to match the "574 MB" disclosure). */
 function fmtMB(bytes: number): string {
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / 1_000_000).toFixed(1) + ' MB';
 }
 
 // Total disclosed size in bytes — matches DISCLOSED_MODEL_SIZE_BYTES in model-download.ts
-const DISCLOSED_BYTES = 601_882_624;
+// (574,041,195 = true HuggingFace size; the old 601,882,624 was 574 MiB, a unit bug.)
+const DISCLOSED_BYTES = 574_041_195;
 
 // ─── Size Disclosure Block ────────────────────────────────────────────────────
 

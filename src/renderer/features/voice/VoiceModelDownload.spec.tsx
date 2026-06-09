@@ -129,7 +129,7 @@ describe('VoiceModelDownload', () => {
 
       // Simulate progress at 50%
       await act(async () => {
-        progressCallback?.({ receivedBytes: 300_941_312, totalBytes: 601_882_624 });
+        progressCallback?.({ receivedBytes: 287_020_597, totalBytes: 574_041_195 });
       });
 
       const progressBar = screen.getByRole('progressbar');
@@ -198,7 +198,7 @@ describe('VoiceModelDownload', () => {
 
       // Simulate completion
       await act(async () => {
-        progressCallback?.({ receivedBytes: 601_882_624, totalBytes: 601_882_624, done: true });
+        progressCallback?.({ receivedBytes: 574_041_195, totalBytes: 574_041_195, done: true });
       });
 
       expect(screen.getByText('Voice ready')).toBeTruthy();
@@ -218,7 +218,7 @@ describe('VoiceModelDownload', () => {
       await act(async () => { fireEvent.click(cta); });
 
       await act(async () => {
-        progressCallback?.({ receivedBytes: 601_882_624, totalBytes: 601_882_624, done: true });
+        progressCallback?.({ receivedBytes: 574_041_195, totalBytes: 574_041_195, done: true });
       });
 
       expect(screen.getByTestId('voice-download-cta')).toHaveTextContent('Continue →');
@@ -239,7 +239,7 @@ describe('VoiceModelDownload', () => {
       await act(async () => { fireEvent.click(cta); });
 
       await act(async () => {
-        progressCallback?.({ receivedBytes: 601_882_624, totalBytes: 601_882_624, done: true });
+        progressCallback?.({ receivedBytes: 574_041_195, totalBytes: 574_041_195, done: true });
       });
 
       await act(async () => { fireEvent.click(screen.getByTestId('voice-download-cta')); });

@@ -48,13 +48,17 @@ const MODEL_URL =
   'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin';
 
 /**
- * Known model size in bytes (601,882,624 bytes ≈ 574 MB).
+ * Known model size in bytes (574,041,195 bytes = 574 MB decimal).
  * Disclosed to the UI BEFORE the download starts (SC4).
  * Also used as the T-15-08 supply-chain integrity check on completion.
  *
- * [VERIFIED: RESEARCH.md Pattern 4 — "~574 MB (601,882,624 bytes)"]
+ * NOTE: the original 601,882,624 was wrong — that is 574 *MiB* (574 × 1048576),
+ * a unit-confusion in RESEARCH.md. The real file is 574,041,195 bytes (574 MB
+ * decimal), confirmed via HuggingFace Content-Length + X-Linked-Size. The wrong
+ * value made the size guard reject every successful download.
+ * [VERIFIED 2026-06-09: huggingface.co .../ggml-large-v3-turbo-q5_0.bin → 574041195]
  */
-export const DISCLOSED_MODEL_SIZE_BYTES = 601_882_624;
+export const DISCLOSED_MODEL_SIZE_BYTES = 574_041_195;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
