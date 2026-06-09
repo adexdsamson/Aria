@@ -131,6 +131,12 @@ function VoicePTTButtonCore({
   // Mirror of modelReadyRef in React state for re-render-driven visual affordance
   const [modelReadyState, setModelReadyState] = useState<boolean | null>(null);
 
+  // ── Cloud-aware gate (D-08/j2b) ─────────────────────────────────────────
+  // Cached result of voiceGetPrefs().useCloud. null = not yet checked.
+  // Cache is session-scoped (same lifetime as modelReadyRef). If the user
+  // toggles cloud mid-session without remounting, the cache is stale — acceptable for v1.
+  const cloudReadyRef = useRef<boolean | null>(null);
+
   // Resolve IPC — test injection or window.aria
   const getIpc = useCallback((): VoiceModelDownloadIpc | null => {
     if (testIpc) return testIpc;
@@ -171,6 +177,44 @@ function VoicePTTButtonCore({
   }
 
   /**
+   * Check whether cloud audio processing is enabled (cached after first check).
+   * Returns false (not true) on error — fail-closed so we fall through to the
+   * local model check rather than bypassing it accidentally.
+   */
+  async function checkCloudEnabled(): Promise<boolean> {
+    if (cloudReadyRef.current !== null) {
+      return cloudReadyRef.current;
+    }
+    const ipc = getIpc();
+    if (!ipc || !ipc.voiceGetPrefs) {
+      // No IPC or voiceGetPrefs not exposed — treat as cloud OFF; fall through to local check
+      cloudReadyRef.current = false;
+      return false;
+    }
+    try {
+      const prefs = await ipc.voiceGetPrefs();
+      const enabled = !!(prefs as { useCloud?: boolean } | undefined)?.useCloud;
+      cloudReadyRef.current = enabled;
+      return enabled;
+    } catch {
+      // Fail-closed on error — do NOT bypass local model gate
+      cloudReadyRef.current = false;
+      return false;
+    }
+  }
+
+  /**
+   * Cloud-aware readiness gate.
+   * If cloud is enabled, returns true immediately (local model irrelevant).
+   * Otherwise delegates to the existing local model check.
+   */
+  async function checkReadyOrCloud(): Promise<boolean> {
+    const cloudEnabled = await checkCloudEnabled();
+    if (cloudEnabled) return true;
+    return checkModelReady();
+  }
+
+  /**
    * Attempt a PTT start action (shared between click and keydown paths).
    *
    * If model readiness is already known (cached), operates synchronously.
@@ -181,7 +225,14 @@ function VoicePTTButtonCore({
    * Only when the IPC check returns NOT ready do we open the download modal.
    */
   function attemptPttStart(vadMode: 'hold' | 'toggle'): void {
-    // Fast path: already known from a previous check
+    // Cloud fast-path: if cloud is already known enabled, skip local model gate entirely
+    if (cloudReadyRef.current === true) {
+      session.setVadMode(vadMode);
+      session.startTurn();
+      return;
+    }
+
+    // Fast path: local model already known NOT ready (cloud fast-path already returned above)
     if (modelReadyRef.current === false) {
       setShowDownloadModal(true);
       return;
@@ -204,17 +255,11 @@ function VoicePTTButtonCore({
       return;
     }
 
-    // Async check: optimistically start the turn while the check is in-flight.
-    // If the model turns out NOT ready, abort the turn and show the modal.
-    // This keeps the synchronous "known ready" and "no IPC" paths fast.
-    checkModelReady().then((ready) => {
+    // Async check (cloud-aware): use checkReadyOrCloud so cloud ON short-circuits
+    // the 574MB download modal.
+    checkReadyOrCloud().then((ready) => {
       if (!ready) {
         setShowDownloadModal(true);
-        // If we had already started the turn optimistically, stop it
-        // (checkModelReady updates modelReadyRef so this branch is only hit
-        // when we learn the model is absent — the turn was never started
-        // because this async path is only taken when null → we do NOT
-        // call startTurn here).
         return;
       }
       session.setVadMode(vadMode);

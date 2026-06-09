@@ -47,6 +47,8 @@ export interface VoiceModelDownloadIpc {
   voiceGetModelStatus: AriaApi['voiceGetModelStatus'];
   voiceDownloadModel: AriaApi['voiceDownloadModel'];
   onVoiceModelProgress: AriaApi['onVoiceModelProgress'];
+  /** Optional — used by VoicePTTButton cloud-aware gate (D-08/j2b) */
+  voiceGetPrefs?: AriaApi['voiceGetPrefs'];
 }
 
 // ─── Download state ───────────────────────────────────────────────────────────

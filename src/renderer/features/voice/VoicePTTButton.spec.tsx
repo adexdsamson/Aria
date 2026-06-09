@@ -202,6 +202,7 @@ function makeIpc(overrides: Partial<VoiceModelDownloadIpc> = {}): VoiceModelDown
     voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, path: null, state: 0 }),
     voiceDownloadModel: vi.fn().mockResolvedValue(undefined),
     onVoiceModelProgress: vi.fn().mockReturnValue(() => undefined),
+    voiceGetPrefs: vi.fn().mockResolvedValue({ speed: 1.0, voiceId: '', useCloud: false }),
     ...overrides,
   };
 }
@@ -265,6 +266,65 @@ describe('VoicePTTButton — lazy first-PTT model-readiness gate (D-08/SC4)', ()
     const skipBtn = screen.getByTestId('voice-download-skip');
     await act(async () => { fireEvent.click(skipBtn); });
     expect(screen.queryByTestId('voice-model-download-modal')).toBeNull();
+    expect(session.startTurn).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Cloud-aware PTT gate (D-08/j2b) ─────────────────────────────────────────
+
+describe('VoicePTTButton — cloud-aware PTT gate', () => {
+  let session: ReturnType<typeof makeSession>;
+
+  beforeEach(() => {
+    session = makeSession();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('click when cloud enabled and local model NOT ready enters listening (no modal)', async () => {
+    const ipc = makeIpc({
+      voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, state: 0 }),
+      voiceGetPrefs: vi.fn().mockResolvedValue({ speed: 1.0, voiceId: '', useCloud: true }),
+    });
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    expect(screen.queryByTestId('voice-model-download-modal')).toBeNull();
+    expect(session.startTurn).toHaveBeenCalled();
+  });
+
+  it('Space keydown when cloud enabled and local model NOT ready enters listening (no modal)', async () => {
+    const ipc = makeIpc({
+      voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, state: 0 }),
+      voiceGetPrefs: vi.fn().mockResolvedValue({ speed: 1.0, voiceId: '', useCloud: true }),
+    });
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    await act(async () => { fireEvent.keyDown(window, { key: ' ', code: 'Space' }); });
+    expect(screen.queryByTestId('voice-model-download-modal')).toBeNull();
+    expect(session.startTurn).toHaveBeenCalled();
+  });
+
+  it('click when cloud OFF and local model NOT ready still shows download modal (D-08 preserved)', async () => {
+    const ipc = makeIpc({
+      voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, state: 0 }),
+      voiceGetPrefs: vi.fn().mockResolvedValue({ speed: 1.0, voiceId: '', useCloud: false }),
+    });
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
+    expect(screen.getByTestId('voice-model-download-modal')).toBeTruthy();
+  });
+
+  it('click when cloud OFF and local model NOT ready does NOT call startTurn (D-08 preserved)', async () => {
+    const ipc = makeIpc({
+      voiceGetModelStatus: vi.fn().mockResolvedValue({ ready: false, state: 0 }),
+      voiceGetPrefs: vi.fn().mockResolvedValue({ speed: 1.0, voiceId: '', useCloud: false }),
+    });
+    render(<VoicePTTButton _testSession={session} _testIpc={ipc} />);
+    const btn = screen.getByTestId('voice-ptt-button');
+    await act(async () => { fireEvent.click(btn); });
     expect(session.startTurn).not.toHaveBeenCalled();
   });
 });
