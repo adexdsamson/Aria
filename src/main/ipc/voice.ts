@@ -44,6 +44,8 @@ import type { cloudTranscribe as CloudTranscribeFn, shouldUseCloud as ShouldUseC
 import type { writePcmToWav as WritePcmToWavFn, tempWavPath as TempWavPathFn } from '../voice/stt/wav';
 import { readRecentVoiceLatencyLog } from '../voice/voice-latency-log';
 import { createVoiceSessionManager } from '../voice/voice-session-manager';
+import { createEmbedClient } from '../rag/ollama-embeddings';
+import { getVectorStore } from '../rag/vector-store';
 import { z } from 'zod';
 import { generateObject } from 'ai';
 import type { VoicePrefsDto } from '../../shared/ipc-contract';
@@ -286,6 +288,8 @@ function ensureVoiceSessionManager(deps: VoiceHandlersDeps, logger: Logger): voi
       logger,
       emitToRenderer: deps.emitToRenderer,
       sessionAbortControllers: abortControllers,
+      embedClient: createEmbedClient(),
+      vectorStore: getVectorStore(deps.dbHolder.db),
     });
   }
 }
