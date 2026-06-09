@@ -500,7 +500,7 @@ export function useVoiceSession(): VoiceSessionState & VoiceSessionActions {
     if (typeof window === 'undefined' || !window.aria) return;
     subscribedRef.current = true;
 
-    ipcUnsubRef.current = store.getState().subscribeToIpc(window.aria as AriaApi);
+    ipcUnsubRef.current = store.subscribeToIpc(window.aria as AriaApi);
 
     return () => {
       ipcUnsubRef.current?.();
