@@ -225,6 +225,48 @@ describe('WhatsApp digest cron', () => {
     expect(pendingCatchup.has('whatsapp-digest')).toBe(true);
   });
 
+  it('multi-day: prior-day digest row exists → today digest is still written (CR-01 regression guard)', async () => {
+    // Arrange: seed a PRIOR-DAY non-NULL digest row for grp1 (simulates day-1 success).
+    // The old CTE would set watermark = MAX(m.sent_at) of ALL grp1 messages, matching
+    // only the single newest message — below MIN_ACTIVITY → group silently skipped.
+    // The fixed CTE derives the floor from last_date (yesterday), so today's messages
+    // (sent_at = now) are all >= yesterday 'T00:00:00.000Z' and are correctly included.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    db.prepare(
+      `INSERT INTO whatsapp_group_digest (jid, date, summary_text, generated_at, model_id)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run('grp1@g.us', yesterday, 'Prior day summary', Date.now() - 86_400_000, 'llama3.1:8b');
+
+    // Existing beforeEach already seeded grp1 with 3 fresh messages (sent_at = now = today).
+    // No extra messages needed; the 3 seeded messages exceed MIN_ACTIVITY.
+
+    const handle = startWhatsAppDigest({
+      db,
+      logger: loggerMock as never,
+      cron: '0 5 * * *',
+      scheduler: null as never,
+      dbHolder: null as never,
+      generateTextFn: mockGenerateText,
+      getLocalModelFn: mockGetLocalModel,
+    });
+
+    await handle.runNow();
+
+    const todayRow = db
+      .prepare(`SELECT summary_text, date FROM whatsapp_group_digest WHERE jid = ? AND date = ?`)
+      .get('grp1@g.us', today) as { summary_text: string | null; date: string } | undefined;
+
+    // Today's digest row must exist with non-NULL summary_text.
+    // Fails against the old CTE (group skipped because MAX(m.sent_at) watermark = latest
+    // message, leaving <MIN_ACTIVITY messages after filter).
+    expect(todayRow).toBeDefined();
+    expect(todayRow!.summary_text).not.toBeNull();
+    expect(typeof todayRow!.summary_text).toBe('string');
+    expect(todayRow!.date).toBe(today);
+  });
+
   it('partial p-queue failure: grp1 succeeds, grp2 generateText throws → grp1 row non-NULL, grp2 row NULL (D-09)', async () => {
     // First call resolves (for grp1), second call rejects (for grp2)
     mockGenerateText
