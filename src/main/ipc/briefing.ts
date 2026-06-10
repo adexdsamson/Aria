@@ -116,20 +116,23 @@ function cronExprForTime(time: string): string {
  *
  * read-only, no model (D-13)
  *
- * Returns undefined when:
- *   - No provider_account row for 'whatsapp' (not linked)
- *   - No tracked groups
- *   - All groups below activity threshold (no digest rows written)
- * Returns { state: 'unavailable', reason: 'model-offline' } when all
- *   digest rows have summary_text=NULL (Ollama was down for all groups).
- * Returns { state: 'ready', groups: [...] } when at least one group
- *   has a non-NULL summary_text for today.
+ * Returns { payload: undefined, shouldGenerate: false } when:
+ *   - No provider_account row for 'whatsapp' (not linked — digest irrelevant)
+ *   - No tracked groups (nothing to generate — digest irrelevant)
+ * Returns { payload: undefined, shouldGenerate: true } when:
+ *   - WhatsApp is linked + groups tracked + ALL groups have no digest row for
+ *     today (no-activity). This is the "linked but no row yet today" case that
+ *     should trigger the D-07.3 async fallback runNow().
+ * Returns { payload: <value>, shouldGenerate: false } when:
+ *   - At least one group has a row (summarized or failed) — generation already ran.
+ *   - { state: 'unavailable', reason: 'model-offline' } when all rows are NULL.
+ *   - { state: 'ready', groups: [...] } when at least one is summarized.
  */
 function readWhatsAppDigests(
   db: Db,
   date: string,
   logger: Pick<Logger, 'warn'>,
-): BriefingPayload['whatsApp'] {
+): { payload: BriefingPayload['whatsApp']; shouldGenerate: boolean } {
   try {
     // Step 1: Check if WhatsApp is linked via provider_account
     const account = db
@@ -137,13 +140,15 @@ function readWhatsAppDigests(
         `SELECT status FROM provider_account WHERE provider_key = 'whatsapp' LIMIT 1`,
       )
       .get() as { status: string } | undefined;
-    if (!account) return undefined;
+    // Not linked — digest is not applicable for this user; do not trigger generation.
+    if (!account) return { payload: undefined, shouldGenerate: false };
 
     // Step 2: Get tracked groups
     const trackedGroups = db
       .prepare(`SELECT jid, display_name FROM whatsapp_group WHERE tracked = 1`)
       .all() as Array<{ jid: string; display_name: string }>;
-    if (trackedGroups.length === 0) return undefined;
+    // Zero tracked groups — digest is not applicable; do not trigger generation.
+    if (trackedGroups.length === 0) return { payload: undefined, shouldGenerate: false };
 
     // Step 3: Get digest rows for today
     const digestRows = db
@@ -179,22 +184,32 @@ function readWhatsAppDigests(
 
     // Step 7: Return based on D-10 state matrix
     if (!hasAnyContent && !hasAnyFailed) {
-      // All groups are sub-threshold (no-activity) — omit section
-      return undefined;
+      // All groups are no-activity (no digest rows for today yet) — omit section but
+      // signal that generation should be triggered (D-07.3). This is specifically the
+      // "linked + groups tracked + no row yet today" case, distinct from "not linked"
+      // or "zero groups" which set shouldGenerate: false above (WR-01 fix).
+      return { payload: undefined, shouldGenerate: true };
     }
     if (!hasAnyContent && hasAnyFailed) {
-      // All digest attempts failed (Ollama was offline for all groups)
+      // All digest attempts failed (Ollama was offline for all groups) — generation
+      // already ran; do not re-trigger.
       return {
-        state: 'unavailable',
-        reason: 'model-offline',
-        ...(connection ? { connection } : {}),
+        payload: {
+          state: 'unavailable',
+          reason: 'model-offline',
+          ...(connection ? { connection } : {}),
+        },
+        shouldGenerate: false,
       };
     }
-    // At least one group has a summary — show the section
+    // At least one group has a summary — show the section; generation already ran.
     return {
-      state: 'ready',
-      groups,
-      ...(connection ? { connection } : {}),
+      payload: {
+        state: 'ready',
+        groups,
+        ...(connection ? { connection } : {}),
+      },
+      shouldGenerate: false,
     };
   } catch (err) {
     logger.warn(
@@ -361,14 +376,17 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
       // Enrichment is AFTER runBriefing returns — frontier never sees whatsApp content (D-11).
       // read-only, no model — readWhatsAppDigests annotated per D-13.
       try {
-        const wa = readWhatsAppDigests(db, date, logger);
+        const { payload: wa, shouldGenerate } = readWhatsAppDigests(db, date, logger);
         if (wa !== undefined) row.whatsApp = wa;
-        // D-07.3 async fallback: if no digest rows for today, trigger generation
+        // D-07.3 async fallback: only trigger runNow() when WhatsApp is linked, groups are
+        // tracked, but no digest row exists for today yet (shouldGenerate=true).
+        // Do NOT fire for unlinked users or users with zero tracked groups — those return
+        // shouldGenerate=false so this call is a no-op for them (WR-01 fix).
         // fire-and-forget — NEVER await here; never propagate Ollama errors into briefing.
         // getDigestHandle() is late-binding (production path); digestHandle is the
         // direct field (test path). Both are checked so tests without getDigestHandle work.
         const _dh = deps.getDigestHandle?.() ?? deps.digestHandle;
-        if (row.whatsApp === undefined && _dh) {
+        if (shouldGenerate && _dh) {
           void _dh.runNow();
         }
       } catch (err) {
