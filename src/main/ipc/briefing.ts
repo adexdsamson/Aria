@@ -70,6 +70,14 @@ export interface BriefingHandlerDeps {
    * existing tests that do not pass it continue to work unchanged.
    */
   digestHandle?: WhatsAppDigestHandle | null;
+  /**
+   * Phase 21 Plan 21-06 — late-binding getter for the digest handle.
+   * Preferred over digestHandle when wired from production index.ts, because
+   * registerBriefingHandlers is called pre-unlock (digestHandle is null at
+   * registration time). The getter is invoked at handler-fire time when
+   * _digestHandle is already assigned. Falls back to digestHandle if absent.
+   */
+  getDigestHandle?: () => WhatsAppDigestHandle | null;
 }
 
 const DEFAULT_TIME = '07:00';
@@ -357,8 +365,11 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
         if (wa !== undefined) row.whatsApp = wa;
         // D-07.3 async fallback: if no digest rows for today, trigger generation
         // fire-and-forget — NEVER await here; never propagate Ollama errors into briefing.
-        if (row.whatsApp === undefined && deps.digestHandle) {
-          void deps.digestHandle.runNow();
+        // getDigestHandle() is late-binding (production path); digestHandle is the
+        // direct field (test path). Both are checked so tests without getDigestHandle work.
+        const _dh = deps.getDigestHandle?.() ?? deps.digestHandle;
+        if (row.whatsApp === undefined && _dh) {
+          void _dh.runNow();
         }
       } catch (err) {
         logger.warn(
@@ -496,10 +507,11 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
   // digest cron (no frontier LLM). Returns immediately; runNow() is async
   // fire-and-forget. Must NOT call briefingGenerateNow (different scope).
   ipcMain.handle(CHANNELS.WHATSAPP_GENERATE_DIGEST_NOW, async () => {
-    if (!deps.digestHandle) {
+    const _dh2 = deps.getDigestHandle?.() ?? deps.digestHandle;
+    if (!_dh2) {
       return { ok: false as const, error: 'digest handle not available' };
     }
-    void deps.digestHandle.runNow();
+    void _dh2.runNow();
     return { ok: true as const };
   });
 

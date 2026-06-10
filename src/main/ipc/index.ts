@@ -94,6 +94,14 @@ export interface IpcDeps {
    * but registerHandlers is called pre-unlock. Returns null until post-unlock.
    */
   getWhatsAppManager?: () => import('../whatsapp/session-manager').WhatsAppSessionManager | null;
+  /**
+   * Plan 21-06 — late-binding getter for the WhatsApp digest handle.
+   * registerBriefingHandlers is called pre-unlock; the digest handle is created
+   * post-unlock in bootPoll. Passing a getter ensures handlers invoke runNow()
+   * on the live instance at briefing-fire time rather than the null reference
+   * captured at registration time.
+   */
+  getDigestHandle?: () => import('../whatsapp/digest-cron').WhatsAppDigestHandle | null;
 }
 
 const NOT_IMPLEMENTED = Object.freeze({ error: 'NOT_IMPLEMENTED' as const });
@@ -282,7 +290,7 @@ export function registerHandlers(
     CHANNELS.BRIEFING_SET_SETTINGS,
   ];
   if (!briefingChannels.every((c) => skip.has(c))) {
-    registerBriefingHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler() });
+    registerBriefingHandlers(ipcMain, { logger, dbHolder, scheduler: getScheduler(), getDigestHandle: deps.getDigestHandle });
     briefingChannels.forEach((c) => skip.add(c));
   }
 

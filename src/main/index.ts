@@ -80,6 +80,7 @@ import { registerKnowledgeFolderIpc, KNOWLEDGE_FOLDER_CHANNELS } from './ipc/kno
 import { registerWhatsAppHandlers, WHATSAPP_CHANNELS } from './ipc/whatsapp';
 import { WhatsAppSessionManager } from './whatsapp/session-manager';
 import { startWhatsAppRetention } from './whatsapp/retention';
+import { startWhatsAppDigest, type WhatsAppDigestHandle } from './whatsapp/digest-cron';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
@@ -160,6 +161,15 @@ let _trayHandle: TrayHandle | null = null;
  * manager.stop() when disconnecting a whatsapp account.
  */
 let whatsAppManager: WhatsAppSessionManager | null = null;
+
+/**
+ * Plan 21-06 — module-level WhatsApp digest cron handle.
+ * Constructed post-unlock in bootPoll immediately after startWhatsAppRetention.
+ * Module-scope so registerLifecycleCallbacks onResume hook can call runNow()
+ * and so getDigestHandle() getter passed to registerHandlers returns the live
+ * instance once the bootPoll block fires (D-07.2 / D-11).
+ */
+let _digestHandle: WhatsAppDigestHandle | null = null;
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -393,6 +403,9 @@ async function bootstrap(): Promise<void> {
     // Plan 20-06: getter is a late-binding closure — returns null until bootPoll
     // creates the manager post-unlock.
     getWhatsAppManager: () => whatsAppManager,
+    // Plan 21-06: late-binding getter for the digest handle — returns null until
+    // startWhatsAppDigest() is called in bootPoll post-unlock.
+    getDigestHandle: () => _digestHandle,
   });
 
   // Phase 12 / Plan 12-01 — register background-activity handlers once at
@@ -620,6 +633,40 @@ async function bootstrap(): Promise<void> {
           logger,
           scheduler,
           dbHolder,
+        });
+        // Plan 21-06 — Register the 05:00 digest cron (D-12 / WA-08).
+        // _digestHandle is module-scope so getDigestHandle() getter and the
+        // powerMonitor onResume hook (D-07.2) both see the live instance.
+        _digestHandle = startWhatsAppDigest({
+          db: waDb,
+          logger,
+          scheduler,
+          dbHolder,
+        });
+        // Plan 21-06 — D-07.2 missed-tick catch-up on wake from sleep.
+        // If the device was asleep at 05:00, no digest row was written.
+        // onResume queries MAX(date) from whatsapp_group_digest and fires
+        // runNow() if no row for today exists. Per-day guard prevents
+        // wake-storm (multiple lid-open/close events in one morning).
+        // UNIQUE(jid,date) constraint absorbs overlap if the pendingCatchup
+        // drain also fires on the same day.
+        registerLifecycleCallbacks({
+          onResume: () => {
+            if (!_digestHandle) return;
+            const db = dbHolder.db;
+            if (!db) return;
+            try {
+              const today = new Date().toISOString().slice(0, 10);
+              const row = db.prepare(
+                'SELECT MAX(date) AS maxDate FROM whatsapp_group_digest',
+              ).get() as { maxDate: string | null } | undefined;
+              if (!row?.maxDate || row.maxDate < today) {
+                void _digestHandle.runNow();
+              }
+            } catch {
+              // best-effort — never block resume
+            }
+          },
         });
       }
     }
@@ -872,11 +919,15 @@ async function runChannelOnce(
   logger: import('pino').Logger,
 ): Promise<void> {
   logger.info({ scope: 'catchup', channel: chan }, 'catchup run starting');
-  // V1: the per-channel runOnce shapes are owned by their subsystem schedulers.
-  // Most schedulers use a module-local lastFired guard that re-arms on next
-  // tick; a no-op here means the next scheduled tick will run normally.
-  // Phase 12 Plan 12-02 — keep the single-shot semantics conservative: log
-  // the drain and let the scheduler's normal tick own re-execution.
-  await Promise.resolve();
+  // Plan 21-06 — real dispatch for 'whatsapp-digest'. All other channels keep
+  // the no-op default (conservative single-shot semantics: log and let the
+  // scheduler's normal tick own re-execution — Phase 12 Plan 12-02 rationale).
+  switch (chan) {
+    case 'whatsapp-digest':
+      if (_digestHandle) await _digestHandle.runNow();
+      break;
+    default:
+      await Promise.resolve();
+  }
   logger.info({ scope: 'catchup', channel: chan }, 'catchup run complete');
 }
