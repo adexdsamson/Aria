@@ -278,12 +278,30 @@ export class WhatsAppSessionManager {
    */
   async startLink(): Promise<void> {
     await this.stop();
+    // A fresh link is a NEW device registration: wipe any prior auth state so
+    // getOrInitCreds() seeds clean creds via initAuthCreds(). This also recovers
+    // from a half-written/partial creds row left by an aborted earlier attempt
+    // (which would otherwise fail the Noise handshake with noiseKey=undefined).
+    this.clearAuthState();
     // Mark linking AFTER stop() (stop resets reconnect state) so startInner()
     // force-opens even with no provider_account row, and closes during the link
     // refresh the QR quickly instead of backing off.
     this.linking = true;
     this.linkingDeadline = Date.now() + LINKING_WINDOW_MS;
     await this.start();
+  }
+
+  /** Wipe persisted Baileys auth state (creds + signal keys) for a clean re-link. */
+  private clearAuthState(): void {
+    if (!this.db) return;
+    try {
+      this.db.prepare('DELETE FROM whatsapp_auth_state').run();
+    } catch (err) {
+      this.logger.warn(
+        { scope: 'whatsapp', event: 'auth-state.clear.fail', err: (err as Error).message },
+        'failed to clear whatsapp_auth_state before link',
+      );
+    }
   }
 
   /** Disconnect the socket and update provider_account status. */
@@ -505,11 +523,17 @@ export class WhatsAppSessionManager {
   /** Attach creds.update handler (persists credentials on change). */
   private wireCredsUpdate(sock: WASocketInstance): void {
     const { BufferJSON } = require('@whiskeysockets/baileys') as typeof import('@whiskeysockets/baileys');
-    sock.ev.on('creds.update', (creds) => {
+    sock.ev.on('creds.update', () => {
       try {
-        // Persist updated creds to whatsapp_auth_state (type='creds', key_id='creds').
-        // We store outside the typed SignalDataTypeMap via a direct SQL upsert
-        // because 'creds' is not a Signal key type — it is the auth identity.
+        // CRITICAL: the creds.update event payload is a PARTIAL<AuthenticationCreds>
+        // (only the fields that changed). Persisting the partial would OVERWRITE the
+        // full stored creds and drop noiseKey/signedIdentityKey — the next session
+        // then reloads creds with noiseKey=undefined and processHandshake throws
+        // "Cannot read properties of undefined (reading 'public')". Baileys merges
+        // the update into sock.authState.creds IN PLACE before emitting, so we
+        // persist the FULL merged creds object, not the event payload.
+        const fullCreds = (sock as { authState?: { creds?: unknown } }).authState?.creds;
+        if (!fullCreds) return;
         this.db
           .prepare(
             `INSERT INTO whatsapp_auth_state (type, key_id, value, updated_at)
@@ -518,7 +542,7 @@ export class WhatsAppSessionManager {
                value = excluded.value,
                updated_at = excluded.updated_at`,
           )
-          .run(JSON.stringify(creds, BufferJSON.replacer));
+          .run(JSON.stringify(fullCreds, BufferJSON.replacer));
       } catch (err) {
         this.logger.warn(
           { scope: 'whatsapp', event: 'creds.update.fail', err },
