@@ -6,17 +6,31 @@ export interface AccountRowProps {
   onDisconnect(account: ProviderAccountDto): void | Promise<void>;
   onSync?(account: ProviderAccountDto): void | Promise<void>;
   onSaveLabel?(account: ProviderAccountDto, label: string): void | Promise<void>;
+  /** WhatsApp-only: called when Reconnect is clicked (needs-auth state). */
+  onReconnect?(account: ProviderAccountDto): void | Promise<void>;
+  /** WhatsApp-only: called when "Manage groups" link is clicked. */
+  onManageGroups?(account: ProviderAccountDto): void;
+  /** WhatsApp-only: count of newly-joined untracked groups (D-04 badge). */
+  newGroupCount?: number;
 }
 
-export function AccountRow({ account, onDisconnect, onSync, onSaveLabel }: AccountRowProps): JSX.Element {
+export function AccountRow({
+  account,
+  onDisconnect,
+  onSync,
+  onSaveLabel,
+  onReconnect,
+  onManageGroups,
+  newGroupCount = 0,
+}: AccountRowProps): JSX.Element {
   const [syncing, setSyncing] = useState(false);
   const label = account.displayLabel || account.displayEmail;
   const needsAuth = account.status === 'needs-auth';
   const degraded = account.status === 'degraded';
   const dotColor = needsAuth
-    ? '#c98a3a'
+    ? 'var(--chip-needs-auth, #c98a3a)'
     : degraded
-      ? '#b34'
+      ? 'var(--chip-degraded, #b34)'
       : '#1f7a4d';
 
   async function handleSync(): Promise<void> {
@@ -91,9 +105,52 @@ export function AccountRow({ account, onDisconnect, onSync, onSaveLabel }: Accou
           <button
             type="button"
             data-testid={`account-reconnect-${account.accountId}`}
+            onClick={() => {
+              if (account.providerKey === 'whatsapp') {
+                // WA-03: Reconnect via WHATSAPP_LINK (onReconnect wired in IntegrationsSection)
+                void (onReconnect ?? (() => {
+                  void window.aria.whatsappLink();
+                }))(account);
+              } else if (onReconnect) {
+                void onReconnect(account);
+              }
+            }}
             style={linkBtnStyle()}
           >
             Reconnect
+          </button>
+        )}
+        {/* D-01: "Manage groups" link — WhatsApp-only */}
+        {account.providerKey === 'whatsapp' && (
+          <button
+            type="button"
+            data-testid={`account-manage-groups-${account.accountId}`}
+            onClick={() => onManageGroups?.(account)}
+            style={linkBtnStyle()}
+          >
+            Manage groups
+            {newGroupCount > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 6,
+                  minWidth: 17,
+                  height: 17,
+                  borderRadius: 999,
+                  background: 'var(--gold, #8a6d3b)',
+                  color: '#fff',
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '0 4px',
+                  lineHeight: 1,
+                }}
+              >
+                {newGroupCount}
+              </span>
+            )}
           </button>
         )}
         {onSync && !needsAuth && (
@@ -123,6 +180,7 @@ export function AccountRow({ account, onDisconnect, onSync, onSaveLabel }: Accou
 function providerDisplayName(providerKey: ProviderAccountDto['providerKey']): string {
   if (providerKey === 'microsoft') return 'Outlook';
   if (providerKey === 'todoist') return 'Todoist';
+  if (providerKey === 'whatsapp') return 'WhatsApp';
   return 'Google';
 }
 
@@ -148,7 +206,14 @@ function dotStyle(): React.CSSProperties {
 }
 
 function chipStyle(needsAuth: boolean, degraded: boolean): React.CSSProperties {
-  const color = needsAuth ? '#c98a3a' : degraded ? '#b34' : 'var(--gold, #8a6d3b)';
+  // Use CSS custom property with hex fallback so jsdom preserves the hex substring
+  // in element.style.color (plain hex is normalized to rgb() by CSSOM). The fallback
+  // values are what browsers + test assertions read.
+  const color = needsAuth
+    ? 'var(--chip-needs-auth, #c98a3a)'
+    : degraded
+      ? 'var(--chip-degraded, #b34)'
+      : 'var(--gold, #8a6d3b)';
   return {
     fontFamily: 'var(--f-mono)',
     fontSize: 10,
