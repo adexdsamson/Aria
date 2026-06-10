@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T00:06:06.150Z"
+last_updated: "2026-06-10T00:31:54.704Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 20 (foundation) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-06-10
 
@@ -46,7 +46,16 @@ Last activity: 2026-06-10
 
 ## Next Action
 
-**`/gsd-execute-phase 20`** — Continue with Plan 20-05 (group-sync + ingest).
+**`/gsd-execute-phase 20`** — Continue with Plan 20-07 (WhatsApp renderer UI + socket attachment).
+
+## Decisions (Phase 20, Plan 06)
+
+- WHATSAPP_CHANNELS excludes push channels (QR_UPDATE, STATE_CHANGED) — they live in pushOnlyChannels (ipc/index.ts); only invoke channels go in the removeHandler loop
+- handleProviderAccountDisconnect exported standalone (mirrors handleVoiceConfirmApproval pattern) — disconnect spec tests it directly without IPC scaffolding
+- getWhatsAppManager getter in IpcDeps (not direct reference) — manager created post-unlock in bootPoll; getter returns null pre-unlock, live instance post-unlock
+- WA-04 cascade relies on migration 138 ON DELETE CASCADE: group DELETE removes message + digest rows (no explicit DELETE needed)
+- Plan 20-07 scope: registerIngest() + registerGroupSync() socket attachment deferred — session-manager must expose socket ref first
+- Static import of handleProviderAccountDisconnect in whatsapp.ts (not dynamic import) — resolves TS2339 at compile time
 
 ## Decisions (Phase 20, Plan 04)
 
