@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
-status: verifying
-last_updated: "2026-06-10T10:52:54.279Z"
-last_activity: "2026-06-10 -- Phase 20 COMPLETE: WhatsApp link/consent/QR/groups/ingest/disconnect all verified live; remaining = run WhatsApp specs GREEN (app-close) + push"
+status: executing
+last_updated: "2026-06-10T11:42:24.991Z"
+last_activity: 2026-06-10 -- Phase 21 planning complete
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 8
+  total_plans: 14
   completed_plans: 8
   percent: 33
 ---
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 Phase: 20 (foundation) — COMPLETE ✅ (live UAT APPROVED 2026-06-10)
 Plan: 8/8 plans complete (8/8 SUMMARYs); 20-08 live UAT APPROVED — all of WA-01..07, WA-11, WA-12 confirmed LIVE
-Status: gsd-verifier 9/9 automated + full live UAT passed on a secondary number; 9 live-UAT defects found & fixed (commits 87045e0..9a8864f)
-Last activity: 2026-06-10 -- Phase 20 COMPLETE: WhatsApp link/consent/QR/groups/ingest/disconnect all verified live; remaining = run WhatsApp specs GREEN (app-close) + push
+Status: Ready to execute
+Last activity: 2026-06-10 -- Phase 21 planning complete
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
 
