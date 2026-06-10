@@ -50,17 +50,23 @@ const config: UserConfig = {
     // Electron's CommonJS main process. Every other dep stays external.
     // Mirror of the preload zod-exclude pattern at line 67.
     //
-    // `include` force-externalizes Baileys' OPTIONAL media peerDependencies
-    // (jimp/sharp/link-preview-js/audio-decode). Baileys only reaches them via
-    // lazy `import('jimp').catch(() => {})` for thumbnail generation — a path
-    // Aria never executes (passive posture, text-only ingest per WA-07, never
-    // sends). Without this, Rollup follows those dynamic imports and fails to
-    // resolve jimp's broken `exports` map. Externalizing leaves them as runtime
-    // dynamic imports that Baileys' own `.catch()` degrades gracefully.
+    // `include` force-externalizes Baileys' CJS dependencies so only Baileys'
+    // own pure-ESM `lib/` is bundled. Two failure modes this prevents:
+    //   1. Media peerDeps (jimp/sharp/link-preview-js/audio-decode): reached only
+    //      via lazy `import('jimp').catch(() => {})` for thumbnails — a path Aria
+    //      never runs (passive, text-only per WA-07, never sends). Bundling them
+    //      makes Rollup fail on jimp's broken `exports` map.
+    //   2. `ws` (CommonJS): Baileys' websocket dep. Bundling ws drags in its
+    //      OPTIONAL native addons `bufferutil`/`utf-8-validate` (not installed) as
+    //      hard `require()`s → runtime "Could not resolve 'bufferutil'". Left
+    //      external, `require('ws')` works in the CJS main and ws's own try/catch
+    //      falls back to its pure-JS frame codec.
+    // Do NOT add ESM-only baileys deps (e.g. music-metadata) here — externalizing
+    // them would emit `require()` of ESM and throw ERR_REQUIRE_ESM.
     plugins: [
       externalizeDepsPlugin({
         exclude: ['@whiskeysockets/baileys'],
-        include: ['jimp', 'sharp', 'link-preview-js', 'audio-decode'],
+        include: ['jimp', 'sharp', 'link-preview-js', 'audio-decode', 'ws'],
       }),
     ],
     define: oauthDefine,
