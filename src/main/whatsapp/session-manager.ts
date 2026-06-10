@@ -30,6 +30,8 @@ import makeWASocket from '@whiskeysockets/baileys';
 import {
   DisconnectReason,
   makeCacheableSignalKeyStore,
+  fetchLatestWaWebVersion,
+  fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
@@ -134,9 +136,11 @@ export function classifyDisconnectReason(
 type WASocketInstance = ReturnType<typeof makeWASocket>;
 
 /** Injectable socket factory — real production uses makeWASocket; tests inject a mock. */
+type WaVersion = [number, number, number];
 type SocketFactory = (
   db: Db,
   logger: Logger,
+  version?: WaVersion,
 ) => WASocketInstance;
 
 export interface WhatsAppSessionManagerDeps {
@@ -174,6 +178,13 @@ export class WhatsAppSessionManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Whether powerMonitor events have been wired (wired once per instance). */
   private powerMonitorWired = false;
+  /**
+   * Cached current WA Web protocol version, resolved once per session.
+   * WhatsApp rejects stale versions with a `<failure reason="405">`; baileys'
+   * bundled default lags the live client. Cached so reconnects/recycles do NOT
+   * re-fetch (addresses the per-connect network/fingerprint concern).
+   */
+  private cachedWaVersion: WaVersion | null = null;
 
   constructor(deps: WhatsAppSessionManagerDeps) {
     this.db = deps.db;
@@ -322,13 +333,61 @@ export class WhatsAppSessionManager {
     }
     this.clearReconnectTimer();
 
-    const sock = this.socketFactory(this.db, this.logger);
+    const version = await this.resolveWaVersion();
+    const sock = this.socketFactory(this.db, this.logger, version);
     this.socket = sock;
 
     this.wireConnectionUpdate(sock);
     this.wireCredsUpdate(sock);
     this.wirePowerMonitor();
     this.wireCapture(sock);
+  }
+
+  /**
+   * Resolve the WA Web protocol version, cached for the session.
+   *
+   * WhatsApp rejects an outdated version with `<failure reason="405">` BEFORE it
+   * ever issues a QR ref, so a current version is mandatory for linking. We try
+   * the live WA version first (most likely accepted), then baileys' recommended
+   * version, then fall back to `undefined` (makeWASocket uses its bundled
+   * default). Network failures NEVER throw — linking degrades, never crashes
+   * boot (WA-12). Resolved once and cached so reconnects do not re-fetch.
+   */
+  private async resolveWaVersion(): Promise<WaVersion | undefined> {
+    if (this.cachedWaVersion) return this.cachedWaVersion;
+    try {
+      const live = await fetchLatestWaWebVersion({});
+      if (live?.version) {
+        this.cachedWaVersion = live.version as WaVersion;
+        this.logger.info(
+          { scope: 'whatsapp', event: 'version.resolved', source: 'wa-web', version: this.cachedWaVersion },
+          'resolved live WA Web version',
+        );
+        return this.cachedWaVersion;
+      }
+    } catch (err) {
+      this.logger.warn(
+        { scope: 'whatsapp', event: 'version.wa-web.fail', err: (err as Error).message },
+        'fetchLatestWaWebVersion failed; trying baileys version',
+      );
+    }
+    try {
+      const rec = await fetchLatestBaileysVersion();
+      if (rec?.version) {
+        this.cachedWaVersion = rec.version as WaVersion;
+        this.logger.info(
+          { scope: 'whatsapp', event: 'version.resolved', source: 'baileys', version: this.cachedWaVersion },
+          'resolved baileys-recommended WA version',
+        );
+        return this.cachedWaVersion;
+      }
+    } catch (err) {
+      this.logger.warn(
+        { scope: 'whatsapp', event: 'version.baileys.fail', err: (err as Error).message },
+        'fetchLatestBaileysVersion failed; using makeWASocket bundled default',
+      );
+    }
+    return undefined; // makeWASocket falls back to its bundled default version
   }
 
   /**
@@ -353,25 +412,24 @@ export class WhatsAppSessionManager {
   }
 
   /** Default production socket factory using makeWASocket. */
-  private defaultSocketFactory(db: Db, logger: Logger): WASocketInstance {
+  private defaultSocketFactory(db: Db, logger: Logger, version?: WaVersion): WASocketInstance {
     const rawStore = makeSQLiteSignalKeyStore(db);
     const keys = makeCacheableSignalKeyStore(rawStore, logger as Parameters<typeof makeCacheableSignalKeyStore>[1]);
 
     // Pinned 6.7.23 (legacy tag). v7 migration blocked on LID API + WASM-asar.
-    // Do NOT hardcode the WA Web protocol version: a stale number is rejected by
-    // WhatsApp with statusCode 405 "Connection Failure" right after registration
-    // (a prior hardcode of [2,3000,1015901307] — OLDER than baileys' own shipped
-    // default — caused exactly that). Omitting `version` makes makeWASocket use
-    // baileys' bundled DEFAULT_CONNECTION_CONFIG.version (the version its protocol
-    // code is built for), which auto-tracks every baileys upgrade. We deliberately
-    // do NOT call fetchLatestWaWebVersion() per-connect (network + fingerprint /
-    // protocol-mismatch anti-pattern); the bundled default is the right pin.
+    // `version` is resolved once per session by resolveWaVersion() (live WA Web
+    // version → baileys-recommended → bundled default). A STALE version is
+    // rejected by WhatsApp with `<failure reason="405">` before any QR ref is
+    // issued — baileys 6.7.23's bundled default (1023223821) lags the live client
+    // (1041183688+), so we MUST send a current one. When `version` is undefined
+    // (all fetches failed offline), makeWASocket uses its bundled default.
     return makeWASocket({
       auth: {
         creds: this.getOrInitCreds(db),
         keys,
       },
       logger: logger as Parameters<typeof makeWASocket>[0]['logger'],
+      ...(version ? { version } : {}),
       markOnlineOnConnect: false,   // WA-11 gate 1
       emitOwnEvents: false,          // WA-11 gate 1
       syncFullHistory: false,        // D-13 explicit
