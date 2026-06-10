@@ -42,7 +42,7 @@ import { powerMonitor } from 'electron';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import { makeSQLiteSignalKeyStore, loadOrInitCreds } from './auth-state';
 import { CHANNELS } from '../../shared/ipc-contract';
-import { registerGroupSync } from './group-sync';
+import { registerGroupSync, syncAllGroups } from './group-sync';
 import { registerIngest } from './ingest';
 
 type Db = Database.Database;
@@ -592,7 +592,9 @@ export class WhatsAppSessionManager {
     // Extract JID from auth creds (D-11: account_id = creds.me.id).
     const creds = (sock as { authState?: { creds?: { me?: { id?: string } } } }).authState?.creds;
     const jid = creds?.me?.id ?? null;
-    const displayNumber = jid ? jid.replace(/@s\.whatsapp\.net$/, '').replace(/^\d+:(\d+)/, '$1') : null;
+    // Display the PHONE number — the part before ':' (device id) or '@'. The old
+    // parse `/^\d+:(\d+)/ → $1` captured the DEVICE id (e.g. "26"), not the phone.
+    const displayNumber = jid ? jid.split(/[:@]/)[0] : null;
 
     // Upsert provider_account row.
     this.upsertProviderAccount(jid, displayNumber, 'ok');
@@ -604,6 +606,13 @@ export class WhatsAppSessionManager {
       { scope: 'whatsapp', event: 'connection.open', jid },
       'WhatsApp connected',
     );
+
+    // Fetch the full participating-group list now — groups.upsert only fires for
+    // NEW/changed groups, so without this the group picker is empty after link.
+    // Fire-and-forget; passive-posture safe (metadata read only); never blocks.
+    void syncAllGroups(sock as never, { db: this.db, logger: this.logger }).catch(() => {
+      /* non-fatal — events will populate over time */
+    });
   }
 
   /** Handle a connection:close event — classify and either retry or set auth-needed. */

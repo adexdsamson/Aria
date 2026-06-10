@@ -42,6 +42,84 @@ interface BaileysSocket {
   ev: { on: (event: string, handler: (arg: unknown) => void) => void };
 }
 
+interface BaileysGroupMetadataFull extends BaileysGroupMetadata {
+  participants?: unknown[];
+}
+
+interface BaileysSocketWithFetch extends BaileysSocket {
+  groupFetchAllParticipating?: () => Promise<Record<string, BaileysGroupMetadataFull>>;
+}
+
+// ─── syncAllGroups ─────────────────────────────────────────────────────────────
+
+/**
+ * Actively fetch EVERY group the linked account participates in and upsert them
+ * (tracked=0 default). Baileys' `groups.upsert` event only fires for NEW or
+ * changed groups — it does NOT push the existing group list on link — so without
+ * this the group picker is empty right after a fresh link. Called by the session
+ * manager on connection:open.
+ *
+ * Passive-posture safe (WA-11): groupFetchAllParticipating is a metadata read
+ * (IQ get); it sends no chat message and no online presence. Returns the number
+ * of groups upserted. Never throws — failures degrade to an empty picker.
+ */
+export async function syncAllGroups(
+  sock: BaileysSocketWithFetch,
+  deps: GroupSyncDeps,
+): Promise<number> {
+  const { db, logger } = deps;
+  if (typeof sock.groupFetchAllParticipating !== 'function') return 0;
+
+  let groups: Record<string, BaileysGroupMetadataFull>;
+  try {
+    groups = await sock.groupFetchAllParticipating();
+  } catch (err) {
+    logger.warn(
+      { scope: 'group-sync', event: 'fetch-all.fail', err: (err as Error).message },
+      'groupFetchAllParticipating failed (group picker will populate via events)',
+    );
+    return 0;
+  }
+
+  const upsertStmt = db.prepare<[string, string, string | null, number | null]>(
+    `INSERT INTO whatsapp_group
+       (jid, display_name, description, member_count, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(jid) DO UPDATE SET
+       display_name = excluded.display_name,
+       description  = excluded.description,
+       member_count = excluded.member_count,
+       updated_at   = datetime('now')`,
+  );
+
+  const list = Object.values(groups ?? {});
+  try {
+    db.transaction(() => {
+      for (const g of list) {
+        if (!g?.id) continue;
+        upsertStmt.run(
+          g.id,
+          g.subject ?? g.id,
+          g.desc ?? null,
+          g.size ?? g.participants?.length ?? null,
+        );
+      }
+    })();
+  } catch (err) {
+    logger.warn(
+      { scope: 'group-sync', event: 'fetch-all.upsert.fail', err: (err as Error).message },
+      'failed to upsert fetched groups',
+    );
+    return 0;
+  }
+
+  logger.info(
+    { scope: 'group-sync', event: 'fetch-all.done', count: list.length },
+    'synced all participating groups (tracked=0 default)',
+  );
+  return list.length;
+}
+
 // ─── registerGroupSync ────────────────────────────────────────────────────────
 
 /**
