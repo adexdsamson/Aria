@@ -143,7 +143,12 @@ function buildGroupPrompt(
  * Uses ISO string comparisons throughout for sent_at (RESEARCH Pitfall 4/D-05).
  */
 async function runDigest(deps: WhatsAppDigestDeps): Promise<void> {
-  const { db, logger } = deps;
+  // Resolve the live db handle from the holder rather than using the connection
+  // captured at first-unlock time. After BACKUP_RESTORE the holder is updated to
+  // a new handle while deps.db still points to the closed connection.  Mirroring
+  // the late-binding pattern used in retention.ts / closeToTrayReader (WR-02 fix).
+  const db: Db = deps.dbHolder?.db ?? deps.db;
+  const { logger } = deps;
   const localModelFactory = deps.getLocalModelFn ?? getLocalModel;
   const gen = deps.generateTextFn ?? generateText;
   const userDisplayName = deps.userDisplayName ?? '';
