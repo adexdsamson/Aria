@@ -110,8 +110,26 @@ metrics:
 ## Known Stubs
 
 None — all 5 WHATSAPP invoke channels are now wired to real implementations post-unlock.
-Plan 20-07 will wire `registerIngest()` + `registerGroupSync()` to the live Baileys socket
-when the session-manager exposes the socket reference.
+
+## Post-Execution Integration Fix (2026-06-10, commit 9767577)
+
+**Gap found:** `registerGroupSync` and `registerIngest` (built in Plan 20-05) were never
+attached to the live Baileys socket. The 20-06 SUMMARY and the comment at `src/main/index.ts:613`
+both deferred this to "Plan 20-07," but Plan 20-07 is the renderer-only plan and would never
+touch the main-process socket. WA-05 group discovery and WA-06 message ingest were dead code.
+
+**Fix:** Added `wireCapture(sock)` private method to `WhatsAppSessionManager`. It calls
+`registerGroupSync(sock, ...)` and `registerIngest({ sock, ... })` and is invoked inside
+`openSocket()` immediately after the existing `wireConnectionUpdate` / `wireCredsUpdate` /
+`wirePowerMonitor` calls. Placement inside `openSocket()` ensures handlers re-attach on
+every reconnect and nightly recycle (each recycle creates a fresh socket via `stop()` + `start()`).
+
+The misleading comment in `src/main/index.ts` was replaced with an accurate note that
+`wireCapture` handles attachment internally.
+
+**Test coverage:** Added assertion to `whatsapp-session.spec.ts` that both `messages.upsert`
+(ingest) and `groups.upsert` (group-sync) handlers are registered alongside `connection.update`
+and `creds.update` after `manager.start()`. All 4 tests GREEN. No new typecheck errors (84 baseline).
 
 ## Threat Flags
 
