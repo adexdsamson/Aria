@@ -18,7 +18,8 @@ export type CatchupChannel =
   | 'gmail-sync'
   | 'calendar-sync'
   | 'knowledge-folder-sweep'
-  | 'whatsapp-retention-sweep';
+  | 'whatsapp-retention-sweep'
+  | 'whatsapp-digest';  // Phase 21 (D-07): digest-cron.ts seal-guard catch-up channel
 
 const _pending = new Set<CatchupChannel>();
 
