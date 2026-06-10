@@ -123,7 +123,10 @@ export function createIngestHandler(deps: IngestHandlerDeps): (
         }
       });
       tx();
-      logger.debug(
+      // WA-06: count only, NEVER the message body — safe at info level and a
+      // useful operational signal (also the live-UAT confirmation that ingest
+      // from a tracked group reached whatsapp_message).
+      logger.info(
         { scope: 'whatsapp-ingest', event: 'batch.flushed', count: batch.length },
         'whatsapp message batch flushed',
       );
