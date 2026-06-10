@@ -200,7 +200,7 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
 ### Phases (v2.1)
 
 - [x] **Phase 20: Foundation** - WhatsApp link/QR flow with ban-risk consent + auth state in SQLCipher + group selection + message ingestion + IPC/UI + all load-bearing safety guards (migration 138). (completed 2026-06-10)
-- [ ] **Phase 21: Digest + Briefing Integration** - Local Ollama digest cron (05:00) per tracked group + WhatsApp section in daily briefing + graceful Ollama-unavailable degradation + frontier-prohibition static ratchet.
+- [x] **Phase 21: Digest + Briefing Integration** - Local Ollama digest cron (05:00) per tracked group + WhatsApp section in daily briefing + graceful Ollama-unavailable degradation + frontier-prohibition static ratchet. (completed 2026-06-10)
 - [ ] **Phase 22: Extraction Consumers** *(deferred — post-Phase 21 validation)* - Action-item extraction (WA-F1), meeting-proposal detection (WA-F2), and project-feedback RAG capture (WA-F3) layered onto stored messages with zero schema additions.
 
 ## Phase Details (v2.1)
@@ -262,7 +262,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 21-06-PLAN.md — Wave 4: index.ts _digestHandle bootstrap + runChannelOnce real switch + powerMonitor D-07.2 onResume hook
+- [x] 21-06-PLAN.md — Wave 4: index.ts _digestHandle bootstrap + runChannelOnce real switch + powerMonitor D-07.2 onResume hook
 
 **UI hint**: yes
 
@@ -286,7 +286,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 20. Foundation | 8/8 | Complete   | 2026-06-10 |
-| 21. Digest + Briefing Integration | 5/6 | In Progress|  |
+| 21. Digest + Briefing Integration | 6/6 | Complete   | 2026-06-10 |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
 ### Research Flags (v2.1)

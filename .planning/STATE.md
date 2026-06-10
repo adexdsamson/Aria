@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
-status: executing
-last_updated: "2026-06-10T12:36:11.162Z"
+status: verifying
+last_updated: "2026-06-10T12:53:32.072Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 14
-  completed_plans: 13
-  percent: 33
+  completed_plans: 14
+  percent: 67
 ---
 
 # State
@@ -23,12 +23,19 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 21 (digest-briefing-integration) — EXECUTING
+Phase: 21 (digest-briefing-integration) — COMPLETE
 Plan: 6 of 6
-Status: Ready to execute
-Last activity: 2026-06-10 -- Plan 21-05 COMPLETE (6edee93)
+Status: Phase 21 COMPLETE (0a18759) — all 6 plans executed; ready for Phase 22
+Last activity: 2026-06-10
 
-**Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+**Progress bar:** Phase 1/3 complete · Phase 20 ✅ · Phase 21 ✅ · [▰ ▰ ·]
+
+## Decisions (Phase 21, Plan 06)
+
+- getDigestHandle getter (not direct value) wired through IpcDeps → registerBriefingHandlers — registerBriefingHandlers is called pre-unlock when _digestHandle is null; getter returns live instance at handler-fire time
+- briefing.ts resolves deps.getDigestHandle?.() ?? deps.digestHandle — backward-compatible with tests that pass digestHandle directly; production uses getter
+- powerMonitor onResume hook registered inside bootPoll WhatsApp block after _digestHandle assigned — natural placement, mirrors voice lifecycle registration pattern
+- runChannelOnce default case retains await Promise.resolve() — conservative no-op for non-WhatsApp channels (Phase 12 Plan 12-02 rationale preserved)
 
 ## Decisions (Phase 21, Plan 05)
 
