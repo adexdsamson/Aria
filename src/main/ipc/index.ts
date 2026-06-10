@@ -87,6 +87,13 @@ export interface IpcDeps {
   entitlementService?: EntitlementService;
   /** Plan 08.1-02 — main window for ENTITLEMENT_STATE_CHANGED push events. */
   mainWindow?: BrowserWindow | null;
+  /**
+   * Plan 20-06 — getter for the WhatsApp session manager, used to pass
+   * the live manager to registerProviderAccountHandlers for cascade disconnect.
+   * A getter is used because the manager is created post-unlock in bootPoll,
+   * but registerHandlers is called pre-unlock. Returns null until post-unlock.
+   */
+  getWhatsAppManager?: () => import('../whatsapp/session-manager').WhatsAppSessionManager | null;
 }
 
 const NOT_IMPLEMENTED = Object.freeze({ error: 'NOT_IMPLEMENTED' as const });
@@ -228,7 +235,11 @@ export function registerHandlers(
     CHANNELS.PROVIDER_ACCOUNT_DISCONNECT,
   ];
   if (!providerAccountChannels.every((c) => skip.has(c))) {
-    registerProviderAccountHandlers(ipcMain, { logger, dbHolder });
+    registerProviderAccountHandlers(ipcMain, {
+      logger,
+      dbHolder,
+      getWhatsAppManager: deps.getWhatsAppManager,
+    });
     providerAccountChannels.forEach((c) => skip.add(c));
   }
 
