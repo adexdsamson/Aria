@@ -7,10 +7,10 @@ last_updated: "2026-06-10T01:00:44.380Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 8
-  completed_plans: 7
-  percent: 0
+  completed_plans: 8
+  percent: 33
 ---
 
 # State
@@ -23,12 +23,12 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 20 (foundation) — CODE-COMPLETE, LIVE UAT PENDING
-Plan: 20-01..07 done; 20-08 Task 1 (WA-12 test) done, Task 2 (live-QR/consent human-action checkpoint) OPEN
-Status: gsd-verifier 9/9 requirements VERIFIED (automated); live UAT is the final gate
-Last activity: 2026-06-10 -- Phase 20 executed (8 plans / 7 waves) + verified; 2 latent gaps caught & fixed (deferred-boot FK-off in 20-03; dead-code capture wiring in 20-06)
+Phase: 20 (foundation) — COMPLETE ✅ (live UAT APPROVED 2026-06-10)
+Plan: 8/8 plans complete (8/8 SUMMARYs); 20-08 live UAT APPROVED — all of WA-01..07, WA-11, WA-12 confirmed LIVE
+Status: gsd-verifier 9/9 automated + full live UAT passed on a secondary number; 9 live-UAT defects found & fixed (commits 87045e0..9a8864f)
+Last activity: 2026-06-10 -- Phase 20 COMPLETE: WhatsApp link/consent/QR/groups/ingest/disconnect all verified live; remaining = run WhatsApp specs GREEN (app-close) + push
 
-**Progress bar:** Phase 0/3 complete · Phase 20 ~95% (live UAT pending) · [▰ · ·]
+**Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
 
 ## Milestone v2.1 Locked Decisions
 
@@ -46,7 +46,7 @@ Last activity: 2026-06-10 -- Phase 20 executed (8 plans / 7 waves) + verified; 2
 
 ## Next Action
 
-**Live UAT for Plan 20-08 Task 2** — run the 6-step checklist in `.planning/phases/20-foundation/20-08-VERIFICATION.md` with a **secondary** WhatsApp number (ban risk): launch via `Remove-Item Env:\ELECTRON_RUN_AS_NODE; pnpm dev`, then verify consent ack-gate → QR link → group track + ingest within ~60s → other surfaces unaffected → disconnect wipes all 5 WA tables. Reply "approved" or report failures (step # + BLOCKER/MINOR). Phase 20 closes after live UAT passes.
+**Phase 20 is COMPLETE.** Remaining housekeeping: (1) run the WhatsApp specs to GREEN once the app is closed (the live session locks `better_sqlite3.node`; `whatsapp-session.spec` was switched to `startLink()` + a `loadOrInitCreds` test added — confirm no regressions from the lifecycle changes); (2) push commits `8f46374..9a8864f` to origin (user's call). Then **Phase 21 (Digest + Briefing)** — `/gsd-plan-phase 21` (depends on the `whatsapp_message` rows this phase now produces). Minor non-blocking follow-ups recorded in 20-08-VERIFICATION.md (modal Cancel doesn't stop linking instantly; Reconnect-via-startLink forces re-scan).
 
 ## Decisions (Phase 20, Plan 07)
 

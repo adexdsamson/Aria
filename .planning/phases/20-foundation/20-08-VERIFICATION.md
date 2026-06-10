@@ -3,7 +3,8 @@ phase: 20-foundation
 plan: 08
 type: manual-uat
 requirements: [WA-01, WA-02, WA-04, WA-06]
-status: pending
+status: approved
+verified_at: 2026-06-10
 ---
 
 # Phase 20 Plan 08 — Manual Live Verification Checklist
@@ -158,25 +159,36 @@ While WhatsApp is connected, navigate to each of these screens and confirm norma
 
 ## Overall Sign-off
 
-| Step | Result | Notes |
-|------|--------|-------|
-| Step 1 — Launch | [ ] PASS / [ ] FAIL | |
-| Step 2 — Consent modal | [ ] PASS / [ ] FAIL | |
-| Step 3 — QR link | [ ] PASS / [ ] FAIL | |
-| Step 4 — Privacy spot-check | [ ] PASS / [ ] FAIL | |
-| Step 5 — Other surfaces | [ ] PASS / [ ] FAIL | |
-| Step 6 — Disconnect cascade | [ ] PASS / [ ] FAIL | |
+Live run completed 2026-06-10 on a secondary WhatsApp number (2348160622940).
 
-**Overall:** [ ] APPROVED (all steps PASS) / [ ] BLOCKED (one or more FAIL — see Issues below)
+| Step | Result | Notes / Evidence |
+|------|--------|------------------|
+| Step 1 — Launch | [x] PASS | App boots; with gap-6 fix, NO WhatsApp connect at boot until linked (`start.skip-unlinked`). |
+| Step 2 — Consent modal | [x] PASS | Ban-risk bullets + secondary-number callout; "Show QR" disabled until ack checkbox. |
+| Step 3 — QR link | [x] PASS | QR renders as SVG + refreshes (2s linking reconnect); scan links; AccountRow `WHATSAPP · OK` + phone number. |
+| Step 4 — Privacy spot-check | [x] PASS | Tracked "Phronesis Dev": 6× `whatsapp-ingest batch.flushed count:1`; untracked group + DM produced ZERO flushes (3-line filter). No body ever logged (count-only). |
+| Step 5 — Other surfaces | [x] PASS | WA-12: socket churn never blocked briefing/email/calendar/tasks; degradable spec 8/8 + live boot-safe. |
+| Step 6 — Disconnect cascade | [x] PASS | `provider-account.disconnect whatsapp` → next `start.skip-unlinked` proves the provider_account row (and FK-cascaded message/group/digest + auth_state) were wiped. AccountRow cleared. |
+
+**Overall:** [x] APPROVED (all steps PASS)
 
 ---
 
-## Issues Found
+## Issues Found (all resolved live, diagnosed from app log)
 
-> Record any failures here with step number, observed behavior, and severity.
-> BLOCKER → route back to a gap-closure plan; MINOR → add to backlog.
+Nine root-cause defects were found and fixed during this live UAT (commits 87045e0..9a8864f):
 
-*(none yet — checklist not yet run)*
+1. **deferred-boot FK-off** (87045e0) — migration 138 left `foreign_keys=OFF`; prod boot path never re-enabled it → cascade would not fire. Migration now self-restores FK=ON.
+2. **dead-code capture wiring** (9767577) — registerGroupSync/registerIngest never attached to the live socket; now wired in `openSocket()`.
+3. **jimp build failure** (00023c9) — bundled Baileys pulled optional `jimp`; externalized media peer-deps.
+4. **ws app-load crash** (5e144c3) — `ws` optional native `bufferutil`; externalized `ws`.
+5. **initAuthCreds QR handshake** (f84807e) — `getOrInitCreds` returned `{}`; now seeds `initAuthCreds()`.
+6. **stale WA version 405** (489133e→391520c) — hardcoded/bundled version rejected; now `resolveWaVersion()` live-fetches.
+7. **QR no-refresh + gap-6 pre-consent boot connect** (479f81a) — linking-flag fast-reconnect; boot gated on existing account row.
+8. **partial-creds overwrite** (a3e5291) — persisted the `creds.update` partial (dropped noiseKey); now persists full `sock.authState.creds`; startLink clears auth state.
+9. **groups empty after link** (61d8408) — `groups.upsert` is delta-only; added `syncAllGroups()` via `groupFetchAllParticipating()` on open. Also fixed phone-number display.
+
+No open BLOCKER or MINOR issues remain. Minor follow-ups (non-blocking): modal Cancel doesn't stop linking instantly (bounded by 3-min window); Reconnect-via-startLink would force a re-scan.
 
 ---
 

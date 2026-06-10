@@ -171,7 +171,7 @@ Lighter research (standard patterns extending existing Aria source): Phase 14 (a
 
 ### Phases (v2.1)
 
-- [ ] **Phase 20: Foundation** - WhatsApp link/QR flow with ban-risk consent + auth state in SQLCipher + group selection + message ingestion + IPC/UI + all load-bearing safety guards (migration 138).
+- [x] **Phase 20: Foundation** - WhatsApp link/QR flow with ban-risk consent + auth state in SQLCipher + group selection + message ingestion + IPC/UI + all load-bearing safety guards (migration 138). (completed 2026-06-10)
 - [ ] **Phase 21: Digest + Briefing Integration** - Local Ollama digest cron (05:00) per tracked group + WhatsApp section in daily briefing + graceful Ollama-unavailable degradation + frontier-prohibition static ratchet.
 - [ ] **Phase 22: Extraction Consumers** *(deferred — post-Phase 21 validation)* - Action-item extraction (WA-F1), meeting-proposal detection (WA-F2), and project-feedback RAG capture (WA-F3) layered onto stored messages with zero schema additions.
 
@@ -196,7 +196,7 @@ Plans:
 - [x] 20-05-PLAN.md — Wave 4: group-sync (untracked-default) + ingest (3-line privacy filter + p-queue batch flush, gates 7/8/9, WA-06) + retention 03:30 sweep
 - [x] 20-06-PLAN.md — Wave 5: ipc/whatsapp.ts (WHATSAPP_CHANNELS) + ipc/index.ts stubs + main/index.ts bootPoll wiring (removeHandler loop) + provider-accounts disconnect cascade (WA-04) + handler-count
 - [x] 20-07-PLAN.md — Wave 6: renderer — consent ack-gate modal (SC-1) + QR modal + AccountRow chip/Reconnect/Manage-groups + group-picker (search+toggle) + IntegrationsSection + preload
-- [ ] 20-08-PLAN.md — Wave 7: WA-12 degradable integration test + live-QR/consent UAT checkpoint (human-verify)
+- [x] 20-08-PLAN.md — Wave 7: WA-12 degradable integration test + live-QR/consent UAT checkpoint (human-verify)
 **UI hint**: yes
 
 ### Phase 21: Digest + Briefing Integration
@@ -226,7 +226,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Foundation | 7/8 | In Progress|  |
+| 20. Foundation | 8/8 | Complete   | 2026-06-10 |
 | 21. Digest + Briefing Integration | 0/0 | Not started | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
