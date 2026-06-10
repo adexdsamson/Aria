@@ -49,7 +49,20 @@ const config: UserConfig = {
     // leaving it as an external require) is the only way to make it work in
     // Electron's CommonJS main process. Every other dep stays external.
     // Mirror of the preload zod-exclude pattern at line 67.
-    plugins: [externalizeDepsPlugin({ exclude: ['@whiskeysockets/baileys'] })],
+    //
+    // `include` force-externalizes Baileys' OPTIONAL media peerDependencies
+    // (jimp/sharp/link-preview-js/audio-decode). Baileys only reaches them via
+    // lazy `import('jimp').catch(() => {})` for thumbnail generation — a path
+    // Aria never executes (passive posture, text-only ingest per WA-07, never
+    // sends). Without this, Rollup follows those dynamic imports and fails to
+    // resolve jimp's broken `exports` map. Externalizing leaves them as runtime
+    // dynamic imports that Baileys' own `.catch()` degrades gracefully.
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['@whiskeysockets/baileys'],
+        include: ['jimp', 'sharp', 'link-preview-js', 'audio-decode'],
+      }),
+    ],
     define: oauthDefine,
     build: {
       outDir: 'out/main',
