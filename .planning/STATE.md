@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T12:34:37.538Z"
-last_activity: 2026-06-10 -- Plan 21-04 COMPLETE (03f5436)
+last_updated: "2026-06-10T12:36:11.162Z"
+last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 33
 ---
 
@@ -24,11 +24,17 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 21 (digest-briefing-integration) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
-Last activity: 2026-06-10 -- Plan 21-04 COMPLETE (03f5436)
+Last activity: 2026-06-10 -- Plan 21-05 COMPLETE (6edee93)
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+
+## Decisions (Phase 21, Plan 05)
+
+- DigestGenerateNowAffordance calls whatsappGenerateDigestNow (lowercase 'a') — AriaApi camelCase matches CHANNEL_METHODS mapping; whatsAppGenerateDigestNow was a TS2551 compile error fixed as Rule 1
+- DigestGenerateNowAffordance stays inline in BriefingScreen.tsx (not extracted) — 40-line component not worth a new file at this complexity level
+- WhatsApp section uses optional chaining on payload.whatsApp?.state for null safety — undefined produces no DOM output without explicit guard
 
 ## Decisions (Phase 21, Plan 04)
 
