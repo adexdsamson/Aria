@@ -1,4 +1,4 @@
-# Aria Roadmap
+﻿# Aria Roadmap
 
 **Project:** Aria — local-first desktop AI executive assistant
 
@@ -208,7 +208,15 @@ Plans:
   2. The digest cron runs at 05:00 (before the briefing at 07:00), uses only `getLocalModel()` with no routing step, and the `UNIQUE(jid, date)` constraint makes re-runs idempotent.
   3. A static ratchet (grep test in CI) fails if any file under `src/main/whatsapp/` imports `getFrontierModel` or any frontier provider — enforcing that group content never reaches a cloud API.
   4. When Ollama is down or the local model is unavailable, the briefing still generates and the WhatsApp section shows a clear "WhatsApp digest unavailable — local model offline" note rather than failing or silently omitting the section.
-**Plans**: TBD
+**Plans**: 6 plans (4 waves)
+Plans:
+- [ ] 21-01-PLAN.md — Wave 1: ipc-contract.ts BriefingPayload.whatsApp union + WhatsAppGroupSummaryDto + WHATSAPP_GENERATE_DIGEST_NOW channel + CatchupChannel 'whatsapp-digest'
+- [ ] 21-02-PLAN.md — Wave 2: Wave 0 test scaffolds (digest-cron.spec.ts + briefing-whatsapp-enrichment.spec.ts + BriefingScreen.spec.tsx extensions)
+- [ ] 21-03-PLAN.md — Wave 2: digest-cron.ts — 05:00 local-model per-group digest cron (getLocalModel, p-queue, seal-guard, INSERT OR REPLACE)
+- [ ] 21-04-PLAN.md — Wave 3: briefing.ts readWhatsAppDigests helper + BRIEFING_TODAY enrichment + WHATSAPP_GENERATE_DIGEST_NOW handler
+- [ ] 21-05-PLAN.md — Wave 3: BriefingScreen.tsx WhatsApp section render switch + DigestGenerateNowAffordance retry component
+- [ ] 21-06-PLAN.md — Wave 4: index.ts _digestHandle bootstrap + runChannelOnce real switch + powerMonitor D-07.2 onResume hook
+**UI hint**: yes
 
 ### Phase 22: Extraction Consumers *(Deferred)*
 **Goal**: The stored `whatsapp_message` rows from Phase 20 are fed through three additional extraction passes — action items, meeting proposals, and project-feedback RAG — each routing through the existing `assertApproved` chokepoint and established pipelines. Zero schema additions required.
@@ -227,7 +235,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 20. Foundation | 8/8 | Complete   | 2026-06-10 |
-| 21. Digest + Briefing Integration | 0/0 | Not started | - |
+| 21. Digest + Briefing Integration | 0/6 | In progress | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
 ### Research Flags (v2.1)
