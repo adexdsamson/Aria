@@ -151,4 +151,40 @@ describe('session-manager.ts — QR push + connection open (R-WA01)', () => {
     const statePayload = statePushes[0]!.payload as { status?: string };
     expect(statePayload.status).toBe('ok');
   });
+
+  it('openSocket() registers messages.upsert (ingest) and groups.upsert (group-sync) handlers', async () => {
+    // Capture ALL ev.on event registrations from the socket factory.
+    const registeredEvents: string[] = [];
+    const mockSocket = {
+      ev: {
+        on: vi.fn((event: string) => {
+          registeredEvents.push(event);
+        }),
+        off: vi.fn(),
+      },
+      sendPresenceUpdate: vi.fn().mockResolvedValue(undefined),
+      end: vi.fn(),
+    };
+
+    const manager = new WhatsAppSessionManager({
+      db,
+      scheduler: schedulerMock as never,
+      logger: loggerMock as never,
+      emitToRenderer: pushFn,
+      _socketFactory: () => mockSocket as never,
+    });
+
+    await manager.start();
+
+    // Allow any async operations to settle.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Capture layer: both handlers must be registered (wireCapture in openSocket).
+    expect(registeredEvents).toContain('messages.upsert');
+    expect(registeredEvents).toContain('groups.upsert');
+
+    // Original connection management handlers must still be registered.
+    expect(registeredEvents).toContain('connection.update');
+    expect(registeredEvents).toContain('creds.update');
+  });
 });

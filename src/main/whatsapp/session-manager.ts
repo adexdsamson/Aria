@@ -40,6 +40,8 @@ import { powerMonitor } from 'electron';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
 import { makeSQLiteSignalKeyStore } from './auth-state';
 import { CHANNELS } from '../../shared/ipc-contract';
+import { registerGroupSync } from './group-sync';
+import { registerIngest } from './ingest';
 
 type Db = Database.Database;
 
@@ -326,6 +328,28 @@ export class WhatsAppSessionManager {
     this.wireConnectionUpdate(sock);
     this.wireCredsUpdate(sock);
     this.wirePowerMonitor();
+    this.wireCapture(sock);
+  }
+
+  /**
+   * Attach the capture layer (group discovery + message ingest) to the socket.
+   *
+   * Called inside openSocket() so handlers re-attach on every reconnect and
+   * nightly recycle (each recycle calls stop() + openSocket() via start()).
+   *
+   * WA-11: no send/presence code here (passive-posture ratchet).
+   * no-frontier: local-only; no frontier model calls (no-frontier ratchet).
+   */
+  private wireCapture(sock: WASocketInstance): void {
+    // The capture helpers define a narrower ev.on signature (event: string).
+    // Baileys socket's ev.on is keyed to BaileysEventMap — cast to satisfy TS.
+    registerGroupSync(sock as never, { db: this.db, logger: this.logger });
+    registerIngest({
+      sock: sock as never,
+      db: this.db,
+      logger: this.logger,
+      scheduler: { queue: this.scheduler.queue },
+    });
   }
 
   /** Default production socket factory using makeWASocket. */

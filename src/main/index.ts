@@ -603,14 +603,11 @@ async function bootstrap(): Promise<void> {
           scheduler,
           manager: whatsAppManager,
         });
-        // Attach group-sync + ingest to the live socket.
-        // The socket is created on manager.start(); these listeners will fire
-        // when the socket connects. For Plan 20-07 the session-manager exposes
-        // the socket directly; here we wire them via the open-socket callback.
-        // For now register via manager internals by wrapping start():
         // WA-12: any socket throw is caught inside startInner(); this outer
         // catch ensures nothing propagates even if the manager constructor threw.
-        // Plan 20-07 wires registerIngest() + registerGroupSync() to the live socket.
+        // registerGroupSync() + registerIngest() are wired internally by
+        // WhatsAppSessionManager.wireCapture() inside openSocket(), so they
+        // re-attach on every reconnect and nightly recycle automatically.
         void whatsAppManager.start().catch((err) => {
           logger.warn(
             { scope: 'whatsapp-boot', err: (err as Error).message },
