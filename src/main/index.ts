@@ -77,6 +77,9 @@ import {
   ENTITLEMENT_HANDLER_CHANNELS,
 } from './ipc/entitlement';
 import { registerKnowledgeFolderIpc, KNOWLEDGE_FOLDER_CHANNELS } from './ipc/knowledge-folders';
+import { registerWhatsAppHandlers, WHATSAPP_CHANNELS } from './ipc/whatsapp';
+import { WhatsAppSessionManager } from './whatsapp/session-manager';
+import { startWhatsAppRetention } from './whatsapp/retention';
 import { createDbHolder } from './ipc/onboarding';
 import { probeOllama } from './llm/ollamaProbe';
 import { autoPickOllamaModel } from './llm/autoPickModel';
@@ -148,6 +151,15 @@ let appIsQuitting = false;
  * bootstrap is reached, so this assignment cannot run twice).
  */
 let _trayHandle: TrayHandle | null = null;
+
+/**
+ * Plan 20-06 — module-level WhatsApp session manager handle.
+ * Constructed post-unlock in bootPoll (lazy-init pattern; mirrors
+ * ensureVoiceSessionManager). Kept at module scope so the
+ * PROVIDER_ACCOUNT_DISCONNECT handler in provider-accounts.ts can call
+ * manager.stop() when disconnecting a whatsapp account.
+ */
+let whatsAppManager: WhatsAppSessionManager | null = null;
 
 /**
  * Content-Security-Policy applied to every response. `connect-src` is a hard
@@ -374,7 +386,14 @@ async function bootstrap(): Promise<void> {
   //      src/main/entitlement/gate.ts and the static-grep ratchet at
   //      tests/static/single-entitlement-gate-site.test.ts.
   let entitlementService: EntitlementService | null = null;
-  registerHandlers(ipcMain, { logger, dataDir, dbHolder });
+  registerHandlers(ipcMain, {
+    logger,
+    dataDir,
+    dbHolder,
+    // Plan 20-06: getter is a late-binding closure — returns null until bootPoll
+    // creates the manager post-unlock.
+    getWhatsAppManager: () => whatsAppManager,
+  });
 
   // Phase 12 / Plan 12-01 — register background-activity handlers once at
   // bootstrap. registerHandlers (above) wired lightweight stubs for these two
@@ -553,6 +572,57 @@ async function bootstrap(): Promise<void> {
             { scope: 'knowledge-lifecycle', err: (err as Error).message },
             'knowledge folder lifecycle failed to start',
           );
+        });
+
+        // Plan 20-06 — WhatsApp IPC wiring (post-unlock, boot-safe, WA-12).
+        //
+        // Pre-unlock: registerHandlers() registered 'db-locked' stubs for the 5
+        // WHATSAPP invoke channels. Remove those stubs before wiring the real
+        // handlers — ipcMain.handle THROWS on a 2nd registration.
+        // WHATSAPP_CHANNELS is the single source of truth (exported from ipc/whatsapp.ts).
+        for (const ch of WHATSAPP_CHANNELS) {
+          ipcMain.removeHandler(ch);
+        }
+        // Lazy-init the manager post-unlock (db + emitToRenderer both present).
+        // Mirrors ensureVoiceSessionManager() pattern: created here, never at
+        // register-time (which would create it before unlock with db=null).
+        const waDb = dbHolder.db!;
+        whatsAppManager = new WhatsAppSessionManager({
+          db: waDb,
+          scheduler,
+          logger,
+          emitToRenderer: (channel, payload) => {
+            const win = BrowserWindow.getAllWindows()[0];
+            win?.webContents.send(channel, payload);
+          },
+        });
+        registerWhatsAppHandlers({
+          ipcMain,
+          logger,
+          dbHolder,
+          scheduler,
+          manager: whatsAppManager,
+        });
+        // Attach group-sync + ingest to the live socket.
+        // The socket is created on manager.start(); these listeners will fire
+        // when the socket connects. For Plan 20-07 the session-manager exposes
+        // the socket directly; here we wire them via the open-socket callback.
+        // For now register via manager internals by wrapping start():
+        // WA-12: any socket throw is caught inside startInner(); this outer
+        // catch ensures nothing propagates even if the manager constructor threw.
+        // Plan 20-07 wires registerIngest() + registerGroupSync() to the live socket.
+        void whatsAppManager.start().catch((err) => {
+          logger.warn(
+            { scope: 'whatsapp-boot', err: (err as Error).message },
+            'WhatsApp manager start failed (degradable — app continues normally)',
+          );
+        });
+        // Register the 03:30 retention sweep cron.
+        startWhatsAppRetention({
+          db: waDb,
+          logger,
+          scheduler,
+          dbHolder,
         });
       }
     }
