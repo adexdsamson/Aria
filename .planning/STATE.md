@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T11:54:23.545Z"
+last_updated: "2026-06-10T12:07:13.372Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 10
   percent: 33
 ---
 
@@ -24,11 +24,16 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 21 (digest-briefing-integration) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Executing Phase 21
-Last activity: 2026-06-10 -- Plan 21-01 COMPLETE (816a2f7, 01fb1f5)
+Last activity: 2026-06-10 -- Plan 21-02 COMPLETE (ba74188, 80b1f96, 17c78d2)
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+
+## Decisions (Phase 21, Plan 02)
+
+- Wave-0 Nyquist gate complete: digest-cron.spec.ts (5 RED stubs) + briefing-whatsapp-enrichment.spec.ts (6 stubs, 5 RED) created before implementation; BriefingScreen.spec.tsx extended with 3 Phase 21 WhatsApp cases (2 RED, 1 GREEN baseline)
+- provider_account INSERT uses actual migration 138 schema (display_email/display_label/capabilities_json) not legacy schema — caught during task 2 first run
 
 ## Decisions (Phase 21, Plan 01)
 
