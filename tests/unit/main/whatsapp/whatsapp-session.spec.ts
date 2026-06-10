@@ -85,7 +85,7 @@ describe('session-manager.ts — QR push + connection open (R-WA01)', () => {
       _socketFactory: () => mockSocket as never, // test-injectable socket factory
     });
 
-    await manager.start();
+    await manager.startLink(); // startLink force-opens (gate: start() skips unlinked at boot)
 
     // Simulate a QR update from Baileys
     const fakeQrString = 'fake-qr-data-123';
@@ -129,7 +129,7 @@ describe('session-manager.ts — QR push + connection open (R-WA01)', () => {
       _socketFactory: () => mockSocket as never,
     });
 
-    await manager.start();
+    await manager.startLink(); // startLink force-opens (gate: start() skips unlinked at boot)
 
     // Simulate connection:open
     for (const cb of connectionUpdateCallbacks) {
@@ -174,7 +174,7 @@ describe('session-manager.ts — QR push + connection open (R-WA01)', () => {
       _socketFactory: () => mockSocket as never,
     });
 
-    await manager.start();
+    await manager.startLink(); // startLink force-opens (gate: start() skips unlinked at boot)
 
     // Allow any async operations to settle.
     await new Promise((r) => setTimeout(r, 0));

@@ -159,6 +159,17 @@ export interface WhatsAppSessionManagerDeps {
 const RECYCLE_CRON_KEY = 'whatsapp-socket-recycle';
 const RECYCLE_CRON_EXPR = '0 3 * * *'; // 03:00 — retention is 03:30 (D-14)
 
+/**
+ * Active-linking reconnect tuning. While the user has the QR modal open, each
+ * WhatsApp connection ends when its QR refs expire (~408/restart); we reconnect
+ * promptly to surface a FRESH QR rather than applying the anti-ban backoff
+ * (5/15/60/300/600s) or the degraded cap — those are for an ESTABLISHED session
+ * losing its connection, not for QR-link churn. Bounded by LINKING_WINDOW_MS so
+ * we never hammer WhatsApp forever if the user walks away from an unscanned QR.
+ */
+const LINKING_RECONNECT_MS = 2_000;
+const LINKING_WINDOW_MS = 180_000; // keep refreshing the QR for up to 3 minutes
+
 // ─── WhatsAppSessionManager class ────────────────────────────────────────────
 
 export class WhatsAppSessionManager {
@@ -167,6 +178,8 @@ export class WhatsAppSessionManager {
   private readonly logger: Logger;
   private readonly emitToRenderer?: (channel: string, payload: unknown) => void;
   private readonly socketFactory: SocketFactory;
+  /** True when a test injected `_socketFactory` — skips the live version fetch. */
+  private readonly injectedFactory: boolean;
 
   /** Currently active Baileys socket — null when not linked. */
   private socket: WASocketInstance | null = null;
@@ -185,6 +198,16 @@ export class WhatsAppSessionManager {
    * re-fetch (addresses the per-connect network/fingerprint concern).
    */
   private cachedWaVersion: WaVersion | null = null;
+  /**
+   * True while a user-initiated QR link is in progress (startLink → until
+   * connection:open, disconnect, or the linking window elapses). Gates two
+   * behaviors: (1) start() at boot refuses to open a socket for a never-linked
+   * account unless linking (D-07: no pre-consent connection); (2) connection
+   * closes reconnect quickly to refresh the QR instead of backing off.
+   */
+  private linking = false;
+  /** Unix-ms after which an unscanned linking attempt stops refreshing the QR. */
+  private linkingDeadline = 0;
 
   constructor(deps: WhatsAppSessionManagerDeps) {
     this.db = deps.db;
@@ -192,6 +215,7 @@ export class WhatsAppSessionManager {
     this.logger = deps.logger;
     this.emitToRenderer = deps.emitToRenderer;
     this.socketFactory = deps._socketFactory ?? this.defaultSocketFactory.bind(this);
+    this.injectedFactory = Boolean(deps._socketFactory);
 
     // Register the nightly recycle cron at construction time so it is
     // available immediately (no-bare-cron ratchet: scheduler.cronRegistry).
@@ -254,11 +278,17 @@ export class WhatsAppSessionManager {
    */
   async startLink(): Promise<void> {
     await this.stop();
+    // Mark linking AFTER stop() (stop resets reconnect state) so startInner()
+    // force-opens even with no provider_account row, and closes during the link
+    // refresh the QR quickly instead of backing off.
+    this.linking = true;
+    this.linkingDeadline = Date.now() + LINKING_WINDOW_MS;
     await this.start();
   }
 
   /** Disconnect the socket and update provider_account status. */
   async disconnect(): Promise<void> {
+    this.linking = false;
     this.stop();
     this.updateProviderAccountStatus(null, 'disconnected');
     this.pushStateChanged(null, 'disconnected');
@@ -283,27 +313,28 @@ export class WhatsAppSessionManager {
   // ─── Private helpers ───────────────────────────────────────────────────────
 
   private async startInner(): Promise<void> {
-    // If no whatsapp account row exists, there is no auth state to load —
-    // wait for the user to initiate a QR link via startLink().
-    // (After a successful link, connection:open inserts the row; subsequent
-    //  boots then find the row and reconnect automatically.)
-    // Skip auto-connect check only when db is provided AND has no WA row.
-    if (this.db) {
+    // D-07 / ban-risk: a never-linked account must NOT open a socket at boot or
+    // on the nightly recycle — that would connect to WhatsApp BEFORE the user
+    // passes the consent gate. Only connect automatically when already linked (a
+    // provider_account row exists). The user-initiated QR link sets this.linking
+    // (via startLink) and force-opens regardless.
+    if (!this.linking && this.db) {
       try {
         const waRow = this.db
           .prepare(
             `SELECT account_id FROM provider_account WHERE provider_key = 'whatsapp' LIMIT 1`,
           )
           .get();
-        // No existing row AND this is NOT triggered by startLink — skip.
-        // startLink() calls stop() + start() without checking; the socket
-        // factory handles the case where no creds exist yet (Baileys generates
-        // a fresh auth state and emits a QR).
-        // We allow start() to proceed always (the factory emits a QR when
-        // no creds exist, which is the first-link flow).
-        void waRow; // intentional — always proceed
+        if (!waRow) {
+          this.logger.info(
+            { scope: 'whatsapp', event: 'start.skip-unlinked' },
+            'WhatsApp not linked — skipping auto-connect (awaiting user QR link)',
+          );
+          return;
+        }
       } catch {
-        // DB not open yet; allow through (start() is non-fatal).
+        // DB not open / table missing — treat as not-linked; skip auto-connect.
+        return;
       }
     }
 
@@ -333,7 +364,11 @@ export class WhatsAppSessionManager {
     }
     this.clearReconnectTimer();
 
-    const version = await this.resolveWaVersion();
+    // Resolve the live WA version only for the real makeWASocket factory. Skip
+    // for injected test factories (no network in unit tests) and when there is
+    // no db (nothing to link).
+    const version =
+      this.injectedFactory || !this.db ? undefined : await this.resolveWaVersion();
     const sock = this.socketFactory(this.db, this.logger, version);
     this.socket = sock;
 
@@ -525,6 +560,8 @@ export class WhatsAppSessionManager {
     // Passive posture: the ONLY permitted presence call.
     void sock.sendPresenceUpdate('unavailable');
 
+    // Linking complete (connection:open only fires after a successful scan).
+    this.linking = false;
     // Reset reconnect counter.
     this.reconnectAttempt = 0;
 
@@ -571,11 +608,35 @@ export class WhatsAppSessionManager {
         statusCode,
         attempt: this.reconnectAttempt,
         action: classification.action,
+        linking: this.linking,
       },
       'WhatsApp connection closed',
     );
 
+    // Active-linking fast path: while the user is scanning, a QR connection ends
+    // when its refs expire (408 "QR refs ended" / 515 restart). Reconnect quickly
+    // to surface a FRESH QR — do NOT apply the anti-ban backoff or the degraded
+    // cap. Bounded by linkingDeadline so an abandoned, unscanned QR stops churning.
+    if (this.linking && classification.action !== 'needs-auth') {
+      if (Date.now() < this.linkingDeadline) {
+        this.reconnectAttempt = 0; // do not accumulate toward degraded while linking
+        this.scheduleReconnect(LINKING_RECONNECT_MS);
+        return;
+      }
+      // Linking window elapsed without a successful scan — stop refreshing.
+      this.linking = false;
+      this.reconnectAttempt = 0;
+      this.logger.info(
+        { scope: 'whatsapp', event: 'link.window-expired' },
+        'WhatsApp link window elapsed without a scan — stopping QR refresh',
+      );
+      this.updateProviderAccountStatus(null, 'disconnected');
+      this.pushStateChanged(null, 'disconnected');
+      return;
+    }
+
     if (classification.action === 'needs-auth') {
+      this.linking = false;
       this.reconnectAttempt = 0;
       this.updateProviderAccountStatus(null, 'needs-auth');
       this.pushStateChanged(null, 'needs-auth');
