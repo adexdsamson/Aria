@@ -240,4 +240,46 @@ describe('BriefingScreen', () => {
       'No items today.',
     );
   });
+
+  // Phase 21 — WhatsApp union-state cases (Wave 0 RED stubs).
+  // Cases 12-14 are RED until Plan 21-05 adds the render switch to BriefingScreen.tsx.
+
+  it('Phase 21 — whatsApp.state=ready → renders briefing-whatsapp section', async () => {
+    installAria(
+      makePayload({
+        whatsApp: {
+          state: 'ready',
+          groups: [
+            {
+              jid: 'g1@g.us',
+              displayName: 'Team Leads',
+              state: 'summarized',
+              summaryText: '### KEY POINTS\n- Shipped v1',
+            },
+          ],
+        },
+      }),
+    );
+    render(<BriefingScreen />);
+    expect(await screen.findByTestId('briefing-whatsapp')).toBeTruthy();
+  });
+
+  it('Phase 21 — whatsApp.state=unavailable → renders unavailable note + retry button', async () => {
+    installAria(
+      makePayload({
+        whatsApp: { state: 'unavailable', reason: 'model-offline' },
+      }),
+    );
+    render(<BriefingScreen />);
+    expect(await screen.findByTestId('briefing-whatsapp-unavailable')).toBeTruthy();
+    expect(await screen.findByTestId('briefing-whatsapp-retry')).toBeTruthy();
+  });
+
+  it('Phase 21 — whatsApp=undefined → WhatsApp section absent from DOM', async () => {
+    installAria(makePayload()); // no whatsApp field
+    render(<BriefingScreen />);
+    await screen.findByTestId('briefing-section-calendar'); // wait for render to complete
+    expect(screen.queryByTestId('briefing-whatsapp')).toBeNull();
+    expect(screen.queryByTestId('briefing-whatsapp-unavailable')).toBeNull();
+  });
 });
