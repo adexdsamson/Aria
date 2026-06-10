@@ -46,7 +46,11 @@ Last activity: 2026-06-10 -- Phase 20 COMPLETE: WhatsApp link/consent/QR/groups/
 
 ## Next Action
 
-**Phase 20 is COMPLETE.** Remaining housekeeping: (1) run the WhatsApp specs to GREEN once the app is closed (the live session locks `better_sqlite3.node`; `whatsapp-session.spec` was switched to `startLink()` + a `loadOrInitCreds` test added — confirm no regressions from the lifecycle changes); (2) push commits `8f46374..9a8864f` to origin (user's call). Then **Phase 21 (Digest + Briefing)** — `/gsd-plan-phase 21` (depends on the `whatsapp_message` rows this phase now produces). Minor non-blocking follow-ups recorded in 20-08-VERIFICATION.md (modal Cancel doesn't stop linking instantly; Reconnect-via-startLink forces re-scan).
+**Phase 20 is COMPLETE, verified, and PUSHED** (origin/master @ 4d42914; WhatsApp specs 100/100 GREEN; full live UAT APPROVED).
+
+**NEXT: `/gsd-discuss-phase 21`** (Digest + Briefing Integration, WA-08/09/10) — discuss BEFORE plan (matches Phase 20). Decisions to lock: per-group vs combined digest; 05:00 local-Ollama digest cron; WhatsApp section format + placement in the daily briefing; graceful Ollama-unavailable degradation UX; digest retention/regeneration; frontier-prohibition static ratchet scope. Depends on Phase 20's `whatsapp_message` rows (now proven landing). After discuss → `/gsd-plan-phase 21`. (User chose to /clear before discuss for a clean context — this long session was the Phase 20 execute + 9-fix live-UAT marathon.)
+
+Phase 20 minor non-blocking follow-ups (in 20-08-VERIFICATION.md): modal Cancel doesn't stop linking instantly (3-min window bound); Reconnect-via-startLink forces a re-scan.
 
 ## Decisions (Phase 20, Plan 07)
 
