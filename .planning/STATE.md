@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T13:20:00.000Z"
+last_updated: "2026-06-10T12:25:16.202Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 14
-  completed_plans: 11
-  percent: 36
+  completed_plans: 12
+  percent: 33
 ---
 
 # State
@@ -24,11 +24,18 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 21 (digest-briefing-integration) — EXECUTING
-Plan: 4 of 6
-Status: Executing Phase 21
-Last activity: 2026-06-10 -- Plan 21-03 COMPLETE (6844ea6)
+Plan: 5 of 6
+Status: Ready to execute
+Last activity: 2026-06-10 -- Plan 21-04 COMPLETE (03f5436)
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+
+## Decisions (Phase 21, Plan 04)
+
+- readWhatsAppDigests is module-local per D-13 — keeps no-frontier ratchet boundary crisp; avoids coupling to whatsapp/ module
+- digestHandle injected via optional BriefingHandlerDeps field — backward-compatible; existing tests that do not pass it work unchanged
+- Outer enrichment try/catch catches and logs scope:'briefing-today-whatsapp' without re-throwing — BRIEFING_TODAY always resolves (WA-10/D-07.3)
+- WHATSAPP_GENERATE_DIGEST_NOW handler returns {ok:true} immediately; runNow() is fire-and-forget — no frontier, no blocking await
 
 ## Decisions (Phase 21, Plan 03)
 

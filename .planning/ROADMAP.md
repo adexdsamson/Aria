@@ -253,11 +253,11 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 21-02-PLAN.md — Wave 2: Wave 0 test scaffolds (digest-cron.spec.ts + briefing-whatsapp-enrichment.spec.ts + BriefingScreen.spec.tsx extensions)
-- [ ] 21-03-PLAN.md — Wave 2: digest-cron.ts — 05:00 local-model per-group digest cron (getLocalModel, p-queue, seal-guard, INSERT OR REPLACE)
+- [x] 21-03-PLAN.md — Wave 2: digest-cron.ts — 05:00 local-model per-group digest cron (getLocalModel, p-queue, seal-guard, INSERT OR REPLACE)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 21-04-PLAN.md — Wave 3: briefing.ts readWhatsAppDigests helper + BRIEFING_TODAY enrichment + WHATSAPP_GENERATE_DIGEST_NOW handler
+- [x] 21-04-PLAN.md — Wave 3: briefing.ts readWhatsAppDigests helper + BRIEFING_TODAY enrichment + WHATSAPP_GENERATE_DIGEST_NOW handler
 - [ ] 21-05-PLAN.md — Wave 3: BriefingScreen.tsx WhatsApp section render switch + DigestGenerateNowAffordance retry component
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -286,7 +286,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 20. Foundation | 8/8 | Complete   | 2026-06-10 |
-| 21. Digest + Briefing Integration | 2/6 | In Progress|  |
+| 21. Digest + Briefing Integration | 4/6 | In Progress|  |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
 ### Research Flags (v2.1)
