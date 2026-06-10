@@ -46,6 +46,140 @@ const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
 
 const BRIEFING_SECTION_KEYS = ['calendar', 'email', 'news'] as const;
 
+// ─── Phase 21: WhatsApp digest section helpers ─────────────────────────────────
+
+/**
+ * Parse the four fixed-header sections from a WhatsApp group digest summary_text.
+ * Partial-parse tolerant — missing sections return empty string.
+ * Headers: ### KEY POINTS, ### DECISIONS, ### OPEN QUESTIONS, ### MENTIONS
+ */
+function parseDigestSections(text: string): {
+  keyPoints: string;
+  decisions: string;
+  openQuestions: string;
+  mentions: string;
+} {
+  const result = { keyPoints: '', decisions: '', openQuestions: '', mentions: '' };
+  if (!text) return result;
+
+  let current: keyof typeof result | null = null;
+  const lines = text.split('\n');
+  const buckets: Record<keyof typeof result, string[]> = {
+    keyPoints: [],
+    decisions: [],
+    openQuestions: [],
+    mentions: [],
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === '### KEY POINTS') { current = 'keyPoints'; continue; }
+    if (trimmed === '### DECISIONS') { current = 'decisions'; continue; }
+    if (trimmed === '### OPEN QUESTIONS') { current = 'openQuestions'; continue; }
+    if (trimmed === '### MENTIONS') { current = 'mentions'; continue; }
+    if (current !== null) buckets[current].push(line);
+  }
+
+  result.keyPoints = buckets.keyPoints.join('\n').trim();
+  result.decisions = buckets.decisions.join('\n').trim();
+  result.openQuestions = buckets.openQuestions.join('\n').trim();
+  result.mentions = buckets.mentions.join('\n').trim();
+  return result;
+}
+
+/**
+ * Phase 21 — digest retry affordance.
+ * Mirrors GenerateNowAffordance shape but calls whatsappGenerateDigestNow (NOT briefingGenerateNow).
+ * Shows a quiet connection note when the WhatsApp connection is degraded / needs-auth.
+ */
+function DigestGenerateNowAffordance({
+  connection,
+}: {
+  connection?: 'degraded' | 'needs-auth';
+}): JSX.Element {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onClick(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = (await window.aria.whatsappGenerateDigestNow()) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!result?.ok) {
+        setError(result?.error ?? 'unknown');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {connection === 'degraded' && (
+        <p
+          style={{
+            fontSize: 12,
+            color: 'var(--gray)',
+            fontStyle: 'italic',
+            margin: '0 0 8px 0',
+          }}
+        >
+          WhatsApp connection is degraded — check Settings to reconnect.
+        </p>
+      )}
+      {connection === 'needs-auth' && (
+        <p
+          style={{
+            fontSize: 12,
+            color: 'var(--gray)',
+            fontStyle: 'italic',
+            margin: '0 0 8px 0',
+          }}
+        >
+          WhatsApp connection needs relink — check Settings to reconnect.
+        </p>
+      )}
+      <button
+        type="button"
+        data-testid="briefing-whatsapp-retry"
+        onClick={() => void onClick()}
+        disabled={busy}
+        style={{
+          padding: '7px 16px',
+          fontSize: 13,
+          fontFamily: 'var(--f-body)',
+          fontWeight: 500,
+          color: 'var(--paper)',
+          background: busy ? 'var(--rule-strong)' : 'var(--gold)',
+          border: 'none',
+          borderRadius: 'var(--radius)',
+          cursor: busy ? 'not-allowed' : 'pointer',
+          transition: 'background 200ms ease',
+        }}
+      >
+        {busy ? 'Generating…' : 'Retry digest now'}
+      </button>
+      {error && (
+        <p
+          role="alert"
+          style={{
+            color: 'var(--rose)',
+            fontSize: 12,
+            fontFamily: 'var(--f-mono)',
+            marginTop: 8,
+            marginBottom: 0,
+          }}
+        >
+          Failed: {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Build a plain-text TTS string from a briefing section.
  * Pitfall 4: reads from already-loaded BriefingPayload — no LLM streaming.
@@ -723,6 +857,107 @@ export function BriefingScreen(): JSX.Element {
             </ul>
           </section>
         )}
+
+      {/* Phase 21 — WhatsApp digest section (D-08/D-10) */}
+      {payload.whatsApp?.state === 'unavailable' && (
+        <section data-testid="briefing-whatsapp-unavailable" style={{ marginBottom: 28 }}>
+          <SectionHead>WhatsApp</SectionHead>
+          <p style={{ fontSize: 13.5, color: 'var(--gray)', fontStyle: 'italic', margin: 0 }}>
+            Digest unavailable — the local model was offline this morning. Aria will retry tonight.
+          </p>
+          <DigestGenerateNowAffordance connection={payload.whatsApp.connection} />
+        </section>
+      )}
+
+      {payload.whatsApp?.state === 'ready' && payload.whatsApp.groups.length > 0 && (
+        <section data-testid="briefing-whatsapp" style={{ marginBottom: 36 }}>
+          <SectionHead>WhatsApp</SectionHead>
+          {payload.whatsApp.groups.map((g) => {
+            if (g.state === 'no-activity') return null;
+            if (g.state === 'failed') {
+              return (
+                <div key={g.jid} style={{ marginBottom: 12 }}>
+                  <strong
+                    style={{
+                      fontSize: 13,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    {g.displayName}
+                  </strong>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--gray)',
+                      fontStyle: 'italic',
+                      margin: '4px 0 0',
+                    }}
+                  >
+                    Digest unavailable for this group.
+                  </p>
+                </div>
+              );
+            }
+            // state === 'summarized'
+            const sections = parseDigestSections(g.summaryText ?? '');
+            return (
+              <div key={g.jid} style={{ marginBottom: 16 }}>
+                <strong
+                  style={{
+                    fontSize: 13,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  {g.displayName}
+                </strong>
+                {sections.keyPoints && (
+                  <p style={{ fontSize: 13, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>
+                    {sections.keyPoints}
+                  </p>
+                )}
+                {sections.decisions && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      margin: '4px 0 0',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    <em>Decisions:</em> {sections.decisions}
+                  </p>
+                )}
+                {sections.openQuestions && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      margin: '4px 0 0',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    <em>Open:</em> {sections.openQuestions}
+                  </p>
+                )}
+                {sections.mentions && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      margin: '4px 0 0',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    <em>Mentions:</em> {sections.mentions}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       <SectionWithChips cascade={5} sectionKey="calendar" date={payload.date}>
         <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
