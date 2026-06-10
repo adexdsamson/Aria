@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T12:07:13.372Z"
+last_updated: "2026-06-10T13:20:00.000Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 14
-  completed_plans: 10
-  percent: 33
+  completed_plans: 11
+  percent: 36
 ---
 
 # State
@@ -24,11 +24,17 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 21 (digest-briefing-integration) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Executing Phase 21
-Last activity: 2026-06-10 -- Plan 21-02 COMPLETE (ba74188, 80b1f96, 17c78d2)
+Last activity: 2026-06-10 -- Plan 21-03 COMPLETE (6844ea6)
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+
+## Decisions (Phase 21, Plan 03)
+
+- runNow() seal-guard mirrors cron callback: dbHolder && !db → pendingCatchup.add('whatsapp-digest'); required because D-07.1 test calls runNow() directly with null dbHolder.db
+- Private p-queue per runDigest() call (not shared scheduler queue) — mirrors aggregate.ts precedent; simpler test isolation
+- DIGEST_SYSTEM_PROMPT as module-level constant with temperature:0 — ensures deterministic structured output at fixed headers on 8B models
 
 ## Decisions (Phase 21, Plan 02)
 
