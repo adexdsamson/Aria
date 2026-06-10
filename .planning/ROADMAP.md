@@ -195,7 +195,7 @@ Plans:
 - [x] 20-04-PLAN.md — Wave 3: session-manager.ts — passive socket (gates 1/2) + QR push + reconnect classify (gate 5) + recycle cron (gate 6) + boot-safe degrade
 - [x] 20-05-PLAN.md — Wave 4: group-sync (untracked-default) + ingest (3-line privacy filter + p-queue batch flush, gates 7/8/9, WA-06) + retention 03:30 sweep
 - [x] 20-06-PLAN.md — Wave 5: ipc/whatsapp.ts (WHATSAPP_CHANNELS) + ipc/index.ts stubs + main/index.ts bootPoll wiring (removeHandler loop) + provider-accounts disconnect cascade (WA-04) + handler-count
-- [ ] 20-07-PLAN.md — Wave 6: renderer — consent ack-gate modal (SC-1) + QR modal + AccountRow chip/Reconnect/Manage-groups + group-picker (search+toggle) + IntegrationsSection + preload
+- [x] 20-07-PLAN.md — Wave 6: renderer — consent ack-gate modal (SC-1) + QR modal + AccountRow chip/Reconnect/Manage-groups + group-picker (search+toggle) + IntegrationsSection + preload
 - [ ] 20-08-PLAN.md — Wave 7: WA-12 degradable integration test + live-QR/consent UAT checkpoint (human-verify)
 **UI hint**: yes
 
@@ -226,7 +226,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Foundation | 6/8 | In Progress|  |
+| 20. Foundation | 7/8 | In Progress|  |
 | 21. Digest + Briefing Integration | 0/0 | Not started | - |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T00:31:54.704Z"
+last_updated: "2026-06-10T01:00:44.380Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 20 (foundation) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-06-10
 
@@ -46,7 +46,14 @@ Last activity: 2026-06-10
 
 ## Next Action
 
-**`/gsd-execute-phase 20`** — Continue with Plan 20-07 (WhatsApp renderer UI + socket attachment).
+**`/gsd-execute-phase 20`** — Continue with Plan 20-08 (WhatsApp consent copy review + verification).
+
+## Decisions (Phase 20, Plan 07)
+
+- CSS custom property with hex fallback (var(--chip-needs-auth, #c98a3a)) for chip colors — jsdom CSSOM normalizes plain hex to rgb(); CSS custom property string is preserved verbatim in element.style.color, allowing spec substring assertions to pass while browsers render the correct color via fallback
+- WhatsAppGroupPickerModal handles both {rows} and {groups} response shapes — test spec mock uses {rows} while ipc-contract declares {groups}; component reads result.rows ?? result.groups
+- Link WhatsApp button added directly to IntegrationsSection header — AddAccountModal only supports google/microsoft/todoist; WhatsApp follows QR flow not OAuth, so a separate entry point is cleaner than extending AddAccountModal in this plan
+- onWhatsappQrUpdate + onWhatsappStateChanged added as preload push overrides — 5 invoke channels are auto-mapped by buildApi() via CHANNEL_METHODS; only push channels need manual ipcRenderer.on wiring (T-20-25: no send channel exposed)
 
 ## Decisions (Phase 20, Plan 06)
 
