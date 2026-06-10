@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
-status: executing
-last_updated: "2026-06-10T01:00:44.380Z"
-last_activity: 2026-06-10
+status: verifying
+last_updated: "2026-06-10T10:52:54.279Z"
+last_activity: "2026-06-10 -- Phase 20 COMPLETE: WhatsApp link/consent/QR/groups/ingest/disconnect all verified live; remaining = run WhatsApp specs GREEN (app-close) + push"
 progress:
   total_phases: 3
   completed_phases: 1
