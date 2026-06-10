@@ -212,6 +212,9 @@ export const CHANNELS = {
   // Push channels (main → renderer via ipcRenderer.on):
   WHATSAPP_QR_UPDATE: 'aria:whatsapp:qr-update',            // WA-01: QR data-URL + expiry countdown
   WHATSAPP_STATE_CHANGED: 'aria:whatsapp:state-changed',    // WA-03: connection state transitions
+  // Phase 21 — Digest + Briefing Integration (21-01)
+  // WA-10/D-10: Re-run digest on demand when Ollama was offline (Generate-now retry affordance).
+  WHATSAPP_GENERATE_DIGEST_NOW: 'aria:whatsapp:generate-digest-now',
 } as const;
 
 // Plan 07-02 RAG DTOs --------------------------------------------------------
@@ -555,6 +558,18 @@ export interface BriefingPayload {
   thisWeekInsights?:
     | { state: 'unlocked'; rows: BriefingInsightRow[] }
     | { state: 'locked'; daysRemaining: number; blockedKinds: InsightKindDto[] };
+  /**
+   * Phase 21 — WhatsApp digest section. Populated at the BRIEFING_TODAY read
+   * path only (D-11/D-13: read-path enrichment, NOT by runBriefing).
+   * Do NOT pass this field into the frontier generateObject prompt (D-12).
+   * One of:
+   *   - { state: 'ready', groups: [...] } — per-group digest summaries (D-09)
+   *   - { state: 'unavailable', reason: 'model-offline' } — local model was offline
+   *   - undefined — WhatsApp not linked, zero tracked groups, or all below threshold
+   */
+  whatsApp?:
+    | { state: 'ready'; groups: WhatsAppGroupSummaryDto[]; connection?: 'degraded' | 'needs-auth' }
+    | { state: 'unavailable'; reason: 'model-offline'; connection?: 'degraded' | 'needs-auth' };
 }
 
 /** Renderer-facing minimal shape for the "This week" cards. */
@@ -1126,6 +1141,13 @@ export interface AriaApi {
   whatsappSetTracked(req: WhatsAppSetTrackedReq): Promise<{ ok: true } | IpcError>;
   /** WA-03: Return current connection status + account identity. */
   whatsappStatus(): Promise<WhatsAppStatusDto | IpcError>;
+  /**
+   * WA-10/D-10: Re-run the WhatsApp digest on demand when the local model was
+   * offline at the scheduled 05:00 cron. Returns ok:true once generation is
+   * enqueued (the actual summarisation is async; the renderer should re-fetch
+   * the briefing after a short delay or listen for a BRIEFING_TODAY push).
+   */
+  whatsappGenerateDigestNow(): Promise<{ ok: boolean; error?: string }>;
 
   /**
    * Phase 20 push subscriptions (ipcRenderer.on, not invoke).
@@ -1589,6 +1611,8 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   WHATSAPP_STATUS: 'whatsappStatus',
   WHATSAPP_QR_UPDATE: 'onWhatsappQrUpdate',
   WHATSAPP_STATE_CHANGED: 'onWhatsappStateChanged',
+  // Phase 21 — Digest + Briefing Integration (21-01)
+  WHATSAPP_GENERATE_DIGEST_NOW: 'whatsappGenerateDigestNow',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1746,6 +1770,29 @@ export const WhatsAppStatusDto = _z_wa.object({
   displayNumber: _z_wa.string().nullable(),
 });
 export type WhatsAppStatusDto = _z_wa.infer<typeof WhatsAppStatusDto>;
+
+/**
+ * Phase 21 — Per-group WhatsApp digest summary for the BriefingPayload.whatsApp section.
+ * D-09: inner sub-state per tracked group (partial Ollama failure possible — some groups
+ * may be summarized while later groups show 'failed' if serialised queue was interrupted).
+ * `summaryText` is the verbatim delimited-markdown string from whatsapp_group_digest.summary_text
+ * (present only when state === 'summarized').
+ */
+export interface WhatsAppGroupSummaryDto {
+  /** Group JID from whatsapp_group.jid */
+  jid: string;
+  /** Human-readable display name from whatsapp_group.display_name */
+  displayName: string;
+  /**
+   * D-09 per-group sub-state:
+   *   - 'summarized': digest generated; summaryText is populated
+   *   - 'no-activity': below the min-activity threshold (≈3 messages); row omitted from section
+   *   - 'failed': model call failed; row included so UI can show per-group retry hint
+   */
+  state: 'summarized' | 'no-activity' | 'failed';
+  /** Present only when state === 'summarized'. */
+  summaryText?: string;
+}
 
 /**
  * QR code update pushed from main via WHATSAPP_QR_UPDATE.
