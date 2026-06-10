@@ -23,12 +23,12 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 20 (foundation) — EXECUTING
-Plan: 8 of 8
-Status: Ready to execute
-Last activity: 2026-06-10
+Phase: 20 (foundation) — CODE-COMPLETE, LIVE UAT PENDING
+Plan: 20-01..07 done; 20-08 Task 1 (WA-12 test) done, Task 2 (live-QR/consent human-action checkpoint) OPEN
+Status: gsd-verifier 9/9 requirements VERIFIED (automated); live UAT is the final gate
+Last activity: 2026-06-10 -- Phase 20 executed (8 plans / 7 waves) + verified; 2 latent gaps caught & fixed (deferred-boot FK-off in 20-03; dead-code capture wiring in 20-06)
 
-**Progress bar:** Phase 0/3 complete · 0% · [ · · · ]
+**Progress bar:** Phase 0/3 complete · Phase 20 ~95% (live UAT pending) · [▰ · ·]
 
 ## Milestone v2.1 Locked Decisions
 
@@ -46,7 +46,7 @@ Last activity: 2026-06-10
 
 ## Next Action
 
-**`/gsd-execute-phase 20`** — Continue with Plan 20-08 (WhatsApp consent copy review + verification).
+**Live UAT for Plan 20-08 Task 2** — run the 6-step checklist in `.planning/phases/20-foundation/20-08-VERIFICATION.md` with a **secondary** WhatsApp number (ban risk): launch via `Remove-Item Env:\ELECTRON_RUN_AS_NODE; pnpm dev`, then verify consent ack-gate → QR link → group track + ingest within ~60s → other surfaces unaffected → disconnect wipes all 5 WA tables. Reply "approved" or report failures (step # + BLOCKER/MINOR). Phase 20 closes after live UAT passes.
 
 ## Decisions (Phase 20, Plan 07)
 
