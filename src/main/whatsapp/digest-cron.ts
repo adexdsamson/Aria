@@ -172,13 +172,26 @@ async function runDigest(deps: WhatsAppDigestDeps): Promise<void> {
       queue.add(async () => {
         try {
           // 4a. Fetch messages in window using ISO string comparisons (Pitfall 4)
-          //     Window = max(lastDigestWatermark, now − WINDOW_DAYS days) (D-04/D-05)
+          //     Window floor = start-of-day of the most recent prior successful digest for
+          //     this group (d.date < today, summary_text IS NOT NULL), converted to an ISO
+          //     timestamp via || 'T00:00:00.000Z'.  Falls back to windowStart (WINDOW_DAYS
+          //     ago) when no prior digest row exists.  The second AND m.sent_at >= ?
+          //     (windowStart) is a hard cap so we never scan the entire message history on
+          //     the very first run (D-04/D-05).
+          //
+          //     IMPORTANT: the prior CTE joined whatsapp_message × whatsapp_group_digest on
+          //     jid and took MAX(m.sent_at), which collapsed to the group's latest message
+          //     timestamp the moment any prior digest existed — causing all subsequent days
+          //     to match ≤1 message, fall below MIN_ACTIVITY, and be skipped (CR-01 fix).
+          //     The corrected CTE subqueries only whatsapp_group_digest so the watermark is
+          //     the prior digest's *date*, not the latest message timestamp.
+          //
+          //     Bind params in order: jid, today, jid, windowStart, windowStart
           const messages = db
             .prepare<[string, string, string, string, string]>(
               `WITH last_digest AS (
-                SELECT MAX(m.sent_at) AS watermark
-                FROM whatsapp_message m
-                INNER JOIN whatsapp_group_digest d ON d.jid = m.jid
+                SELECT MAX(d.date) AS last_date
+                FROM whatsapp_group_digest d
                 WHERE d.jid = ?
                   AND d.summary_text IS NOT NULL
                   AND d.date < ?
@@ -186,7 +199,8 @@ async function runDigest(deps: WhatsAppDigestDeps): Promise<void> {
               SELECT m.jid, m.body_text, m.sent_at, m.sender_jid
               FROM whatsapp_message m
               WHERE m.jid = ?
-                AND m.sent_at >= COALESCE((SELECT watermark FROM last_digest), ?)
+                AND m.sent_at >= COALESCE(
+                      (SELECT last_date || 'T00:00:00.000Z' FROM last_digest), ?)
                 AND m.sent_at >= ?
               ORDER BY m.sent_at ASC
               LIMIT ${MAX_MESSAGES}`,
