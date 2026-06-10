@@ -17,7 +17,8 @@ export type CatchupChannel =
   | 'entitlement'
   | 'gmail-sync'
   | 'calendar-sync'
-  | 'knowledge-folder-sweep';
+  | 'knowledge-folder-sweep'
+  | 'whatsapp-retention-sweep';
 
 const _pending = new Set<CatchupChannel>();
 
