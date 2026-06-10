@@ -66,7 +66,7 @@ describe('WHATSAPP_DISCONNECT cascade (R-WA04 → Plan 20-06)', () => {
     ).run(WA_JID, WA_JID, '{"messaging":1}');
 
     db.prepare(
-      `INSERT INTO whatsapp_auth_state (type, key_id, value_json) VALUES (?, ?, ?)`,
+      `INSERT INTO whatsapp_auth_state (type, key_id, value) VALUES (?, ?, ?)`,
     ).run('creds', 'creds-main', '{"me":{"id":"' + WA_JID + '"}}');
 
     db.prepare(
