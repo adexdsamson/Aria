@@ -19,7 +19,7 @@ findings:
   warning: 5
   info: 4
   total: 10
-status: issues_found
+status: partially_resolved
 ---
 
 # Phase 21: Code Review Report
@@ -27,7 +27,7 @@ status: issues_found
 **Reviewed:** 2026-06-10
 **Depth:** standard
 **Files Reviewed:** 10
-**Status:** issues_found
+**Status:** partially_resolved
 
 ## Summary
 
@@ -104,6 +104,8 @@ LIMIT ${MAX_MESSAGES}
 Add a multi-day regression test: seed a prior-day digest row + fresh messages dated today, run
 `runNow()`, assert today's row is written non-NULL.
 
+**Status:** Resolved (fix commit a30ac3d — corrected CTE; regression test commit 824e7d2)
+
 ## Warnings
 
 ### WR-01: Fire-and-forget `runNow()` triggers on every briefing view for unlinked / zero-group users
@@ -136,6 +138,8 @@ if (wa !== undefined) row.whatsApp = wa;
 if (shouldGenerate && _dh) void _dh.runNow();
 ```
 
+**Status:** Resolved (fix commit e81bfc6)
+
 ### WR-02: Digest handle captures `deps.db` while seal-guard reads `deps.dbHolder.db` — diverges after backup-restore
 
 **File:** `src/main/whatsapp/digest-cron.ts:269-299` and `src/main/index.ts:602-645`
@@ -152,6 +156,8 @@ session.
 `const db = deps.dbHolder?.db ?? deps.db;` after the seal-guard, mirroring the late-binding pattern used
 elsewhere (e.g. `closeToTrayReader`, `getDigestHandle`). `retention.ts` shares the same latent issue but
 is out of scope for this phase.
+
+**Status:** Resolved (fix commit b8fc3a9)
 
 ### WR-03: `INSERT OR REPLACE` on the NULL-failure path writes `generated_at = null, model_id = null`
 
