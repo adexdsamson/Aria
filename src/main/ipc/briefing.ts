@@ -19,13 +19,17 @@
  */
 import type { IpcMain } from 'electron';
 import type { Logger } from 'pino';
+import type Database from 'better-sqlite3-multiple-ciphers';
 import {
   CHANNELS,
   type BriefingSettings,
   type BriefingSummary,
+  type BriefingPayload,
+  type WhatsAppGroupSummaryDto,
 } from '../../shared/ipc-contract';
 import type { DbHolder } from './onboarding';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
+import type { WhatsAppDigestHandle } from '../whatsapp/digest-cron';
 import { LLMRouter } from '../llm/router';
 import { probeOllama } from '../llm/ollamaProbe';
 import { getActiveProvider, hasFrontierKey } from '../secrets/safeStorage';
@@ -48,6 +52,8 @@ import { BrowserWindow } from 'electron';
 import { showBriefingReadyNotification } from '../tray/notify';
 import { readBgPref } from '../background/prefs';
 
+type Db = Database.Database;
+
 export interface BriefingHandlerDeps {
   logger: Logger;
   dbHolder: DbHolder;
@@ -58,6 +64,12 @@ export interface BriefingHandlerDeps {
   calendarClientFactory?: () => CalendarClient | null;
   /** Override timezone resolver (tests). */
   userTzFn?: () => string;
+  /**
+   * Phase 21 — WhatsApp digest handle for fire-and-forget runNow() (D-07.3).
+   * Injected by index.ts after startWhatsAppDigest() is called. Optional so
+   * existing tests that do not pass it continue to work unchanged.
+   */
+  digestHandle?: WhatsAppDigestHandle | null;
 }
 
 const DEFAULT_TIME = '07:00';
@@ -88,6 +100,101 @@ function cronExprForTime(time: string): string {
   const m = WHOLE_HOUR_RE.exec(time);
   if (!m) return '0 7 * * *';
   return `0 ${Number(m[1])} * * *`;
+}
+
+/**
+ * Phase 21 — Read WhatsApp group digest data for today and map to the
+ * BriefingPayload.whatsApp discriminated union (D-10 state matrix).
+ *
+ * read-only, no model (D-13)
+ *
+ * Returns undefined when:
+ *   - No provider_account row for 'whatsapp' (not linked)
+ *   - No tracked groups
+ *   - All groups below activity threshold (no digest rows written)
+ * Returns { state: 'unavailable', reason: 'model-offline' } when all
+ *   digest rows have summary_text=NULL (Ollama was down for all groups).
+ * Returns { state: 'ready', groups: [...] } when at least one group
+ *   has a non-NULL summary_text for today.
+ */
+function readWhatsAppDigests(
+  db: Db,
+  date: string,
+  logger: Pick<Logger, 'warn'>,
+): BriefingPayload['whatsApp'] {
+  try {
+    // Step 1: Check if WhatsApp is linked via provider_account
+    const account = db
+      .prepare(
+        `SELECT status FROM provider_account WHERE provider_key = 'whatsapp' LIMIT 1`,
+      )
+      .get() as { status: string } | undefined;
+    if (!account) return undefined;
+
+    // Step 2: Get tracked groups
+    const trackedGroups = db
+      .prepare(`SELECT jid, display_name FROM whatsapp_group WHERE tracked = 1`)
+      .all() as Array<{ jid: string; display_name: string }>;
+    if (trackedGroups.length === 0) return undefined;
+
+    // Step 3: Get digest rows for today
+    const digestRows = db
+      .prepare(
+        `SELECT jid, summary_text FROM whatsapp_group_digest WHERE date = ?`,
+      )
+      .all(date) as Array<{ jid: string; summary_text: string | null }>;
+    const digestMap = new Map<string, string | null>(
+      digestRows.map((r) => [r.jid, r.summary_text]),
+    );
+
+    // Step 4: Map tracked groups to WhatsAppGroupSummaryDto
+    const groups: WhatsAppGroupSummaryDto[] = trackedGroups.map((g) => {
+      if (!digestMap.has(g.jid)) {
+        return { jid: g.jid, displayName: g.display_name, state: 'no-activity' };
+      }
+      const text = digestMap.get(g.jid) ?? null;
+      if (text === null) {
+        return { jid: g.jid, displayName: g.display_name, state: 'failed' };
+      }
+      return { jid: g.jid, displayName: g.display_name, state: 'summarized', summaryText: text };
+    });
+
+    // Step 5: Determine content/failed flags
+    const hasAnyContent = groups.some((g) => g.state === 'summarized');
+    const hasAnyFailed = groups.some((g) => g.state === 'failed');
+
+    // Step 6: Build connection field from account status
+    const connection: 'degraded' | 'needs-auth' | undefined =
+      account.status === 'degraded' || account.status === 'needs-auth'
+        ? (account.status as 'degraded' | 'needs-auth')
+        : undefined;
+
+    // Step 7: Return based on D-10 state matrix
+    if (!hasAnyContent && !hasAnyFailed) {
+      // All groups are sub-threshold (no-activity) — omit section
+      return undefined;
+    }
+    if (!hasAnyContent && hasAnyFailed) {
+      // All digest attempts failed (Ollama was offline for all groups)
+      return {
+        state: 'unavailable',
+        reason: 'model-offline',
+        ...(connection ? { connection } : {}),
+      };
+    }
+    // At least one group has a summary — show the section
+    return {
+      state: 'ready',
+      groups,
+      ...(connection ? { connection } : {}),
+    };
+  } catch (err) {
+    logger.warn(
+      { scope: 'readWhatsAppDigests', err: (err as Error).message },
+      'readWhatsAppDigests internal error',
+    );
+    throw err; // re-throw so the caller's try/catch can handle graceful degradation
+  }
 }
 
 export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandlerDeps): void {
@@ -242,6 +349,23 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
           'failed to enrich briefing with insights',
         );
       }
+      // Phase 21 — enrich with WhatsApp group digests (D-11).
+      // Enrichment is AFTER runBriefing returns — frontier never sees whatsApp content (D-11).
+      // read-only, no model — readWhatsAppDigests annotated per D-13.
+      try {
+        const wa = readWhatsAppDigests(db, date, logger);
+        if (wa !== undefined) row.whatsApp = wa;
+        // D-07.3 async fallback: if no digest rows for today, trigger generation
+        // fire-and-forget — NEVER await here; never propagate Ollama errors into briefing.
+        if (row.whatsApp === undefined && deps.digestHandle) {
+          void deps.digestHandle.runNow();
+        }
+      } catch (err) {
+        logger.warn(
+          { scope: 'briefing-today-whatsapp', err: (err as Error).message },
+          'failed to enrich briefing with whatsapp digests',
+        );
+      }
       return row;
     } catch (err) {
       return { error: (err as Error).message };
@@ -364,6 +488,19 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     } catch (err) {
       return { error: (err as Error).message };
     }
+  });
+
+  // ── WHATSAPP_GENERATE_DIGEST_NOW ───────────────────────────────────────────
+  // Phase 21 — SC4 retry affordance: renderer calls this when the local model
+  // was offline and the user wants to re-run the digest. Calls the local-only
+  // digest cron (no frontier LLM). Returns immediately; runNow() is async
+  // fire-and-forget. Must NOT call briefingGenerateNow (different scope).
+  ipcMain.handle(CHANNELS.WHATSAPP_GENERATE_DIGEST_NOW, async () => {
+    if (!deps.digestHandle) {
+      return { ok: false as const, error: 'digest handle not available' };
+    }
+    void deps.digestHandle.runNow();
+    return { ok: true as const };
   });
 
   void hashFromUrl; // re-export keep-alive for IPC consumers that may need it
