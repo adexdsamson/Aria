@@ -358,18 +358,20 @@ export class WhatsAppSessionManager {
     const keys = makeCacheableSignalKeyStore(rawStore, logger as Parameters<typeof makeCacheableSignalKeyStore>[1]);
 
     // Pinned 6.7.23 (legacy tag). v7 migration blocked on LID API + WASM-asar.
-    // version is required by makeWASocket config; use a fixed pinned version
-    // that matches 6.7.23 WA Web protocol. Do NOT call fetchLatestWaWebVersion
-    // per-connect (fingerprint/incompat anti-pattern).
-    const version: [number, number, number] = [2, 3000, 1015901307];
-
+    // Do NOT hardcode the WA Web protocol version: a stale number is rejected by
+    // WhatsApp with statusCode 405 "Connection Failure" right after registration
+    // (a prior hardcode of [2,3000,1015901307] — OLDER than baileys' own shipped
+    // default — caused exactly that). Omitting `version` makes makeWASocket use
+    // baileys' bundled DEFAULT_CONNECTION_CONFIG.version (the version its protocol
+    // code is built for), which auto-tracks every baileys upgrade. We deliberately
+    // do NOT call fetchLatestWaWebVersion() per-connect (network + fingerprint /
+    // protocol-mismatch anti-pattern); the bundled default is the right pin.
     return makeWASocket({
       auth: {
         creds: this.getOrInitCreds(db),
         keys,
       },
       logger: logger as Parameters<typeof makeWASocket>[0]['logger'],
-      version,
       markOnlineOnConnect: false,   // WA-11 gate 1
       emitOwnEvents: false,          // WA-11 gate 1
       syncFullHistory: false,        // D-13 explicit
