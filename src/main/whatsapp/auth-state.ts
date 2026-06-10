@@ -18,8 +18,12 @@
  *   revived with `BufferJSON.reviver`. Rolling your own Buffer handling corrupts creds.
  */
 import type Database from 'better-sqlite3-multiple-ciphers';
-import { BufferJSON } from '@whiskeysockets/baileys';
-import type { SignalDataSet, SignalDataTypeMap } from '@whiskeysockets/baileys';
+import { BufferJSON, initAuthCreds } from '@whiskeysockets/baileys';
+import type {
+  AuthenticationCreds,
+  SignalDataSet,
+  SignalDataTypeMap,
+} from '@whiskeysockets/baileys';
 
 type Db = Database.Database;
 
@@ -125,4 +129,28 @@ export function makeSQLiteSignalKeyStore(db: Db): SQLiteSignalKeyStore {
       tx();
     },
   };
+}
+
+/**
+ * Load the persisted Baileys auth credentials, or seed a fresh set on first link.
+ *
+ * CRITICAL: when no creds row exists, this returns `initAuthCreds()` — a fully
+ * formed credential set (noiseKey, signedIdentityKey, signedPreKey,
+ * registrationId, …). It MUST NOT return `{}`: Baileys does not lazily generate
+ * creds. With an empty object, `creds.noiseKey` is undefined and the Noise
+ * handshake throws `Cannot read properties of undefined (reading 'public')` in
+ * processHandshake on every connection — the socket never reaches the point of
+ * emitting a `qr` event, so the QR link modal hangs forever.
+ *
+ * Persisted creds are written by the session manager's `creds.update` handler as
+ * a single row (type='creds', key_id='creds') via `JSON.stringify(creds,
+ * BufferJSON.replacer)`, and revived here through the key store's
+ * `BufferJSON.reviver` so Buffer key material survives a restart.
+ */
+export function loadOrInitCreds(db: Db): AuthenticationCreds {
+  const store = makeSQLiteSignalKeyStore(db);
+  const existing = store.get('creds' as keyof SignalDataTypeMap, ['creds'])[
+    'creds'
+  ] as AuthenticationCreds | undefined;
+  return existing ?? initAuthCreds();
 }

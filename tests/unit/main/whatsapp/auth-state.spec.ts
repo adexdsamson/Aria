@@ -10,12 +10,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { BufferJSON } from '@whiskeysockets/baileys';
 import { openDb, closeDb } from '../../../../src/main/db/connect';
 import { runMigrations } from '../../../../src/main/db/migrations/runner';
 import { createTempUserDataDir } from '../../../setup';
 
 // Module under test — does not exist yet; RED-fails until Plan 20-03 lands.
-import { makeSQLiteSignalKeyStore } from '../../../../src/main/whatsapp/auth-state';
+import { makeSQLiteSignalKeyStore, loadOrInitCreds } from '../../../../src/main/whatsapp/auth-state';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../src/main/db/migrations');
 
@@ -152,5 +153,54 @@ describe('auth-state.ts — keys.set() transaction atomicity (gate 4)', () => {
 
     const rows = db.prepare("SELECT * FROM whatsapp_auth_state WHERE type='pre-key' AND key_id='del-key-1'").all();
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('loadOrInitCreds — first-link creds initialization (Noise-handshake QR fix)', () => {
+  let db: ReturnType<typeof openDb>;
+
+  beforeEach(() => {
+    const dataDir = createTempUserDataDir('aria-creds-init');
+    const dbKey = crypto.randomBytes(32);
+    db = openDb({ dataDir, dbKey, runMigrationsOnOpen: false });
+    runMigrations(db, { dir: MIGRATIONS_DIR });
+  });
+
+  // ROOT CAUSE regression: getOrInitCreds previously returned `{}` when no creds
+  // were stored, so `creds.noiseKey` was undefined and Baileys' processHandshake
+  // threw "Cannot read properties of undefined (reading 'public')" on EVERY
+  // connection — the Noise handshake died before any `qr` event could fire, so
+  // the QR modal hung on "GENERATING QR…" forever. Valid creds MUST be seeded
+  // via initAuthCreds().
+  it('returns a valid initAuthCreds() (noiseKey Buffer keypair) when none stored', () => {
+    const creds = loadOrInitCreds(db);
+    expect(creds).toBeDefined();
+    // The exact field processHandshake reads (noise-handler.js: encrypt(noiseKey.public)).
+    expect(Buffer.isBuffer(creds.noiseKey?.public)).toBe(true);
+    expect(Buffer.isBuffer(creds.noiseKey?.private)).toBe(true);
+    expect(Buffer.isBuffer(creds.signedIdentityKey?.public)).toBe(true);
+    expect(typeof creds.registrationId).toBe('number');
+    // Guard against the `{}` regression specifically.
+    expect(Object.keys(creds).length).toBeGreaterThan(3);
+  });
+
+  it('round-trips persisted creds with Buffers revived (survives restart)', () => {
+    const seed = loadOrInitCreds(db);
+    // Persist exactly as wireCredsUpdate does: direct SQL, type/key_id='creds',
+    // BufferJSON.replacer.
+    db.prepare(
+      `INSERT INTO whatsapp_auth_state (type, key_id, value, updated_at)
+       VALUES ('creds', 'creds', ?, unixepoch())`,
+    ).run(JSON.stringify(seed, BufferJSON.replacer));
+
+    const loaded = loadOrInitCreds(db);
+    expect(Buffer.isBuffer(loaded.noiseKey?.public)).toBe(true);
+    expect(loaded.noiseKey.public.equals(seed.noiseKey.public)).toBe(true);
+    expect(loaded.registrationId).toBe(seed.registrationId);
+  });
+
+  it('closeDb cleans up', () => {
+    closeDb(db);
+    expect(true).toBe(true);
   });
 });

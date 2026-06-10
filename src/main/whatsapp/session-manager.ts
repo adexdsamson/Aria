@@ -38,7 +38,7 @@ const _qrSvgRenderer = require('qrcode/lib/renderer/svg.js') as {
 };
 import { powerMonitor } from 'electron';
 import type { SchedulerHandle } from '../lifecycle/scheduler';
-import { makeSQLiteSignalKeyStore } from './auth-state';
+import { makeSQLiteSignalKeyStore, loadOrInitCreds } from './auth-state';
 import { CHANNELS } from '../../shared/ipc-contract';
 import { registerGroupSync } from './group-sync';
 import { registerIngest } from './ingest';
@@ -376,18 +376,15 @@ export class WhatsAppSessionManager {
     });
   }
 
-  /** Load creds from auth state or return empty initial creds. */
+  /**
+   * Load persisted creds, or seed a fresh credential set via initAuthCreds() on
+   * first link. NEVER returns `{}` — Baileys does not lazily generate creds, and
+   * an empty object leaves `creds.noiseKey` undefined, which makes the Noise
+   * handshake throw `Cannot read properties of undefined (reading 'public')` and
+   * the QR event never fires. See loadOrInitCreds in auth-state.ts.
+   */
   private getOrInitCreds(db: Db): Parameters<typeof makeWASocket>[0]['auth']['creds'] {
-    // Baileys stores creds as 'creds' type with key_id 'creds'.
-    const store = makeSQLiteSignalKeyStore(db);
-    const result = store.get('creds' as keyof import('@whiskeysockets/baileys').SignalDataTypeMap, ['creds']);
-    const existingCreds = result['creds'];
-    if (existingCreds) {
-      return existingCreds as Parameters<typeof makeWASocket>[0]['auth']['creds'];
-    }
-    // Return minimal empty creds — Baileys will generate a fresh key pair
-    // and emit a QR.
-    return {} as Parameters<typeof makeWASocket>[0]['auth']['creds'];
+    return loadOrInitCreds(db) as Parameters<typeof makeWASocket>[0]['auth']['creds'];
   }
 
   /** Attach connection.update handler to the socket. */
