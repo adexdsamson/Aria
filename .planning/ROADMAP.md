@@ -248,7 +248,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 21-01-PLAN.md — Wave 1: ipc-contract.ts BriefingPayload.whatsApp union + WhatsAppGroupSummaryDto + WHATSAPP_GENERATE_DIGEST_NOW channel + CatchupChannel 'whatsapp-digest'
+- [x] 21-01-PLAN.md — Wave 1: ipc-contract.ts BriefingPayload.whatsApp union + WhatsAppGroupSummaryDto + WHATSAPP_GENERATE_DIGEST_NOW channel + CatchupChannel 'whatsapp-digest'
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -286,7 +286,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 20. Foundation | 8/8 | Complete   | 2026-06-10 |
-| 21. Digest + Briefing Integration | 0/6 | In progress | - |
+| 21. Digest + Briefing Integration | 1/6 | In Progress|  |
 | 22. Extraction Consumers (deferred) | 0/0 | Not started | - |
 
 ### Research Flags (v2.1)

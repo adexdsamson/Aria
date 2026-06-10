@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Messaging / Group Intelligence
 status: executing
-last_updated: "2026-06-10T11:42:24.991Z"
-last_activity: 2026-06-10 -- Phase 21 planning complete
+last_updated: "2026-06-10T11:54:23.545Z"
+last_activity: 2026-06-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 14
-  completed_plans: 8
+  completed_plans: 9
   percent: 33
 ---
 
@@ -23,12 +23,19 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 20 (foundation) — COMPLETE ✅ (live UAT APPROVED 2026-06-10)
-Plan: 8/8 plans complete (8/8 SUMMARYs); 20-08 live UAT APPROVED — all of WA-01..07, WA-11, WA-12 confirmed LIVE
-Status: Ready to execute
-Last activity: 2026-06-10 -- Phase 21 planning complete
+Phase: 21 (digest-briefing-integration) — EXECUTING
+Plan: 2 of 6
+Status: Executing Phase 21
+Last activity: 2026-06-10 -- Plan 21-01 COMPLETE (816a2f7, 01fb1f5)
 
 **Progress bar:** Phase 1/3 complete · Phase 20 ✅ · [▰ · ·]
+
+## Decisions (Phase 21, Plan 01)
+
+- BriefingPayload.whatsApp? uses optional discriminated union (ready/unavailable/undefined) mirroring thisWeekInsights? — enables exhaustive switch on state in renderer (D-08)
+- WhatsAppGroupSummaryDto is a plain TS interface not a Zod schema — briefing DTOs at this boundary are not runtime-validated (follows BriefingInsightRow precedent)
+- WHATSAPP_GENERATE_DIGEST_NOW is an invoke-channel returning { ok, error? } — immediate renderer feedback without polling
+- 'whatsapp-digest' appended as last CatchupChannel member mirroring 'whatsapp-retention-sweep' placement (Phase 20 precedent, D-07)
 
 ## Milestone v2.1 Locked Decisions
 

@@ -23,9 +23,9 @@ WhatsApp group-tracking layered onto Aria's shipped surfaces (daily briefing, ap
 
 ### Daily Group Digest (WA-DIGEST)
 
-- [ ] **WA-08** — The daily briefing includes a WhatsApp section summarizing each tracked group's activity since the last digest, exec-framed: key points, decisions, open questions, and mentions of the user.
-- [ ] **WA-09** — WhatsApp group content is summarized using the local model only and is never sent to a frontier API (enforced by a static ratchet, not convention).
-- [ ] **WA-10** — If the local model is unavailable, the briefing still generates and the WhatsApp section degrades gracefully (clear "unavailable" note) rather than failing the whole briefing.
+- [x] **WA-08** — The daily briefing includes a WhatsApp section summarizing each tracked group's activity since the last digest, exec-framed: key points, decisions, open questions, and mentions of the user.
+- [x] **WA-09** — WhatsApp group content is summarized using the local model only and is never sent to a frontier API (enforced by a static ratchet, not convention).
+- [x] **WA-10** — If the local model is unavailable, the briefing still generates and the WhatsApp section degrades gracefully (clear "unavailable" note) rather than failing the whole briefing.
 
 ### Safety, Privacy & Resilience (WA-SAFE)
 
@@ -61,9 +61,9 @@ These layer onto the `whatsapp_message` rows the foundation already stores; **ze
 | WA-05 | Phase 20 — Foundation | Complete |
 | WA-06 | Phase 20 — Foundation | Complete |
 | WA-07 | Phase 20 — Foundation | Complete |
-| WA-08 | Phase 21 — Digest + Briefing Integration | Pending |
-| WA-09 | Phase 21 — Digest + Briefing Integration | Pending |
-| WA-10 | Phase 21 — Digest + Briefing Integration | Pending |
+| WA-08 | Phase 21 — Digest + Briefing Integration | Complete |
+| WA-09 | Phase 21 — Digest + Briefing Integration | Complete |
+| WA-10 | Phase 21 — Digest + Briefing Integration | Complete |
 | WA-11 | Phase 20 — Foundation | Complete |
 | WA-12 | Phase 20 — Foundation | Complete |
 | WA-F1 | Phase 22 — Extraction Consumers (deferred) | Deferred |
