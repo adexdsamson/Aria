@@ -83,6 +83,26 @@ const api = buildApi();
   return () => ipcRenderer.removeListener(CHANNELS.VOICE_TTS_CHUNK, handler);
 };
 
+// Phase 20 / Plan 20-07 — WhatsApp push channels.
+// The 5 invoke channels (whatsappLink, whatsappDisconnect, whatsappListGroups,
+// whatsappSetTracked, whatsappStatus) are auto-mapped by buildApi() via CHANNEL_METHODS.
+// Only the 2 push channels require manual override (same pattern as voice push channels
+// and entitlementOnStateChanged above). T-20-25: only read-only channels exposed; no
+// send/pairing-code channel exists.
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onWhatsappQrUpdate = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.WHATSAPP_QR_UPDATE, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.WHATSAPP_QR_UPDATE, handler);
+};
+
+(api as unknown as Record<string, ((cb: (d: unknown) => void) => () => void)>)
+  .onWhatsappStateChanged = (cb: (d: unknown) => void) => {
+  const handler = (_e: unknown, d: unknown) => cb(d);
+  ipcRenderer.on(CHANNELS.WHATSAPP_STATE_CHANGED, handler);
+  return () => ipcRenderer.removeListener(CHANNELS.WHATSAPP_STATE_CHANGED, handler);
+};
+
 // E2E-only escape hatches; gated by ARIA_E2E env var so production builds
 // never expose them. Used by the Plan 03-01 crash-recovery spec to seed a
 // 'generating' approval row before forcing a process exit.
