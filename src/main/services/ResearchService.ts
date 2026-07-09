@@ -27,7 +27,7 @@ import {
   hasFrontierKey,
   getActiveProvider,
 } from '../secrets/safeStorage';
-import { getFrontierModel } from '../llm/providers';
+import { getFrontierModel, getLocalModel } from '../llm/providers';
 
 type Db = Database.Database;
 
@@ -351,6 +351,7 @@ export async function detectResearchTopics(
   noteId: string,
   noteTitle: string,
   emitToRenderer?: (channel: string, payload?: unknown) => void,
+  logger?: Pick<Logger, 'warn'>,
 ): Promise<void> {
   try {
     // Load transcript text
@@ -359,10 +360,7 @@ export async function detectResearchTopics(
       .get(noteId) as { normalized_text: string } | undefined;
     if (!note) return;
 
-    const activeProvider = await getActiveProvider();
-    if (!activeProvider || !(await hasFrontierKey({ provider: activeProvider as import('../../shared/ipc-contract').ProviderId }))) return;
-    const model = await getFrontierModel(activeProvider as import('../../shared/ipc-contract').ProviderId);
-
+    // Build the transcript prompt ONCE, before any provider resolution.
     const prompt = `You are an AI assistant. Review this meeting transcript and identify 0-5 research topics
 that the participant should investigate further. For each topic provide a title, goals, and relevant domains.
 Return an empty array if no clear research topics emerge.
@@ -371,11 +369,37 @@ Meeting title: ${noteTitle}
 Transcript:
 ${note.normalized_text.slice(0, 8000)}`;
 
-    const { object: topics } = await generateObject({
-      model: model as Parameters<typeof generateObject>[0]['model'],
-      schema: TopicsSchema,
-      prompt,
-    });
+    // Local-first: attempt generation on the LOCAL Ollama model before any
+    // frontier call so raw meeting transcripts stay on-device by default.
+    let topics: z.infer<typeof TopicsSchema> | undefined;
+    try {
+      const localModel = getLocalModel();
+      const { object } = await generateObject({
+        model: localModel as Parameters<typeof generateObject>[0]['model'],
+        schema: TopicsSchema,
+        prompt,
+      });
+      topics = object;
+    } catch {
+      // Local model unavailable (Ollama not running / model missing / network).
+      // Fall back to frontier ONLY if a provider + key are configured, and only
+      // after emitting a disclosure warn that the transcript leaves the device.
+      const activeProvider = await getActiveProvider();
+      if (!activeProvider || !(await hasFrontierKey({ provider: activeProvider as import('../../shared/ipc-contract').ProviderId }))) {
+        return;
+      }
+      logger?.warn(
+        { scope: 'research', noteId },
+        'topic-detect: local model unavailable — falling back to frontier (transcript leaves device)',
+      );
+      const frontierModel = await getFrontierModel(activeProvider as import('../../shared/ipc-contract').ProviderId);
+      const { object } = await generateObject({
+        model: frontierModel as Parameters<typeof generateObject>[0]['model'],
+        schema: TopicsSchema,
+        prompt,
+      });
+      topics = object;
+    }
 
     if (!topics || topics.length === 0) return;
 

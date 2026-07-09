@@ -32,7 +32,7 @@ export function registerTranscriptHandlers(ipcMain: IpcMain, deps: TranscriptHan
       const approval = createTaskBatchApprovalForNote(db, result.noteId);
 
       // Fire-and-forget research topic auto-detect (Phase 11).
-      void detectResearchTopics(db, result.noteId, result.title ?? '', deps.emitToRenderer).catch(
+      void detectResearchTopics(db, result.noteId, result.title ?? '', deps.emitToRenderer, logger).catch(
         (err) => logger.warn({ scope: 'research', err: String(err) }, 'auto-detect failed silently'),
       );
 
