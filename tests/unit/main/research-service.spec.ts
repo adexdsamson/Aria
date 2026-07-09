@@ -11,6 +11,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import BetterSqlite3 from 'better-sqlite3-multiple-ciphers';
 import type { Database } from 'better-sqlite3-multiple-ciphers';
 import type { ScheduledTask } from 'node-cron';
+import type { Logger } from 'pino';
 import {
   createResearchJob,
   runResearchJob,
@@ -39,6 +40,7 @@ vi.mock('../../../src/main/secrets/safeStorage', () => ({
 
 vi.mock('../../../src/main/llm/providers', () => ({
   getFrontierModel: vi.fn(),
+  getLocalModel: vi.fn(),
 }));
 
 vi.mock('ai', async (importOriginal) => {
@@ -61,7 +63,7 @@ vi.mock('node-cron', () => ({
 
 import { searchBrave, searchExa, fetchWithJina } from '../../../src/main/services/SearchProviderService';
 import { getProviderTokens, getActiveProvider, hasFrontierKey } from '../../../src/main/secrets/safeStorage';
-import { getFrontierModel } from '../../../src/main/llm/providers';
+import { getFrontierModel, getLocalModel } from '../../../src/main/llm/providers';
 import { generateObject } from 'ai';
 import cron from 'node-cron';
 
@@ -174,6 +176,7 @@ beforeEach(() => {
   vi.mocked(getActiveProvider).mockResolvedValue('anthropic');
   vi.mocked(hasFrontierKey).mockResolvedValue(true);
   vi.mocked(getFrontierModel).mockResolvedValue({} as ReturnType<typeof getFrontierModel> extends Promise<infer T> ? T : never);
+  vi.mocked(getLocalModel).mockReturnValue({} as ReturnType<typeof getLocalModel>);
   vi.mocked(generateObject).mockResolvedValue({ object: makeSynthesisObject() } as Awaited<ReturnType<typeof generateObject>>);
   vi.mocked(searchBrave).mockResolvedValue([
     { url: 'https://q.example.com', title: 'Quantum', description: 'Overview' },
@@ -328,6 +331,9 @@ describe('detectResearchTopics', () => {
       .all() as { title: string }[];
     expect(drafts.length).toBeGreaterThanOrEqual(1);
     expect(drafts[0].title).toBe('Blockchain in Financial Services');
+    // Local-first: topics extracted on-device; frontier never reached.
+    expect(getLocalModel).toHaveBeenCalled();
+    expect(getFrontierModel).not.toHaveBeenCalled();
   });
 
   it('returns silently when LLM throws', async () => {
@@ -336,6 +342,10 @@ describe('detectResearchTopics', () => {
        VALUES ('note-2', 'paste', 'Meeting', 'Short meeting.', datetime('now'), 'captured')`,
     ).run();
 
+    // Both attempts fail: local unavailable AND frontier synthesis throws.
+    vi.mocked(getLocalModel).mockImplementationOnce(() => {
+      throw new Error('ollama down');
+    });
     vi.mocked(generateObject).mockRejectedValueOnce(new Error('Model overloaded'));
 
     // Should not throw
@@ -345,6 +355,43 @@ describe('detectResearchTopics', () => {
 
     const drafts = db.prepare(`SELECT * FROM research_job WHERE status = 'draft'`).all();
     expect(drafts).toHaveLength(0);
+  });
+
+  it('falls back to frontier only when local is unavailable and frontier is configured', async () => {
+    db.prepare(
+      `INSERT INTO meeting_note (id, source_kind, title, normalized_text, ingested_at, status)
+       VALUES ('note-3', 'paste', 'Roadmap Meeting', 'We should research edge AI deployment.', datetime('now'), 'captured')`,
+    ).run();
+
+    // Local unavailable → fallback path; frontier configured (beforeEach defaults).
+    vi.mocked(getLocalModel).mockImplementationOnce(() => {
+      throw new Error('ollama down');
+    });
+    vi.mocked(generateObject).mockResolvedValueOnce({
+      object: [
+        {
+          title: 'Edge AI Deployment',
+          goals: 'Evaluate on-device inference options',
+          domains: 'edge, AI',
+        },
+      ],
+    } as Awaited<ReturnType<typeof generateObject>>);
+
+    const emitToRenderer = vi.fn();
+    await detectResearchTopics(
+      db,
+      'note-3',
+      'Roadmap Meeting',
+      emitToRenderer,
+      { warn: vi.fn() } as unknown as Pick<Logger, 'warn'>,
+    );
+
+    expect(getFrontierModel).toHaveBeenCalled();
+    const drafts = db
+      .prepare(`SELECT * FROM research_job WHERE status = 'draft'`)
+      .all() as { title: string }[];
+    expect(drafts.length).toBeGreaterThanOrEqual(1);
+    expect(drafts[0].title).toBe('Edge AI Deployment');
   });
 });
 
