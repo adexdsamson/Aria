@@ -315,6 +315,7 @@ Phase 20 minor non-blocking follow-ups (in 20-08-VERIFICATION.md): modal Cancel 
 | 260609-vte | Fix voice (tts-chunk) + entitlement (activate) double-registration crashes; canonical channel lists | 2026-06-09 | 442bd05 |
 | 260609-kfp | Fix knowledge (pick-folder) double-registration crash on login; 4th/final IPC re-register site (audit complete) | 2026-06-09 | 6c05b8e |
 | 260609-vms | Fix voice model size guard (601882624→574041195; 574 MiB vs MB unit bug) rejecting valid download | 2026-06-09 | 245e30b |
+| 260709-rcd | Route research topic auto-detect (RES-04) local-first; frontier only as logged fallback (privacy: raw meeting transcripts stay on-device) | 2026-07-09 | e89d27e / a8d3b82 |
 | 260609-vmd | Voice model: pre-download disk check (skip 574MB re-download) + on-disk 'end' guard (fs.statSync, injectable) | 2026-06-09 | 5e88cae |
 | 260609-htx | Wire cloud STT into live VOICE_FEED_AUDIO (shouldUseCloud→cloudTranscribe whisper-1; local fallback on error) — local whisper too slow for smoke | 2026-06-09 | 934f3f7 |
 | 260609-j2b | Make VoicePTTButton lazy-download gate cloud-aware — skip local 574MB model modal when cloud audio enabled (fails closed) | 2026-06-09 | 8b253f3 |
