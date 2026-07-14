@@ -17,9 +17,12 @@ export async function parse(absolutePath: string): Promise<ParsedDocument> {
     });
   }
 
-  // Dynamic import to avoid issues with canvas/worker resolution in test environments.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfjs = require('pdfjs-dist/legacy/build/pdf.js') as typeof import('pdfjs-dist');
+  // pdfjs-dist v5 legacy build is ESM-only (`pdf.mjs`; there is no `pdf.js`),
+  // and it's externalized, so load it via a real runtime dynamic import.
+  // The specifier is held in a variable so the bundler can't rewrite the
+  // import() into a CJS require() (which would throw ERR_REQUIRE_ESM on .mjs).
+  const pdfjsSpecifier = 'pdfjs-dist/legacy/build/pdf.mjs';
+  const pdfjs = (await import(pdfjsSpecifier)) as unknown as typeof import('pdfjs-dist');
   // Disable worker for Node.js compatibility.
   pdfjs.GlobalWorkerOptions.workerSrc = '';
 
