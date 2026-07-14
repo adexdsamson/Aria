@@ -53,6 +53,7 @@ export function FrontierKeySection(): JSX.Element {
   const [activeProvider, setActiveProviderState] = useState<ProviderId | null>(null);
   const [status, setStatus] = useState<string>('');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const keychain = useMemo(() => detectKeychain(), []);
 
@@ -105,6 +106,38 @@ export function FrontierKeySection(): JSX.Element {
     setStatus('Saved.');
     setLastSavedAt(new Date());
     await refreshAll();
+  }
+
+  /**
+   * On-demand health check — verifies the ACTIVE provider's stored key works by
+   * making one minimal API call (server-side). Distinguishes a stored key from
+   * a working key; the same result drives the Status page dot.
+   */
+  async function onVerify(): Promise<void> {
+    setStatus('');
+    setVerifying(true);
+    try {
+      const res = (await window.aria.frontierVerify()) as {
+        ok?: boolean;
+        reason?: string;
+        provider?: string;
+        error?: string;
+      };
+      if (res?.error) {
+        setStatus(
+          `Could not verify: ${res.error === 'no-active-provider' ? 'no active provider set' : res.error}`,
+        );
+      } else if (res?.ok) {
+        setStatus(`Verified — ${res.provider ?? provider} key works.`);
+      } else {
+        setStatus(`Could not verify: ${res?.reason ?? 'unknown error'}`);
+      }
+    } catch (e) {
+      setStatus(`Could not verify: ${(e as Error).message}`);
+    } finally {
+      setVerifying(false);
+      await refreshAll();
+    }
   }
 
   async function onClear(p: ProviderId): Promise<void> {
@@ -374,6 +407,37 @@ export function FrontierKeySection(): JSX.Element {
             }}
           >
             Clear {provider} key
+          </button>
+        )}
+        {providerHasKey && activeProvider === provider && (
+          <button
+            type="button"
+            data-testid="frontier-key-verify"
+            onClick={() => void onVerify()}
+            disabled={verifying}
+            style={{
+              padding: '9px 18px',
+              fontFamily: 'var(--f-body)',
+              fontSize: 13,
+              color: verifying ? 'var(--gray)' : 'var(--ink-soft)',
+              background: 'var(--paper)',
+              border: '1px solid var(--rule-strong)',
+              borderRadius: 'var(--radius)',
+              cursor: verifying ? 'wait' : 'pointer',
+              transition: `border-color 180ms ease, color 180ms ease`,
+            }}
+            onMouseEnter={(e) => {
+              if (!verifying) {
+                e.currentTarget.style.borderColor = 'var(--gold)';
+                e.currentTarget.style.color = 'var(--gold-deep)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--rule-strong)';
+              e.currentTarget.style.color = verifying ? 'var(--gray)' : 'var(--ink-soft)';
+            }}
+          >
+            {verifying ? 'Verifying…' : 'Verify key'}
           </button>
         )}
       </div>

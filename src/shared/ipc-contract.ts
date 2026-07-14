@@ -25,6 +25,7 @@ export const CHANNELS = {
   OLLAMA_SET_ACTIVE_MODEL: 'aria:ollama:set-active-model',
   DIAGNOSTICS_ROUTING_LOG: 'aria:diagnostics:routing-log',
   DIAGNOSTICS_STATUS: 'aria:diagnostics:status',
+  FRONTIER_VERIFY: 'aria:frontier:verify',
   BACKUP_CREATE: 'aria:backup:create',
   BACKUP_RESTORE: 'aria:backup:restore',
   BACKUP_STATS: 'aria:backup:stats',
@@ -337,12 +338,41 @@ export type OllamaSetActiveModelResult =
   | { ok: true; modelId: string }
   | { ok: false; error: string };
 
+/**
+ * Frontier failure classes surfaced to the UI. `model-not-found` (404) and
+ * `bad-request` (400) are split from `auth` (401/403) so the Status page names
+ * the true cause. Canonical definition lives here (shared); main/llm re-exports.
+ */
+export type FrontierErrorClass =
+  | 'network'
+  | 'auth'
+  | 'model-not-found'
+  | 'bad-request'
+  | 'rate-limited-or-down';
+
+/**
+ * Last-known frontier health. Written by an explicit key check ('verify') or
+ * observed from a real frontier call ('usage'); read by the Status page so it
+ * reflects whether the key ACTUALLY works, not just that one is stored.
+ */
+export interface FrontierHealthDto {
+  ok: boolean;
+  /** classification when ok === false */
+  reason?: FrontierErrorClass;
+  /** ISO timestamp of the check */
+  checkedAt: string;
+  provider: ProviderId;
+  source: 'verify' | 'usage';
+}
+
 export interface DiagnosticsStatus {
   ollama: OllamaStatus;
   frontierConfigured: boolean;
   activeProvider: ProviderId | null;
   mode: 'LOCAL_ONLY' | 'HYBRID' | 'FRONTIER_ONLY' | 'NONE';
   dataDir: string;
+  /** Last-known frontier health (null until first verify or frontier use). */
+  frontierVerify: FrontierHealthDto | null;
 }
 
 /** Onboarding payloads (concrete shapes finalized by Plan 03; permissive here). */
@@ -834,6 +864,8 @@ export interface AriaApi {
 
   diagnosticsRoutingLog(req?: { limit?: number }): Promise<RoutingLogEntry[] | IpcError>;
   diagnosticsStatus(): Promise<DiagnosticsStatus | IpcError>;
+  /** On-demand frontier key check — one minimal API call to the active provider. */
+  frontierVerify(): Promise<FrontierHealthDto | IpcError>;
 
   backupCreate(req?: { destination?: string }): Promise<{ path: string } | IpcError>;
   backupRestore(req: { source: string; passphrase: string }): Promise<{ ok: boolean } | IpcError>;
@@ -1451,6 +1483,7 @@ export const CHANNEL_METHODS: Record<keyof typeof CHANNELS, keyof AriaApi> = {
   OLLAMA_SET_ACTIVE_MODEL: 'ollamaSetActiveModel',
   DIAGNOSTICS_ROUTING_LOG: 'diagnosticsRoutingLog',
   DIAGNOSTICS_STATUS: 'diagnosticsStatus',
+  FRONTIER_VERIFY: 'frontierVerify',
   BACKUP_CREATE: 'backupCreate',
   BACKUP_RESTORE: 'backupRestore',
   BACKUP_STATS: 'backupStats',

@@ -17,7 +17,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOllama } from 'ollama-ai-provider-v2';
-import type { ProviderId } from '../../shared/ipc-contract';
+import type { ProviderId, FrontierErrorClass } from '../../shared/ipc-contract';
 import { getFrontierKey, getOllamaModelId } from '../secrets/safeStorage';
 
 export const DEFAULT_LOCAL_MODEL = 'llama3.1:8b-instruct-q4_K_M';
@@ -26,16 +26,17 @@ export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434/api';
 
+// Frontier failure classes — canonical union lives in the shared contract so
+// the renderer and main agree; re-exported here for main/llm consumers.
+export type { FrontierErrorClass };
+
 export class OllamaUnavailableError extends Error {
   override readonly name = 'OllamaUnavailableError';
 }
 export class FrontierUnavailableError extends Error {
   override readonly name = 'FrontierUnavailableError';
-  readonly classification: 'network' | 'auth' | 'rate-limited-or-down';
-  constructor(
-    classification: 'network' | 'auth' | 'rate-limited-or-down',
-    message?: string,
-  ) {
+  readonly classification: FrontierErrorClass;
+  constructor(classification: FrontierErrorClass, message?: string) {
     super(message ?? `frontier-unavailable:${classification}`);
     this.classification = classification;
   }

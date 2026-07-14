@@ -111,6 +111,56 @@ export function StatusPanel(): JSX.Element {
     };
   }, []);
 
+  // ── Local model health — reachable is NOT enough; the active model must
+  // actually be installed, else local reasoning silently fails. ────────────
+  const ollama = status?.ollama;
+  const activeId = activeModel?.modelId;
+  const installed = ollama?.models ?? [];
+  const activeInstalled = activeId ? installed.includes(activeId) : installed.length > 0;
+  const localState: RowState = !ollama
+    ? 'idle'
+    : !ollama.reachable
+      ? 'block'
+      : installed.length === 0 || (activeId ? !activeInstalled : false)
+        ? 'warn'
+        : 'ok';
+  const localDetails: string = !ollama
+    ? 'loading…'
+    : !ollama.reachable
+      ? `unreachable (${ollama.error ?? 'unknown'})`
+      : (() => {
+          const head = `Ollama · ${ollama.version ? `v${ollama.version} · ` : ''}${installed.length} model${installed.length === 1 ? '' : 's'}`;
+          if (installed.length === 0) {
+            return `${head} · no models installed — run: ollama pull ${activeId ?? '<model>'}`;
+          }
+          if (activeId && !activeInstalled) {
+            return `${head} · active ${activeId} NOT installed`;
+          }
+          return `${head}${activeId ? ` · active ${activeId}` : ''}`;
+        })();
+
+  // ── Frontier health — presence of a key ≠ a working key. Prefer the
+  // last-known verify/usage result; fall back to "configured · unverified". ──
+  const fv = status?.frontierVerify ?? null;
+  const frontierState: RowState = !status?.activeProvider
+    ? 'idle'
+    : fv
+      ? fv.ok
+        ? 'ok'
+        : 'block'
+      : status.frontierConfigured
+        ? 'warn'
+        : 'idle';
+  const frontierDetails: string = !status?.activeProvider
+    ? 'no active provider'
+    : fv
+      ? fv.ok
+        ? `${status.activeProvider} · verified (${fv.source})`
+        : `${status.activeProvider} · ${fv.reason ?? 'unavailable'} (${fv.source})`
+      : status.frontierConfigured
+        ? `${status.activeProvider} · configured · unverified`
+        : `${status.activeProvider} · no key`;
+
   return (
     <section
       data-testid="settings-status"
@@ -195,28 +245,14 @@ export function StatusPanel(): JSX.Element {
           >
             <ServiceRow
               name="Local model"
-              state={status.ollama.reachable ? 'ok' : 'block'}
-              details={
-                status.ollama.reachable
-                  ? `Ollama · ${status.ollama.version ? `v${status.ollama.version} · ` : ''}${status.ollama.models.length} model${status.ollama.models.length === 1 ? '' : 's'}${activeModel?.modelId ? ` · active ${activeModel.modelId}` : ''}`
-                  : `unreachable (${status.ollama.error ?? 'unknown'})`
-              }
+              state={localState}
+              details={localDetails}
               testid="status-row-ollama"
             />
             <ServiceRow
               name="Frontier API"
-              state={
-                status.activeProvider
-                  ? 'ok'
-                  : status.frontierConfigured
-                    ? 'warn'
-                    : 'idle'
-              }
-              details={
-                status.activeProvider
-                  ? `${status.activeProvider} · ${status.frontierConfigured ? 'configured' : 'no key'}`
-                  : 'no active provider'
-              }
+              state={frontierState}
+              details={frontierDetails}
               testid="status-row-frontier"
             />
             <ServiceRow

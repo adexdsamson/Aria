@@ -20,9 +20,12 @@
  */
 import { app, type IpcMain } from 'electron';
 import type { Logger } from 'pino';
+import { generateText } from 'ai';
 import {
   CHANNELS,
   type DiagnosticsStatus,
+  type FrontierHealthDto,
+  type IpcError,
   type OllamaActiveModel,
   type OllamaSetActiveModelResult,
 } from '../../shared/ipc-contract';
@@ -33,7 +36,9 @@ import {
   hasFrontierKey,
   setOllamaModelId,
 } from '../secrets/safeStorage';
-import { DEFAULT_LOCAL_MODEL } from '../llm/providers';
+import { DEFAULT_LOCAL_MODEL, getFrontierModel } from '../llm/providers';
+import { getFrontierHealth, recordFrontierHealth } from '../llm/frontierHealth';
+import { classifyFrontierError } from '../rag/ask-service';
 
 export interface OllamaDeps {
   logger: Logger;
@@ -143,6 +148,52 @@ export function registerOllamaHandlers(
       activeProvider,
       mode,
       dataDir: resolvedDataDir,
+      // Last-known frontier health (explicit verify OR observed real usage).
+      // null until the key is verified or the frontier is actually used.
+      frontierVerify: getFrontierHealth(),
     };
   });
+
+  // ── FRONTIER_VERIFY ──────────────────────────────────────────────────────
+  // On-demand key check: one minimal generateText call against the active
+  // provider. Distinguishes a stored key (presence) from a working key (health)
+  // and records the result so the Status page can reflect it in real time.
+  ipcMain.handle(
+    CHANNELS.FRONTIER_VERIFY,
+    async (): Promise<FrontierHealthDto | IpcError> => {
+      let provider = null as Awaited<ReturnType<typeof getActiveProvider>>;
+      try {
+        provider = await getActiveProvider();
+      } catch {
+        provider = null;
+      }
+      if (!provider) {
+        return { error: 'no-active-provider' };
+      }
+      const checkedAt = new Date().toISOString();
+      try {
+        const model = await getFrontierModel(provider);
+        await generateText({
+          model: model as Parameters<typeof generateText>[0]['model'],
+          prompt: 'Reply with the single word: ok',
+        });
+        const health: FrontierHealthDto = { ok: true, checkedAt, provider, source: 'verify' };
+        recordFrontierHealth(health);
+        logger.info({ scope: 'frontier', event: 'verify.ok', provider });
+        return health;
+      } catch (err) {
+        const reason = classifyFrontierError(err);
+        const health: FrontierHealthDto = {
+          ok: false,
+          reason,
+          checkedAt,
+          provider,
+          source: 'verify',
+        };
+        recordFrontierHealth(health);
+        logger.warn({ scope: 'frontier', event: 'verify.failed', provider, reason });
+        return health;
+      }
+    },
+  );
 }

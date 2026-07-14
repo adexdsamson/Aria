@@ -26,7 +26,9 @@ import {
   OllamaUnavailableError,
   FrontierUnavailableError,
   DEFAULT_LOCAL_MODEL,
+  type FrontierErrorClass,
 } from '../llm/providers';
+import { recordFrontierHealth } from '../llm/frontierHealth';
 import {
   writeRoutingLog,
   hashPrompt,
@@ -62,7 +64,7 @@ export interface AskServiceDeps {
   writeRoutingLogFn?: (entry: RoutingLogInput) => void;
 }
 
-function classifyFrontierError(err: unknown): 'network' | 'auth' | 'rate-limited-or-down' {
+function classifyFrontierError(err: unknown): FrontierErrorClass {
   if (err instanceof FrontierUnavailableError) return err.classification;
   if (err && typeof err === 'object') {
     const e = err as {
@@ -79,8 +81,11 @@ function classifyFrontierError(err: unknown): 'network' | 'auth' | 'rate-limited
     const status = e.statusCode ?? e.status;
     if (typeof status === 'number') {
       if (status === 401 || status === 403) return 'auth';
+      if (status === 404) return 'model-not-found';
       if (status === 429 || status >= 500) return 'rate-limited-or-down';
-      if (status >= 400 && status < 500) return 'auth';
+      // Any other 4xx (e.g. 400 bad request) — a real config/request problem,
+      // NOT an auth failure. Conflating these hid model-not-found behind 'auth'.
+      if (status >= 400 && status < 500) return 'bad-request';
     }
   }
   return 'rate-limited-or-down';
@@ -193,6 +198,14 @@ export async function performAsk(
       latency_ms,
       ok: 1,
     });
+    // Passive last-known health for the Status page — a real frontier call
+    // just succeeded, so the stored key demonstrably works.
+    recordFrontierHealth({
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      provider: frontierProvider,
+      source: 'usage',
+    });
     logger.info({ event: 'ask.ok', route: 'FRONTIER', reason: decision.reason, latency_ms });
     return {
       answer: result.text,
@@ -204,6 +217,15 @@ export async function performAsk(
     const cls = classifyFrontierError(e);
     const fallbackReason = `frontier-unavailable:${cls}`;
     logger.warn({ event: 'ask.frontier.failed', classification: cls });
+    // Passive last-known health — record the observed failure class so Status
+    // shows the real cause (auth / model-not-found / …), not a false OK.
+    recordFrontierHealth({
+      ok: false,
+      reason: cls,
+      checkedAt: new Date().toISOString(),
+      provider: frontierProvider,
+      source: 'usage',
+    });
     // Fall back to LOCAL
     try {
       const model = localModelFactory();
