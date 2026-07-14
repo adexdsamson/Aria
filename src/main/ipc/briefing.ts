@@ -341,6 +341,62 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     );
   }
 
+  // Enrich a freshly-read briefing row with the "This week" insights and the
+  // WhatsApp group-digest section. Extracted so EVERY payload-returning path
+  // (BRIEFING_TODAY read + BRIEFING_REGENERATE_TODAY) enriches identically —
+  // previously only BRIEFING_TODAY did, so the WhatsApp section silently
+  // vanished after a "Regenerate". Mutates `row` in place; never throws.
+  // Enrichment runs AFTER runBriefing returns — frontier never sees whatsApp
+  // content (D-11). readWhatsAppDigests is read-only, no model (D-13).
+  function enrichBriefingRow(
+    db: Db,
+    date: string,
+    tz: string,
+    row: import('../../shared/ipc-contract').BriefingPayload,
+  ): void {
+    // Plan 08-01 — "This week" insights.
+    try {
+      const weekYmd = weekStartYmdFor(new Date(), tz);
+      const ins = readLatestInsights(db, weekYmd);
+      if (ins.state === 'unlocked') {
+        row.thisWeekInsights = {
+          state: 'unlocked',
+          rows: ins.rows.map((r) => ({ id: r.id, kind: r.kind, sentences: r.sentences })),
+        };
+      } else if (ins.state === 'locked') {
+        row.thisWeekInsights = {
+          state: 'locked',
+          daysRemaining: ins.daysRemaining,
+          blockedKinds: ins.blockedKinds,
+        };
+      } // 'empty-unlocked' → leave undefined (section omitted)
+    } catch (err) {
+      logger.warn(
+        { scope: 'briefing-enrich-insights', err: (err as Error).message },
+        'failed to enrich briefing with insights',
+      );
+    }
+    // Phase 21 — WhatsApp group digests (D-11).
+    try {
+      const { payload: wa, shouldGenerate } = readWhatsAppDigests(db, date, logger);
+      if (wa !== undefined) row.whatsApp = wa;
+      // D-07.3 async fallback: only trigger runNow() when WhatsApp is linked,
+      // groups are tracked, but no digest row exists for today yet
+      // (shouldGenerate=true). Unlinked / zero-group users return
+      // shouldGenerate=false, so this is a no-op for them (WR-01). Fire-and-forget:
+      // never await, never propagate Ollama errors into the briefing.
+      const _dh = deps.getDigestHandle?.() ?? deps.digestHandle;
+      if (shouldGenerate && _dh) {
+        void _dh.runNow();
+      }
+    } catch (err) {
+      logger.warn(
+        { scope: 'briefing-enrich-whatsapp', err: (err as Error).message },
+        'failed to enrich briefing with whatsapp digests',
+      );
+    }
+  }
+
   // ── BRIEFING_TODAY ─────────────────────────────────────────────────────────
   ipcMain.handle(CHANNELS.BRIEFING_TODAY, async (_e, payload?: { date?: string }) => {
     const db = dbHolder.db;
@@ -350,51 +406,7 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
     try {
       const row = readBriefing(db, date);
       if (!row) return { error: 'no-briefing', lastOkDate: lastOkDate(db) };
-      // Plan 08-01 — enrich with "This week" insights.
-      try {
-        const weekYmd = weekStartYmdFor(new Date(), tz);
-        const ins = readLatestInsights(db, weekYmd);
-        if (ins.state === 'unlocked') {
-          row.thisWeekInsights = {
-            state: 'unlocked',
-            rows: ins.rows.map((r) => ({ id: r.id, kind: r.kind, sentences: r.sentences })),
-          };
-        } else if (ins.state === 'locked') {
-          row.thisWeekInsights = {
-            state: 'locked',
-            daysRemaining: ins.daysRemaining,
-            blockedKinds: ins.blockedKinds,
-          };
-        } // 'empty-unlocked' → leave undefined (section omitted)
-      } catch (err) {
-        logger.warn(
-          { scope: 'briefing-today-insights', err: (err as Error).message },
-          'failed to enrich briefing with insights',
-        );
-      }
-      // Phase 21 — enrich with WhatsApp group digests (D-11).
-      // Enrichment is AFTER runBriefing returns — frontier never sees whatsApp content (D-11).
-      // read-only, no model — readWhatsAppDigests annotated per D-13.
-      try {
-        const { payload: wa, shouldGenerate } = readWhatsAppDigests(db, date, logger);
-        if (wa !== undefined) row.whatsApp = wa;
-        // D-07.3 async fallback: only trigger runNow() when WhatsApp is linked, groups are
-        // tracked, but no digest row exists for today yet (shouldGenerate=true).
-        // Do NOT fire for unlinked users or users with zero tracked groups — those return
-        // shouldGenerate=false so this call is a no-op for them (WR-01 fix).
-        // fire-and-forget — NEVER await here; never propagate Ollama errors into briefing.
-        // getDigestHandle() is late-binding (production path); digestHandle is the
-        // direct field (test path). Both are checked so tests without getDigestHandle work.
-        const _dh = deps.getDigestHandle?.() ?? deps.digestHandle;
-        if (shouldGenerate && _dh) {
-          void _dh.runNow();
-        }
-      } catch (err) {
-        logger.warn(
-          { scope: 'briefing-today-whatsapp', err: (err as Error).message },
-          'failed to enrich briefing with whatsapp digests',
-        );
-      }
+      enrichBriefingRow(db, date, tz, row);
       return row;
     } catch (err) {
       return { error: (err as Error).message };
@@ -435,6 +447,9 @@ export function registerBriefingHandlers(ipcMain: IpcMain, deps: BriefingHandler
       });
       const fresh = readBriefing(db, today);
       if (!fresh) return { ok: false as const, error: 'regenerate-no-row' };
+      // Enrich the regenerate payload identically to BRIEFING_TODAY so the
+      // WhatsApp section (and "This week" insights) survive a Regenerate.
+      enrichBriefingRow(db, today, tz, fresh);
       // Phase 12 / Plan 12-03 — mirror the runOnce notification hook on the
       // regenerate path. The dedupe Set in notify.ts resets on app restart, so
       // this fires at most once per dateKey per session (same as GENERATE_NOW).
