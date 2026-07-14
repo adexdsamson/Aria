@@ -1067,7 +1067,9 @@ export interface AriaApi {
   knowledgeListFolders(): Promise<{ folders: KnowledgeFolderDto[] } | IpcError>;
   knowledgeRemoveFolder(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
   knowledgeFolderStats(req: { folderId: string }): Promise<KnowledgeFolderStatsDto | IpcError>;
-  knowledgeReindex(req: { folderId: string }): Promise<{ ok: true } | IpcError>;
+  knowledgeReindex(
+    req: { folderId: string },
+  ): Promise<{ ok: true; indexed: number; errors: number } | IpcError>;
   knowledgeSetSensitivity(req: { folderId: string; sensitivity: 'general' | 'sensitive' }): Promise<{ ok: true; folderUpdated: number; chunksUpdated: number } | IpcError>;
 
   // Plan 08-04 Task 5 — auto-updater

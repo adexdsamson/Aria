@@ -73,6 +73,7 @@ describe('runBootReconciliation', () => {
       getFolder: vi.fn().mockReturnValue(folder),
       removeFolder: vi.fn(),
       setSensitivity: vi.fn(),
+      markFolderScanned: vi.fn(),
       addFile: vi.fn().mockReturnValue({ id: 'new-file', folder_id: folderId, relative_path: 'file1.txt', absolute_path: path.join(tmpDir, 'file1.txt'), size: 8, mtime: now, content_hash: null, status: 'pending', last_error: null, tombstoned_at: null, created_at: now, updated_at: now }),
       markFileIndexed: vi.fn(),
       markFileError: vi.fn(),

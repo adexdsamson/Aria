@@ -53,6 +53,8 @@ export interface FolderRegistry {
   getFolder(id: string): FolderRow | undefined;
   removeFolder(id: string): void;
   setSensitivity(folderId: string, sensitivity: 'general' | 'sensitive'): void;
+  /** Stamp last_scan_at (+updated_at) — called when a folder scan completes. */
+  markFolderScanned(folderId: string): void;
 
   addFile(opts: {
     folderId: string;
@@ -71,7 +73,7 @@ export interface FolderRegistry {
 }
 
 export function createFolderRegistry(db: Db): FolderRegistry {
-  const insertFolder = db.prepare<[string, string, string, string, string, string, string]>(
+  const insertFolder = db.prepare<[string, string, string, string, string, string]>(
     `INSERT INTO knowledge_folders (id, path, label, sensitivity, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'active', ?, ?)`
   );
@@ -90,6 +92,10 @@ export function createFolderRegistry(db: Db): FolderRegistry {
 
   const setSensitivityStmt = db.prepare<[string, string, string]>(
     `UPDATE knowledge_folders SET sensitivity = ?, updated_at = ? WHERE id = ?`
+  );
+
+  const markScannedStmt = db.prepare<[string, string, string]>(
+    `UPDATE knowledge_folders SET last_scan_at = ?, updated_at = ? WHERE id = ?`
   );
 
   const insertFile = db.prepare<[string, string, string, string, number, string, string | null, string, string]>(
@@ -136,6 +142,11 @@ export function createFolderRegistry(db: Db): FolderRegistry {
 
     getFolder(id) {
       return getFolderStmt.get(id) as FolderRow | undefined;
+    },
+
+    markFolderScanned(folderId) {
+      const now = nowIso();
+      markScannedStmt.run(now, now, folderId);
     },
 
     removeFolder(id) {

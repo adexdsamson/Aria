@@ -160,11 +160,21 @@ export function registerKnowledgeFolderIpc(deps: KnowledgeFolderIpcDeps): void {
 
   // aria:knowledge:reindex
   ipcMain.handle(CHANNELS.KNOWLEDGE_REINDEX, async (_event, req: { folderId: string }) => {
-    // Wave 2 worker will replace this stub. For now, run ingestion directly.
-    ingestionService.ingestFolderOnce(req.folderId).catch((err) => {
+    // Re-scan the folder from disk first (registers new/changed files), THEN
+    // re-ingest — ingestFolderOnce alone only iterates already-registered rows,
+    // so a folder that was never disk-scanned would re-index nothing. Await the
+    // whole thing so the renderer can show a spinner and refresh on completion,
+    // and stamp last_scan_at so the "Last scan" metric updates.
+    try {
+      await runBootReconciliation({ registry, ingestionService, logger });
+      const { indexed, errors } = await ingestionService.ingestFolderOnce(req.folderId);
+      registry.markFolderScanned(req.folderId);
+      logger.info({ scope: 'knowledge-ipc', event: 'reindex_done', folderId: req.folderId, indexed, errors });
+      return { ok: true as const, indexed, errors };
+    } catch (err) {
       logger.error({ scope: 'knowledge-ipc', event: 'reindex_error', folderId: req.folderId, error: String(err) });
-    });
-    return { ok: true };
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // aria:knowledge:set-sensitivity (Plan 10-02 — shipped together with chunk-bulk-flip)

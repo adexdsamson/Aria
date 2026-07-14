@@ -131,6 +131,9 @@ export async function runBootReconciliation(deps: BootReconcilerDeps): Promise<{
           });
         }
       }
+
+      // Scan completed for this folder — stamp last_scan_at so the UI reflects it.
+      registry.markFolderScanned(folder.id);
     } catch (err) {
       logger.warn({
         scope: 'boot-reconciler',

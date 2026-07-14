@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import { openDb, closeDb } from '../db/connect';
+import { openDb } from '../db/connect';
 import { runMigrations } from '../db/migrations/runner';
 import { createFolderRegistry } from './folder-registry';
 import { createTempUserDataDir } from '../../../tests/setup';

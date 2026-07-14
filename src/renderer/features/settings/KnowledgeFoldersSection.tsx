@@ -212,12 +212,14 @@ function AddFolderModal({ path, onCancel, onSubmit }: AddFolderModalProps): JSX.
 
 interface FolderCardProps {
   folder: KnowledgeFolderDto;
+  reindexing: boolean;
+  reindexResult?: string | null;
   onReindex(id: string): void;
   onFlipSensitivity(id: string, next: 'general' | 'sensitive'): void;
   onRemove(folder: KnowledgeFolderDto): void;
 }
 
-function FolderCard({ folder, onReindex, onFlipSensitivity, onRemove }: FolderCardProps): JSX.Element {
+function FolderCard({ folder, reindexing, reindexResult, onReindex, onFlipSensitivity, onRemove }: FolderCardProps): JSX.Element {
   const isSensitive = folder.sensitivity === 'sensitive';
   const nextSensitivity: 'general' | 'sensitive' = isSensitive ? 'general' : 'sensitive';
 
@@ -256,15 +258,24 @@ function FolderCard({ folder, onReindex, onFlipSensitivity, onRemove }: FolderCa
               {folder.lastError}
             </div>
           )}
+          {reindexResult && (
+            <div
+              data-testid={`kf-reindex-result-${folder.id}`}
+              style={{ fontSize: 12, color: 'var(--moss)', marginTop: 4, fontFamily: 'var(--f-mono)', letterSpacing: '0.02em' }}
+            >
+              {reindexResult}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, flex: '0 0 auto', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             data-testid={`kf-reindex-${folder.id}`}
             onClick={() => onReindex(folder.id)}
-            style={outlineBtnStyle()}
+            disabled={reindexing}
+            style={{ ...outlineBtnStyle(), ...(reindexing ? { opacity: 0.6, cursor: 'wait' } : {}) }}
             title="Re-index this folder"
           >
-            Reindex
+            {reindexing ? 'Reindexing…' : 'Reindex'}
           </button>
           <button
             data-testid={`kf-flip-sensitivity-${folder.id}`}
@@ -301,6 +312,8 @@ export function KnowledgeFoldersSection(): JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ kind: 'idle' });
   const [busy, setBusy] = useState(false);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
+  const [reindexResults, setReindexResults] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -364,9 +377,31 @@ export function KnowledgeFoldersSection(): JSX.Element {
   }
 
   async function handleReindex(folderId: string): Promise<void> {
-    await window.aria.knowledgeReindex({ folderId });
-    // Optimistic: refresh after brief delay to pick up state changes
-    setTimeout(() => void refresh(), 500);
+    setReindexingId(folderId);
+    setReindexResults((r) => {
+      const next = { ...r };
+      delete next[folderId];
+      return next;
+    });
+    try {
+      const res = await window.aria.knowledgeReindex({ folderId });
+      if ('error' in res) {
+        setReindexResults((r) => ({ ...r, [folderId]: `Reindex failed: ${String(res.error)}` }));
+      } else {
+        setReindexResults((r) => ({
+          ...r,
+          [folderId]: `Indexed ${res.indexed}, ${res.errors} error${res.errors === 1 ? '' : 's'}`,
+        }));
+      }
+      await refresh();
+    } catch (err) {
+      setReindexResults((r) => ({
+        ...r,
+        [folderId]: `Reindex failed: ${err instanceof Error ? err.message : String(err)}`,
+      }));
+    } finally {
+      setReindexingId(null);
+    }
   }
 
   async function handleFlipSensitivity(folderId: string, sensitivity: 'general' | 'sensitive'): Promise<void> {
@@ -432,6 +467,8 @@ export function KnowledgeFoldersSection(): JSX.Element {
           <div key={f.id} style={{ animationDelay: `${i * 60}ms` }} className="kf-cascade-in">
             <FolderCard
               folder={f}
+              reindexing={reindexingId === f.id}
+              reindexResult={reindexResults[f.id] ?? null}
               onReindex={handleReindex}
               onFlipSensitivity={handleFlipSensitivity}
               onRemove={handleRemoveRequest}
