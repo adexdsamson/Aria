@@ -585,29 +585,56 @@ export async function runBriefing(deps: RunBriefingDeps): Promise<BriefingPayloa
     const latency_ms = Math.max(0, Date.now() - startMs);
     const obj = (result as { object: BriefingLLMObject }).object;
 
-    const calendar: BriefingItem[] = (obj.calendar ?? []).slice(0, 3).map((c) => {
-      const source = calendarCandidates.find((candidate) => candidate.id === c.id);
-      return {
+    // Clamp each LLM section to items that actually exist in THAT section's
+    // candidate set. A weak local model can ignore "do not invent items" and
+    // borrow across sections — e.g. filling an empty Priority Email with News
+    // headlines. Filtering by candidate id per section drops hallucinated and
+    // cross-section items, and forces the empty state when a section had no
+    // candidates (e.g. Priority Email while Gmail is not connected).
+    const calendarIds = new Set(calendarCandidates.map((c) => c.id));
+    const emailIds = new Set(emailCandidates.map((c) => c.id));
+    const newsIds = new Set(newsCandidates.map((n) => n.id));
+
+    const calendar: BriefingItem[] = (obj.calendar ?? [])
+      .filter((c) => calendarIds.has(c.id))
+      .slice(0, 3)
+      .map((c) => {
+        const source = calendarCandidates.find((candidate) => candidate.id === c.id);
+        return {
+          id: c.id,
+          title: c.title,
+          why: c.why,
+          provider_key: source?.provider_key ?? null,
+          account_id: source?.account_id ?? null,
+        };
+      });
+    const email: BriefingItem[] = (obj.email ?? [])
+      .filter((c) => emailIds.has(c.id))
+      .slice(0, 3)
+      .map((c) => ({ id: c.id, title: c.title, why: c.why }));
+    const news: BriefingNewsItem[] = (obj.news ?? [])
+      .filter((c) => newsIds.has(c.id))
+      .slice(0, 3)
+      .map((c) => ({
         id: c.id,
         title: c.title,
         why: c.why,
-        provider_key: source?.provider_key ?? null,
-        account_id: source?.account_id ?? null,
-      };
-    });
-    const email: BriefingItem[] = (obj.email ?? []).slice(0, 3).map((c) => ({
-      id: c.id,
-      title: c.title,
-      why: c.why,
-    }));
-    const news: BriefingNewsItem[] = (obj.news ?? []).slice(0, 3).map((c) => ({
-      id: c.id,
-      title: c.title,
-      why: c.why,
-      url: c.url,
-      sourceKind: c.source_kind,
-      dismissed: false,
-    }));
+        url: c.url,
+        sourceKind: c.source_kind,
+        dismissed: false,
+      }));
+
+    // Surface hallucination / cross-section leakage rather than dropping silently.
+    const droppedCount =
+      (obj.calendar ?? []).filter((c) => !calendarIds.has(c.id)).length +
+      (obj.email ?? []).filter((c) => !emailIds.has(c.id)).length +
+      (obj.news ?? []).filter((c) => !newsIds.has(c.id)).length;
+    if (droppedCount > 0) {
+      logger.warn(
+        { scope: 'briefing', event: 'llm-items-dropped', dropped: droppedCount },
+        'dropped LLM briefing items not present in their section candidate set',
+      );
+    }
 
     safeWriteLog(db, logger, {
       ts: generatedAt,
