@@ -27,7 +27,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BriefingItem, BriefingNewsItem, BriefingPayload, IpcError } from '../../../shared/ipc-contract';
-import { RouteBadge } from '../../components/editorial';
+import { RouteBadge, Card } from '../../components/editorial';
 import { GenerateNowAffordance } from './GenerateNowAffordance';
 import { SectionCalendar } from './SectionCalendar';
 import { SectionEmail } from './SectionEmail';
@@ -869,95 +869,75 @@ export function BriefingScreen(): JSX.Element {
         </section>
       )}
 
-      {payload.whatsApp?.state === 'ready' && payload.whatsApp.groups.length > 0 && (
-        <section data-testid="briefing-whatsapp" style={{ marginBottom: 36 }}>
-          <SectionHead>WhatsApp</SectionHead>
-          {payload.whatsApp.groups.map((g) => {
-            if (g.state === 'no-activity') return null;
-            if (g.state === 'failed') {
-              return (
-                <div key={g.jid} style={{ marginBottom: 12 }}>
-                  <strong
-                    style={{
-                      fontSize: 13,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    {g.displayName}
-                  </strong>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--gray)',
-                      fontStyle: 'italic',
-                      margin: '4px 0 0',
-                    }}
-                  >
-                    Digest unavailable for this group.
-                  </p>
-                </div>
-              );
-            }
-            // state === 'summarized'
-            const sections = parseDigestSections(g.summaryText ?? '');
-            return (
-              <div key={g.jid} style={{ marginBottom: 16 }}>
-                <strong
-                  style={{
-                    fontSize: 13,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                  }}
-                >
-                  {g.displayName}
-                </strong>
-                {sections.keyPoints && (
-                  <p style={{ fontSize: 13, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>
-                    {sections.keyPoints}
-                  </p>
-                )}
-                {sections.decisions && (
-                  <p
-                    style={{
-                      fontSize: 13,
-                      margin: '4px 0 0',
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    <em>Decisions:</em> {sections.decisions}
-                  </p>
-                )}
-                {sections.openQuestions && (
-                  <p
-                    style={{
-                      fontSize: 13,
-                      margin: '4px 0 0',
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    <em>Open:</em> {sections.openQuestions}
-                  </p>
-                )}
-                {sections.mentions && (
-                  <p
-                    style={{
-                      fontSize: 13,
-                      margin: '4px 0 0',
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    <em>Mentions:</em> {sections.mentions}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </section>
-      )}
+      {payload.whatsApp?.state === 'ready' &&
+        payload.whatsApp.groups.some((g) => g.state !== 'no-activity') && (
+          <section data-testid="briefing-whatsapp" data-aria-cascade={5} style={{ marginBottom: 48 }}>
+            {/* Header matches sibling sections (SectionEmail): Playfair h2 + smallcaps count. */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
+              <h2
+                style={{
+                  fontFamily: 'var(--f-display)',
+                  fontSize: 'clamp(1.5rem, 2.5vw, 1.75rem)',
+                  fontWeight: 500,
+                  letterSpacing: '-0.01em',
+                  margin: 0,
+                }}
+              >
+                WhatsApp
+              </h2>
+              <span className="smallcaps" style={{ color: 'var(--gray-soft)' }} aria-hidden="true">
+                {payload.whatsApp.groups.filter((g) => g.state !== 'no-activity').length} group
+                {payload.whatsApp.groups.filter((g) => g.state !== 'no-activity').length === 1
+                  ? ''
+                  : 's'}
+              </span>
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--f-display)',
+                fontStyle: 'italic',
+                color: 'var(--gray)',
+                fontSize: 14,
+                marginBottom: 14,
+              }}
+            >
+              Per-group summary of your tracked WhatsApp activity — summarized on-device.
+            </div>
+            <Card>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {payload.whatsApp.groups.map((g) => {
+                  if (g.state === 'no-activity') return null;
+                  if (g.state === 'failed') {
+                    return (
+                      <li
+                        key={g.jid}
+                        style={{ padding: '14px 0', borderBottom: '1px solid var(--rule)', listStyle: 'none' }}
+                      >
+                        <strong style={WA_GROUP_NAME_STYLE}>{g.displayName}</strong>
+                        <p style={{ fontSize: 13, color: 'var(--gray)', fontStyle: 'italic', margin: '6px 0 0' }}>
+                          Digest unavailable for this group.
+                        </p>
+                      </li>
+                    );
+                  }
+                  const sections = parseDigestSections(g.summaryText ?? '');
+                  return (
+                    <li
+                      key={g.jid}
+                      style={{ padding: '14px 0', borderBottom: '1px solid var(--rule)', listStyle: 'none' }}
+                    >
+                      <strong style={WA_GROUP_NAME_STYLE}>{g.displayName}</strong>
+                      {sections.keyPoints && <WhatsAppField value={sections.keyPoints} />}
+                      {sections.decisions && <WhatsAppField label="Decisions" value={sections.decisions} />}
+                      {sections.openQuestions && <WhatsAppField label="Open" value={sections.openQuestions} />}
+                      {sections.mentions && <WhatsAppField label="Mentions" value={sections.mentions} />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          </section>
+        )}
 
       <SectionWithChips cascade={5} sectionKey="calendar" date={payload.date}>
         <SectionCalendar items={payload.calendar} error={payload.errors?.calendar} />
@@ -1089,6 +1069,49 @@ function SectionHead({ children }: { children: React.ReactNode }): JSX.Element {
     >
       {children}
     </h2>
+  );
+}
+
+// Phase 21 — WhatsApp group entry primitives, matching the editorial section
+// design (Playfair title-case group name + mono-gold eyebrow rails), so the
+// section reads like Priority Email / News rather than raw asterisk markdown.
+const WA_GROUP_NAME_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--f-display)',
+  fontSize: '1rem',
+  fontWeight: 500,
+  color: 'var(--ink)',
+  lineHeight: 1.35,
+  display: 'block',
+};
+
+function WhatsAppField({ label, value }: { label?: string; value: string }): JSX.Element {
+  return (
+    <div style={{ marginTop: label ? 8 : 6 }}>
+      {label && (
+        <div
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 9,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 3,
+          }}
+        >
+          {label}
+        </div>
+      )}
+      <div
+        style={{
+          fontSize: 13.5,
+          lineHeight: 1.55,
+          color: label ? 'var(--gray)' : 'var(--ink-soft)',
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 
