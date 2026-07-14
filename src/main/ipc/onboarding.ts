@@ -217,12 +217,20 @@ export function registerOnboardingHandlers(
       // the DB only becomes reachable at this point via dbHolder.set().)
       await runApprovalStartupRecovery(db, logger);
       await deps.onDbReady?.(db);
+      // Seal succeeded — NOW it is safe to drop the pending mnemonic. Clearing
+      // only on success (never in `finally`) means a failed seal keeps the
+      // mnemonic alive so the user can retry the same step. Otherwise the first
+      // failure wipes it and every retry returns NO_PENDING_MNEMONIC, stranding
+      // the user on the password screen (MEMORY project_aria_seal_not_atomic).
+      pendingMnemonic = null;
+      pendingPositions = null;
       logger.info({ event: 'onboarding.sealed' });
       return { ok: true };
     } catch (err) {
       // On any failure: close the partial handle and DO NOT persist
       // vault.json. Surface a structured error so the renderer can show
-      // the recovery dialog.
+      // the recovery dialog. The pending mnemonic is intentionally retained
+      // (not cleared) so the seal is retryable without restarting onboarding.
       if (db) {
         try {
           closeDb(db);
@@ -236,8 +244,7 @@ export function registerOnboardingHandlers(
       });
       return { error: 'SEAL_FAILED' };
     } finally {
-      pendingMnemonic = null;
-      pendingPositions = null;
+      // Always zero the derived key material, on both success and failure.
       dbKey.fill(0);
     }
   });
