@@ -21,7 +21,9 @@ import type { ProviderId, FrontierErrorClass } from '../../shared/ipc-contract';
 import { getFrontierKey, getOllamaModelId } from '../secrets/safeStorage';
 
 export const DEFAULT_LOCAL_MODEL = 'llama3.1:8b-instruct-q4_K_M';
-export const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5';
+// claude-sonnet-4-5 is superseded and 404s (surfaced as model-not-found by the
+// frontier verify path); claude-sonnet-5 is the current Sonnet id.
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-5';
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434/api';
