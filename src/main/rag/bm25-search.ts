@@ -47,11 +47,15 @@ export function bm25Search(
   if (expr === '""') return [];
 
   const accountFilter = opts.accountFilter ?? [];
+  // Knowledge-folder chunks are NOT account-scoped (no provider_key/account_id),
+  // so an account filter must never exclude them — otherwise a folder the user
+  // explicitly indexed silently drops out of /ask whenever any account chip is
+  // selected. Always allow source_kind='folder' alongside the selected accounts.
   const accountClause =
     accountFilter.length > 0
-      ? ` AND (${accountFilter
+      ? ` AND ((${accountFilter
           .map(() => '(c.provider_key = ? AND c.account_id = ?)')
-          .join(' OR ')})`
+          .join(' OR ')}) OR c.source_kind = 'folder')`
       : '';
 
   const sql = `

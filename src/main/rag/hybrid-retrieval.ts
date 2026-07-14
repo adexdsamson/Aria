@@ -131,11 +131,13 @@ export async function hybridRetrieve(
     const ids = vectorHits.map((h) => h.chunkId);
     const placeholders = ids.map(() => '?').join(',');
     const accountFilter = opts.accountFilter ?? [];
+    // Folder chunks are not account-scoped — never let an account filter drop
+    // them (mirrors bm25-search). Always include source_kind='folder'.
     const accountClause =
       accountFilter.length > 0
-        ? ` AND (${accountFilter
+        ? ` AND ((${accountFilter
             .map(() => '(provider_key = ? AND account_id = ?)')
-            .join(' OR ')})`
+            .join(' OR ')}) OR source_kind = 'folder')`
         : '';
     const params: Array<string | number> = [...ids];
     for (const f of accountFilter) params.push(f.providerKey, f.accountId);
