@@ -21,7 +21,7 @@
  * issues (mirrors VoicePTTButton._testSession pattern).
  */
 import { useEffect, useState, useCallback } from 'react';
-import { Button, Card } from '../../components/editorial';
+import { AppLogo, Button } from '../../components/editorial';
 import { Modal } from '../../components/editorial/Modal';
 import type { AriaApi } from '../../../shared/ipc-contract';
 
@@ -267,34 +267,38 @@ function DownloadContent({
   const isDownloading = dl.phase === 'downloading' || dl.phase === 'paused';
   const isComplete = dl.phase === 'complete';
 
+  const isStep = variant === 'step';
   const heading = variant === 'modal' ? 'Download the voice model' : 'Set up voice for Aria';
 
   return (
     <div style={{ color: 'var(--ink)', fontFamily: 'var(--f-body)' }}>
-      {/* Eyebrow */}
-      <div
-        style={{
-          fontFamily: 'var(--f-mono)',
-          fontSize: 10,
-          fontWeight: 500,
-          letterSpacing: '0.2em',
-          textTransform: 'uppercase',
-          color: 'var(--gold)',
-          marginBottom: 6,
-        }}
-      >
-        VOICE ASSISTANT
-      </div>
+      {/* Eyebrow — the onboarding step gets its step indicator from the page
+          chrome (section header below), so only the modal renders it here. */}
+      {!isStep && (
+        <div
+          style={{
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 6,
+          }}
+        >
+          VOICE ASSISTANT
+        </div>
+      )}
 
-      {/* Heading */}
+      {/* Heading — step matches sibling onboarding h1 scale (32); modal is tighter (20). */}
       <h2
         style={{
           fontFamily: 'var(--f-display)',
-          fontSize: 20,
+          fontSize: isStep ? 32 : 20,
           fontWeight: 500,
           letterSpacing: '-0.01em',
           color: 'var(--ink)',
-          margin: '0 0 10px',
+          margin: isStep ? '0 0 12px' : '0 0 10px',
           lineHeight: 1.1,
         }}
       >
@@ -302,13 +306,13 @@ function DownloadContent({
       </h2>
 
       {/* Body */}
-      {variant === 'step' && (
+      {isStep && (
         <p
           style={{
             fontFamily: 'var(--f-body)',
-            fontSize: 14,
-            color: 'var(--gray)',
-            lineHeight: 1.5,
+            fontSize: 15,
+            color: 'var(--ink-soft)',
+            lineHeight: 1.55,
             margin: '0 0 4px',
           }}
         >
@@ -490,18 +494,38 @@ export function VoiceModelDownload({
   );
 
   if (variant === 'step') {
+    // Onboarding step chrome — mirrors the password/sealing steps so the flow
+    // reads as one continuous wizard (centered 560 column, AppLogo header,
+    // "Step N of 6" eyebrow) instead of an orphaned card pinned to the corner.
     return (
-      <div data-testid="voice-model-download-step">
-        <Card
+      <section
+        data-testid="voice-model-download-step"
+        style={{
+          padding: 32,
+          maxWidth: 560,
+          margin: '0 auto',
+          color: 'var(--ink)',
+          fontFamily: 'var(--f-body)',
+          background: 'var(--paper)',
+        }}
+      >
+        <div style={{ marginBottom: 18 }}>
+          <AppLogo variant="header" />
+        </div>
+        <div
           style={{
-            padding: '32px 40px',
-            maxWidth: 560,
-            margin: '0 auto',
+            fontFamily: 'var(--f-mono)',
+            fontSize: 10,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--gold)',
+            marginBottom: 6,
           }}
         >
-          {content}
-        </Card>
-      </div>
+          Step 6 of 6 · set up voice
+        </div>
+        {content}
+      </section>
     );
   }
 
