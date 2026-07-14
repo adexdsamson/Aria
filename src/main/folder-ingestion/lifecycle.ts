@@ -105,6 +105,17 @@ export async function startKnowledgeFolderLifecycle(deps: LifecycleDeps): Promis
   });
 }
 
+/**
+ * Attach a folder to the RUNNING watcher so file changes after it was added
+ * mid-session are picked up without an app restart. No-op if the lifecycle
+ * hasn't started yet (boot reconciliation will pick the folder up next start).
+ * The initial scan of the folder's EXISTING files is done separately by the
+ * caller via runBootReconciliation (the watcher uses ignoreInitial: true).
+ */
+export function addFolderToWatcher(folderId: string, folderPath: string): void {
+  currentWatcher?.addFolder(folderId, folderPath);
+}
+
 export async function stopKnowledgeFolderLifecycle(logger: Logger): Promise<void> {
   if (!started) return;
   started = false;

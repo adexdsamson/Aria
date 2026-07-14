@@ -12,6 +12,8 @@ import type { FolderRegistry } from '../folder-ingestion/folder-registry';
 import type { FolderIngestionService } from '../folder-ingestion/ingestion-service';
 import { prescanFolder } from '../folder-ingestion/prescan';
 import { flipFolderSensitivity } from '../folder-ingestion/folder-flip';
+import { runBootReconciliation } from '../folder-ingestion/boot-reconciler';
+import { addFolderToWatcher } from '../folder-ingestion/lifecycle';
 import type Database from 'better-sqlite3-multiple-ciphers';
 
 const FILE_COUNT_THRESHOLD = 5000;
@@ -78,6 +80,23 @@ export function registerKnowledgeFolderIpc(deps: KnowledgeFolderIpcDeps): void {
     async (_event, req: { path: string; label: string; sensitivity: 'general' | 'sensitive' }) => {
       const folder = registry.addFolder({ path: req.path, label: req.label, sensitivity: req.sensitivity });
       logger.info({ scope: 'knowledge-ipc', event: 'add_folder', folderId: folder.id });
+      // Attach to the live watcher so future file changes are picked up without
+      // a restart (watcher uses ignoreInitial:true, so it won't scan existing
+      // files — that's what the reconciliation below is for).
+      addFolderToWatcher(folder.id, req.path);
+      // Kick off the initial scan of the folder's EXISTING files. Without this,
+      // add only registered the folder row and nothing walked the directory, so
+      // the card showed Files 0 / Last scan — until the next app restart (when
+      // boot reconciliation runs). Fire-and-forget: the handler returns the id
+      // immediately and the renderer re-reads stats once indexing progresses.
+      void runBootReconciliation({ registry, ingestionService, logger }).catch((err) => {
+        logger.error({
+          scope: 'knowledge-ipc',
+          event: 'add_folder_scan_error',
+          folderId: folder.id,
+          error: String(err),
+        });
+      });
       return { folderId: folder.id };
     },
   );
