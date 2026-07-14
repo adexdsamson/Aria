@@ -8,7 +8,11 @@ updated: 2026-06-10T00:00:00Z
 
 ## Current Test
 
-[awaiting human testing]
+number: 1
+name: Live morning briefing renders the WhatsApp section
+expected: |
+  After the 05:00 digest cron runs (or via the "Retry digest now" / runNow trigger), opening the daily briefing shows a WhatsApp section with one sub-section per tracked group (decisions / open questions / @mentions / waiting-on), summarized by the local model only.
+awaiting: user response
 
 ## Tests
 
