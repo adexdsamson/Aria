@@ -138,6 +138,15 @@
       "binaries": [
         "Contents/Resources/whisper-cli"
       ],
+      "extraResources": [
+        {
+          "from": "build/whisper/macos/",
+          "to": ".",
+          "filter": [
+            "whisper-cli"
+          ]
+        }
+      ],
       "target": [
         {
           "target": "dmg",
@@ -150,6 +159,19 @@
     },
     "win": {
       "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "build/whisper/windows/",
+          "to": ".",
+          "filter": [
+            "whisper-cli.exe",
+            "whisper.dll",
+            "ggml.dll",
+            "ggml-base.dll",
+            "ggml-cpu.dll"
+          ]
+        }
+      ],
       "target": [
         "nsis"
       ]
@@ -189,26 +211,6 @@
           "tray-iconTemplate*.png",
           "tray-iconBadgedTemplate*.png"
         ]
-      },
-      {
-        "from": "build/whisper/windows/",
-        "to": ".",
-        "filter": [
-          "whisper-cli.exe",
-          "whisper.dll",
-          "ggml.dll",
-          "ggml-base.dll",
-          "ggml-cpu.dll"
-        ],
-        "platform": "win32"
-      },
-      {
-        "from": "build/whisper/macos/",
-        "to": ".",
-        "filter": [
-          "whisper-cli"
-        ],
-        "platform": "darwin"
       }
     ]
   }

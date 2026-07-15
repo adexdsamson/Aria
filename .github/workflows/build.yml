@@ -45,6 +45,15 @@ jobs:
           MS_OAUTH_CLIENT_ID: ${{ secrets.MS_OAUTH_CLIENT_ID }}
           MS_OAUTH_TENANT_ID: ${{ secrets.MS_OAUTH_TENANT_ID }}
 
+      # Voice/whisper binaries are procured out-of-band and gitignored, so they
+      # are absent on CI runners. Create the empty staging dir electron-builder's
+      # win.extraResources `from` points at, so config validation + copy resolve
+      # (the filter simply matches nothing). Voice is excluded from CI builds
+      # until a procurement step is added; local builds still bundle whisper.
+      - name: Stage voice binaries dir (whisper excluded from CI)
+        shell: bash
+        run: mkdir -p build/whisper/windows
+
       - name: Package Windows installer
         run: npx electron-builder --win nsis --publish never
 
@@ -93,6 +102,13 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           MS_OAUTH_CLIENT_ID: ${{ secrets.MS_OAUTH_CLIENT_ID }}
           MS_OAUTH_TENANT_ID: ${{ secrets.MS_OAUTH_TENANT_ID }}
+
+      # See build-win: whisper is absent on CI. Create the empty staging dir
+      # mac.extraResources `from` points at so config + copy resolve. macOS
+      # build is unsigned (CSC_IDENTITY_AUTO_DISCOVERY: false), so mac.binaries
+      # signing is skipped and the missing whisper-cli is not a problem.
+      - name: Stage voice binaries dir (whisper excluded from CI)
+        run: mkdir -p build/whisper/macos
 
       - name: Package macOS DMG (unsigned)
         run: npx electron-builder --mac dmg --publish never
