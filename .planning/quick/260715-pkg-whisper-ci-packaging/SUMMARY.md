@@ -33,9 +33,20 @@ Local builds still bundle whisper (binaries present on the dev machine).
 - package.json valid JSON; extraResources restructured as intended.
 - CI run watched to completion (see STATE.md row for outcome).
 
+## Iteration 2 (mac ad-hoc signing)
+
+First push (b7f06f7): build-win GREEN (installer built + artifact uploaded);
+build-mac FAILED. Even unsigned (`CSC_IDENTITY_AUTO_DISCOVERY: false`),
+electron-builder falls back to AD-HOC signing, which still walks
+`mac.binaries` and runs `codesign` on `Contents/Resources/whisper-cli` →
+"No such file or directory" (whisper excluded from CI). Fix: removed the
+`mac.binaries` whisper-cli entry from package.json too.
+
 ## Follow-up (deferred)
 
 - Add whisper.cpp binary procurement to CI for a voice-capable installer.
+  When doing so, RE-ADD `mac.binaries: ["Contents/Resources/whisper-cli"]`
+  (removed here) so the procured binary gets ad-hoc/real signed.
 
 ## Files touched
 
