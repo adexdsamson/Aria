@@ -7,6 +7,7 @@
  * Enforces 50 MB hard skip and 5 MB extracted-text truncate.
  */
 import * as fsp from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { SIZE_LIMIT_BYTES, TEXT_TRUNCATE_BYTES, type ParsedDocument, type SectionLocator } from './text';
 
 export async function parse(absolutePath: string): Promise<ParsedDocument> {
@@ -23,8 +24,16 @@ export async function parse(absolutePath: string): Promise<ParsedDocument> {
   // import() into a CJS require() (which would throw ERR_REQUIRE_ESM on .mjs).
   const pdfjsSpecifier = 'pdfjs-dist/legacy/build/pdf.mjs';
   const pdfjs = (await import(pdfjsSpecifier)) as unknown as typeof import('pdfjs-dist');
-  // Disable worker for Node.js compatibility.
-  pdfjs.GlobalWorkerOptions.workerSrc = '';
+  // pdfjs v5 still spins up its worker in Electron's main process: pdf.js detects
+  // Electron as browser-like (not Node), so it takes the browser fake-worker path,
+  // which REQUIRES a loadable `workerSrc`. An empty string throws
+  // "Setting up fake worker failed: No GlobalWorkerOptions.workerSrc specified"
+  // and every PDF fails to parse (the earlier `workerSrc = ''` "disable" trick
+  // only worked under the old Node-detection path). Point it at the legacy worker
+  // .mjs as a file:// URL — a bare/OS path is not a valid ESM import specifier —
+  // so the in-process fake worker can import() it.
+  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
 
   const buf = await fsp.readFile(absolutePath);
   const typedArray = new Uint8Array(buf);
