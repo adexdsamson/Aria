@@ -1,0 +1,148 @@
+{
+  "generatedAt": "2026-09-08T16:31:20.713Z",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpuModel": "Intel(R) Core(TM) i5-8365U CPU @ 1.60GHz",
+    "cpuCount": 8,
+    "totalMemGb": 7.8,
+    "nodeVersion": "v22.23.0"
+  },
+  "retrieval": {
+    "corpus": {
+      "totalChunks": 680,
+      "topics": 12,
+      "chunksPerTopic": 40,
+      "dim": 768,
+      "modelId": "offline-hashing-vectorizer:v1"
+    },
+    "vectorBackend": "fallback",
+    "queries": 12,
+    "repeats": 20,
+    "strategies": [
+      {
+        "strategy": "bm25",
+        "queryForm": "natural",
+        "recallAt10": 0,
+        "precisionAt10": null,
+        "mrr": 0,
+        "ndcgAt10": 0,
+        "latencyMs": {
+          "n": 240,
+          "min": 0.16179999988526106,
+          "p50": 0.24270000029355288,
+          "p95": 0.43009999953210354,
+          "p99": 0.5777000002563,
+          "max": 1.1905999993905425,
+          "mean": 0.26558041664926957
+        }
+      },
+      {
+        "strategy": "vector",
+        "queryForm": "natural",
+        "recallAt10": 0.16041666666666668,
+        "precisionAt10": 0.6416666666666667,
+        "mrr": 0.9583333333333334,
+        "ndcgAt10": 0.7180766824527417,
+        "latencyMs": {
+          "n": 240,
+          "min": 11.885300000198185,
+          "p50": 14.186799999326468,
+          "p95": 23.271699999459088,
+          "p99": 34.5323999999091,
+          "max": 35.86869999952614,
+          "mean": 15.699324583308771
+        }
+      },
+      {
+        "strategy": "hybrid",
+        "queryForm": "natural",
+        "recallAt10": 0.16041666666666668,
+        "precisionAt10": 0.6416666666666667,
+        "mrr": 0.9583333333333334,
+        "ndcgAt10": 0.7180766824527417,
+        "latencyMs": {
+          "n": 240,
+          "min": 12.003899999894202,
+          "p50": 14.06499999947846,
+          "p95": 23.29769999999553,
+          "p99": 26.727699999697506,
+          "max": 32.877400000579655,
+          "mean": 15.502642083346533
+        }
+      },
+      {
+        "strategy": "bm25",
+        "queryForm": "keywords",
+        "recallAt10": 0.1708333333333333,
+        "precisionAt10": 1,
+        "mrr": 1,
+        "ndcgAt10": 0.7801129508110015,
+        "latencyMs": {
+          "n": 240,
+          "min": 0.1398999998345971,
+          "p50": 0.1552999997511506,
+          "p95": 0.3077000007033348,
+          "p99": 0.3980000000447035,
+          "max": 0.4945999998599291,
+          "mean": 0.18165000003452103
+        }
+      },
+      {
+        "strategy": "vector",
+        "queryForm": "keywords",
+        "recallAt10": 0.23958333333333334,
+        "precisionAt10": 0.9583333333333334,
+        "mrr": 1,
+        "ndcgAt10": 0.969862659473233,
+        "latencyMs": {
+          "n": 240,
+          "min": 10.609600000083447,
+          "p50": 12.246000000275671,
+          "p95": 15.457499999552965,
+          "p99": 16.926799999549985,
+          "max": 17.17769999988377,
+          "mean": 12.729832083339959
+        }
+      },
+      {
+        "strategy": "hybrid",
+        "queryForm": "keywords",
+        "recallAt10": 0.24166666666666667,
+        "precisionAt10": 0.9666666666666667,
+        "mrr": 1,
+        "ndcgAt10": 0.9771227079927995,
+        "latencyMs": {
+          "n": 240,
+          "min": 11.01509999949485,
+          "p50": 13.11629999987781,
+          "p95": 18.23410000000149,
+          "p99": 22.236899999901652,
+          "max": 24.601400000043213,
+          "mean": 13.803799166673949
+        }
+      }
+    ]
+  },
+  "routingOffline": {
+    "mode": "offline",
+    "prompts": 18,
+    "piiDetected": 1,
+    "categoryCaughtByRegex": 0,
+    "benignFalsePositive": 0,
+    "latencyMs": {
+      "n": 900,
+      "min": 0.002199999988079071,
+      "p50": 0.004399999976158142,
+      "p95": 0.0072999997064471245,
+      "p99": 0.02389999944716692,
+      "max": 0.691300000064075,
+      "mean": 0.006588444455216328
+    }
+  },
+  "routingLive": {
+    "mode": "skipped",
+    "reason": "ollama-unreachable",
+    "detail": "nothing listening on http://127.0.0.1:11434 (ECONNREFUSED)"
+  }
+}

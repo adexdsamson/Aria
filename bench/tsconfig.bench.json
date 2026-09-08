@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.node.json",
+  "compilerOptions": {
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "electron": ["bench/stubs/electron.ts"]
+    }
+  },
+  "include": ["../bench/**/*", "../src/main/**/*", "../src/shared/**/*"]
+}
