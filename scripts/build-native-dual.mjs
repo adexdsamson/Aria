@@ -18,7 +18,8 @@
  *   1. electron-rebuild (already run by postinstall.mjs OR by this script)
  *        → produces ABI-145 binary at build/Release/better_sqlite3.node
  *   2. Copy aside as build/Release/better_sqlite3.electron.node
- *   3. node-gyp rebuild (against system Node headers)
+ *   3. node-gyp rebuild (against system Node headers) — node-gyp is located by
+ *      tiered resolution (see resolveNodeGyp), never at a fixed hoisted path
  *        → overwrites build/Release/better_sqlite3.node with ABI-141
  *   4. Copy aside as build/Release/better_sqlite3.node-node
  *   5. Restore the Electron binary as the active build/Release/better_sqlite3.node
@@ -34,11 +35,15 @@
  */
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const require = createRequire(import.meta.url);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
+const NODE_MODULES = path.join(REPO, 'node_modules');
 const PKG_DIR = path.join(
   REPO,
   'node_modules',
@@ -81,8 +86,108 @@ function copy(src, dst) {
   console.log(`[dual-build] cp ${path.basename(src)} -> ${path.basename(dst)}`);
 }
 
+const NODE_GYP_SUBPATH = 'node-gyp/bin/node-gyp.js';
+
+/**
+ * Locate node-gyp WITHOUT depending on a hoisted `node_modules/node-gyp`.
+ *
+ * node-gyp is not a direct dependency of this repo — it arrives transitively
+ * through `@electron/rebuild`. Under pnpm's strict (non-hoisted) layout it
+ * therefore lives only inside `node_modules/.pnpm/`, and the old hardcoded
+ * `node_modules/node-gyp/bin/node-gyp.js` path only ever worked because of a
+ * stale hoist artifact left behind by an older install.
+ *
+ * Tiers are ordered declared-dependency-first on purpose: a planted
+ * `.pnpm/node-gyp@<higher-version>` directory can never pre-empt a node-gyp
+ * that is legitimately reachable through the dependency graph.
+ *
+ * @returns {{ path: string, tier: string }}
+ */
+function resolveNodeGyp() {
+  // Tier 1 — direct: wins if node-gyp is hoisted or declared as a direct
+  // dependency (e.g. someone later runs `pnpm add -D node-gyp`).
+  try {
+    return { path: require.resolve(NODE_GYP_SUBPATH), tier: 'direct' };
+  } catch {
+    /* fall through */
+  }
+
+  // Tier 2 — via @electron/rebuild: the dependency edge that actually supplies
+  // node-gyp here. Anchor on the package MAIN ENTRY, not its package.json —
+  // that manifest subpath is blocked by the package's `exports` map
+  // (ERR_PACKAGE_PATH_NOT_EXPORTED). This deliberately reuses the very same
+  // node-gyp that electron-rebuild drives in step 1, so both halves of the
+  // dual build are produced by one builder.
+  try {
+    const anchor = require.resolve('@electron/rebuild');
+    const anchored = createRequire(anchor);
+    return { path: anchored.resolve(NODE_GYP_SUBPATH), tier: '@electron/rebuild' };
+  } catch {
+    /* fall through */
+  }
+
+  // Tier 3 — pnpm scan: dependency-free readdir of the virtual store. Last
+  // resort; covers partial installs where the dependency graph is unreadable.
+  try {
+    const store = path.join(NODE_MODULES, '.pnpm');
+    const candidates = fs
+      .readdirSync(store)
+      .filter((entry) => entry.startsWith('node-gyp@'))
+      .sort()
+      .reverse();
+    for (const entry of candidates) {
+      const candidate = path.join(
+        store,
+        entry,
+        'node_modules',
+        'node-gyp',
+        'bin',
+        'node-gyp.js',
+      );
+      if (fs.existsSync(candidate)) {
+        return { path: candidate, tier: 'pnpm-scan' };
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  console.error('[dual-build] x could not locate node-gyp.');
+  console.error('[dual-build] x tried, in order:');
+  console.error(`[dual-build] x   1. direct resolution of "${NODE_GYP_SUBPATH}"`);
+  console.error(`[dual-build] x   2. resolution of "${NODE_GYP_SUBPATH}" via @electron/rebuild`);
+  console.error(`[dual-build] x   3. filesystem scan of ${path.join(NODE_MODULES, '.pnpm')} for node-gyp@*`);
+  console.error('[dual-build] x remedies:');
+  console.error('[dual-build] x   - re-run the install (node-gyp ships transitively via @electron/rebuild)');
+  console.error('[dual-build] x   - or declare it explicitly:  pnpm add -D node-gyp');
+  process.exit(1);
+}
+
 const args = new Set(process.argv.slice(2));
 const nodeOnly = args.has('--node-only');
+const printNodeGyp = args.has('--print-node-gyp');
+
+// Resolve once; the same value feeds both --print-node-gyp and the step-3 spawn.
+const nodeGyp = resolveNodeGyp();
+// Diagnostics go to stderr so --print-node-gyp stdout stays pipe-clean.
+console.error(`[dual-build] node-gyp via ${nodeGyp.tier}: ${nodeGyp.path}`);
+{
+  const rel = path.relative(NODE_MODULES, nodeGyp.path);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    // Warning only, never fatal: git worktrees in this repo junction
+    // node_modules back to the main checkout, so an out-of-repo realpath is
+    // legitimate here. Surfacing it keeps an unexpected source visible.
+    console.error(
+      `[dual-build] ! node-gyp resolved OUTSIDE ${NODE_MODULES} — expected under a worktree junction; verify if unexpected.`,
+    );
+  }
+}
+
+if (printNodeGyp) {
+  // Diagnostic probe: resolve and report only. No rebuild, no copy.
+  process.stdout.write(`${nodeGyp.path}\n`);
+  process.exit(0);
+}
 
 if (!nodeOnly) {
   // Step 1: build for Electron ABI. postinstall.mjs has already done this,
@@ -107,7 +212,7 @@ if (!nodeOnly) {
 // Invoke the JS entrypoint directly so Windows shell resolution doesn't
 // interfere with the rebuild path.
 run('node-gyp rebuild', process.execPath, [
-  path.join(REPO, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'),
+  nodeGyp.path,
   'rebuild',
 ], PKG_DIR);
 
