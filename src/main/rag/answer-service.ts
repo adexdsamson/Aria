@@ -314,8 +314,27 @@ export function createAnswerService(deps: AnswerServiceDeps): AnswerService {
       return { kind: 'error', text: ERROR_TEXT, detail: 'retrieve-failed' };
     }
 
+    // [diag 260715-pdf] retrieval visibility — counts only, no text (log hygiene).
+    logger.info(
+      {
+        scope: 'rag.answer-service',
+        event: 'retrieved',
+        count: retrieved.length,
+        accounts: req.accountFilter?.length ?? 0,
+        kinds: retrieved.reduce<Record<string, number>>((m, c) => {
+          m[c.sourceKind] = (m[c.sourceKind] ?? 0) + 1;
+          return m;
+        }, {}),
+      },
+      'rag.answer-service.retrieved',
+    );
+
     // 4. Empty retrieval → refusal turn + refusal result.
     if (retrieved.length === 0) {
+      logger.info(
+        { scope: 'rag.answer-service', event: 'refusal', reason: 'no-sources' },
+        'rag.answer-service.refusal',
+      );
       appendTurn(db, { threadId, role: 'user', text: req.question });
       const refusalTurn = appendTurn(db, {
         threadId,
@@ -397,6 +416,17 @@ export function createAnswerService(deps: AnswerServiceDeps): AnswerService {
 
     // 8. All-dropped → refusal.
     if (!validated) {
+      logger.info(
+        {
+          scope: 'rag.answer-service',
+          event: 'refusal',
+          reason: 'citations-empty',
+          chunks: routerChunks.length,
+          route: decision.route,
+          hadRaw: raw != null,
+        },
+        'rag.answer-service.refusal',
+      );
       appendTurn(db, { threadId, role: 'user', text: req.question });
       const refusalTurn = appendTurn(db, {
         threadId,

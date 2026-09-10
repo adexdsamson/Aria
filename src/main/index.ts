@@ -111,6 +111,13 @@ import { createFolderRegistry } from './folder-ingestion/folder-registry';
 import { createFolderIngestionService } from './folder-ingestion/ingestion-service';
 import { PARSERS } from './folder-ingestion/parsers/index';
 import { strategyC } from './rag/chunk-strategies';
+// Background embedding worker — drains rag_source_dirty and produces the vectors
+// hybrid retrieval needs. It was implemented (rag/index-worker.ts) but never
+// wired into bootstrap, so vector search always returned 0 and Ask Aria could
+// never answer from indexed content. Started at the post-unlock seam below.
+import { createIndexWorker, type IndexWorker } from './rag/index-worker';
+import { createEmbedClient } from './rag/ollama-embeddings';
+import { getVectorStore } from './rag/vector-store';
 import {
   readBgPref,
   reconcileAutoLaunchOnBoot,
@@ -161,6 +168,8 @@ let _trayHandle: TrayHandle | null = null;
  * manager.stop() when disconnecting a whatsapp account.
  */
 let whatsAppManager: WhatsAppSessionManager | null = null;
+// Background embedding worker handle — started post-unlock, stopped on quit.
+let indexWorker: IndexWorker | null = null;
 
 /**
  * Plan 21-06 — module-level WhatsApp digest cron handle.
@@ -587,6 +596,30 @@ async function bootstrap(): Promise<void> {
           );
         });
 
+        // Start the background embedding worker now that the DB is unlocked.
+        // Without this, chunks written by ingestion stay dirty=1 forever, no
+        // vectors are produced, and hybrid retrieval's vector arm always returns
+        // 0 (Ask Aria answers nothing from indexed content). Same embedClient /
+        // vectorStore construction the answer-service factory uses (ipc/index.ts).
+        try {
+          indexWorker = createIndexWorker({
+            db: kfDb,
+            logger,
+            embedClient: createEmbedClient(),
+            vectorStore: getVectorStore(kfDb),
+          });
+          indexWorker.start();
+          logger.info(
+            { scope: 'rag.index-worker', event: 'started' },
+            'embedding worker started (post-unlock)',
+          );
+        } catch (err) {
+          logger.warn(
+            { scope: 'rag.index-worker', err: (err as Error).message },
+            'embedding worker failed to start',
+          );
+        }
+
         // Plan 20-06 — WhatsApp IPC wiring (post-unlock, boot-safe, WA-12).
         //
         // Pre-unlock: registerHandlers() registered 'db-locked' stubs for the 5
@@ -901,6 +934,12 @@ app.on('before-quit', () => {
     /* best-effort */
   }
   _trayHandle = null;
+  try {
+    indexWorker?.stop();
+  } catch {
+    /* best-effort */
+  }
+  indexWorker = null;
   void stopKnowledgeFolderLifecycle(getLogger());
 });
 
